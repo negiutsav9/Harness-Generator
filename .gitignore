@@ -35,9 +35,9 @@ env/
 .DS_Store
 
 # Project-specific directories
-backend/harnesses/
-backend/verification/
-backend/reports/
+source/harnesses/
+source/verification/
+source/reports/
 
 # ChromaDB files
 .chroma/

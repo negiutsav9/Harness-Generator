@@ -244,7 +244,7 @@ def setup_llm():
         anthropic_api_key=api_key,
         temperature=0.2,  # Lower temperature for more deterministic code generation
         max_tokens=4000,  # Ensure we have enough tokens for complete responses
-        system=system_prompt,  # Use our custom system prompt
+        model_kwargs={"system": system_prompt},  # Use model_kwargs for the system prompt
     )
     
     return llm
@@ -264,6 +264,9 @@ class HarnessGenerationState(MessagesState):
     processed_functions: List[str] = []  # Track functions that have been processed
     improvement_recommendation: str = ""  # Store recommendations for harness improvement
     loop_counter: int = 0  # Counter to detect and prevent infinite loops
+    
+    # New field to track harness version history
+    harness_history: Dict[str, List[str]] = {}
     
     # Progress tracking
     total_functions: int = 0  # Total number of functions to process
@@ -863,6 +866,19 @@ def generator_node(state):
     improvement_recommendation = state.get("improvement_recommendation", "")
     is_refinement = bool(improvement_recommendation)
     
+    # Track harness history in the state if not already present
+    harness_history = state.get("harness_history", {})
+    if func_name not in harness_history:
+        harness_history[func_name] = []
+    
+    # Get the previous harness if this is a refinement
+    previous_harness = ""
+    if is_refinement and func_name in state.get("harnesses", {}):
+        previous_harness = state.get("harnesses", {})[func_name]
+        # Add to history if not already there
+        if previous_harness not in harness_history[func_name]:
+            harness_history[func_name].append(previous_harness)
+    
     # Get function code from CodeDB if not refining
     if not is_refinement:
         function_result = code_collection.get(ids=[func_name], include=["documents", "metadatas"])
@@ -879,27 +895,55 @@ def generator_node(state):
         # Get pattern information from PatternDB
         patterns_result = query_pattern_db(func_code)
         
-        # CBMC verification information
-        cbmc_verification_info = """
-        CBMC Verification Options Guide:
+        # Analyze function to determine which checks are actually needed
+        has_malloc = "malloc(" in func_code
+        has_free = "free(" in func_code
+        has_array_access = "[" in func_code and "]" in func_code
+        has_pointer_arithmetic = "*" in func_code or "->" in func_code
+        has_division = "/" in func_code or "%" in func_code
+        has_type_conversion = "(" in func_code and ")" in func_code and any(type_name in func_code for type_name in ["int", "char", "float", "double", "size_t", "unsigned", "long"])
         
-        1. --memory-leak-check: Checks for memory that is allocated but not freed.
-        2. --memory-cleanup-check: Verifies all allocated memory is properly freed before program exit
-        3. --bounds-check: Verifies array accesses are within bounds
-        4. --pointer-overflow-check: Detects pointer arithmetic that results in overflow
-        5. --conversion-check: Detects problematic type conversions
-        6. --div-by-zero-check: Checks for division by zero errors
+        # Produce targeted verification guide based on actual function contents
+        verification_checks = []
+        if has_malloc or has_free:
+            verification_checks.append("--memory-leak-check: Verify memory is properly allocated and freed")
+        if has_array_access:
+            verification_checks.append("--bounds-check: Verify array accesses are within bounds")
+        if has_pointer_arithmetic:
+            verification_checks.append("--pointer-overflow-check: Verify pointer arithmetic is safe")
+        if has_division:
+            verification_checks.append("--div-by-zero-check: Verify divisors are non-zero")
+        if has_type_conversion:
+            verification_checks.append("--conversion-check: Verify type conversions are safe")
         
-        The harness should use:
-        - __CPROVER_assert() to verify properties
-        - __CPROVER_assume() to specify valid input ranges
-        - Nondet functions like nondet_int() for inputs
+        # Construct the verification guide
+        if verification_checks:
+            verification_guide = "Relevant CBMC Verification Checks for this function:\n" + "\n".join(verification_checks)
+        else:
+            verification_guide = "This function doesn't appear to need special CBMC verification checks beyond basic assertions."
+        
+        # Clear guidance about avoiding unnecessary mocks
+        cbmc_verification_info = f"""
+        {verification_guide}
+        
+        IMPORTANT GUIDELINES:
+        
+        1. Do NOT create mock implementations that aren't necessary for verification.
+        2. Focus ONLY on testing the actual function behavior, not on artificial scenarios.
+        3. Only implement verification checks that are relevant to this specific function.
+        4. Avoid creating test cases for verification types that don't apply to this function.
+        5. Keep the harness minimal and focused on real potential issues.
+        
+        The harness should:
+        - Use __CPROVER_assert() only for properties that could actually fail in this function
+        - Use __CPROVER_assume() to specify realistic input constraints
+        - Use nondet functions like nondet_int() for inputs that need to be nondeterministic
         """
         
-        # Build generator prompt
+        # Build generator prompt with focused verification
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
-        Create a CBMC-compatible harness for the following function that might have memory or arithmetic issues:
+        Create a MINIMAL, FOCUSED harness for the following function WITHOUT unnecessary mocks:
         
         ```c
         {func_code}
@@ -908,49 +952,61 @@ def generator_node(state):
         Function metadata:
         - Return type: {func_metadata.get("return_type", "void")}
         - Parameters: {func_metadata.get("params", "")}
-        - Contains malloc: {func_metadata.get("has_malloc", False)}
-        - Contains free: {func_metadata.get("has_free", False)}
+        - Contains malloc: {has_malloc}
+        - Contains free: {has_free}
         
         Matching vulnerability patterns:
         {json.dumps(patterns_result.get('matching_patterns', {}), indent=2)}
         
         {cbmc_verification_info}
         
-        The harness should:
-        1. Create realistic or nondeterministic inputs for the function using CBMC's nondet functions
-        2. Set up appropriate CBMC assertions and assumptions (__CPROVER_assert, __CPROVER_assume)
-        3. Properly call the function and check its behavior
-        4. Include checks for memory leaks, bounds violations, division by zero, etc.
-        5. Follow CBMC's harness structure with a void main() function
-        6. Be complete and properly formatted, ending with closing braces for all opened blocks
+        CRITICAL INSTRUCTIONS:
+        1. DO NOT create mock implementations of functions that aren't directly related to verification
+        2. DO NOT implement stubs or test code just to satisfy CBMC checklist items
+        3. ONLY verify properties that are relevant to this specific function
+        4. DO NOT add checks for issues that cannot occur in this function
+        5. Keep the harness SMALL and FOCUSED - don't add anything that isn't necessary
+        6. If function dependencies are unavailable, minimize assumptions rather than creating elaborate mocks
+        7. Follow CBMC's harness structure with a void main() function
         
-        Provide only the harness code without explanation.
+        Provide only the minimal, focused harness code without explanation.
         """
     else:
-        # For refinement, use the recommendation from the evaluator
+        # For refinement, use targeted improvement guidance
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
-        You need to REFINE an existing harness based on evaluation feedback.
+        You need to REFINE an existing harness based on evaluation feedback, focusing on ELIMINATING UNNECESSARY MOCKS.
         
         {improvement_recommendation}
         
-        Create an improved version of the harness that addresses all the identified issues.
+        Previous harness code that you should improve:
+        ```c
+        {previous_harness}
+        ```
+        
+        Create an improved version of the harness that addresses the identified issues while REMOVING UNNECESSARY CODE.
+        
+        CRITICAL INSTRUCTIONS:
+        1. REMOVE any mock implementations that aren't directly necessary for verification
+        2. ELIMINATE any test code that's just there to satisfy CBMC checklist items
+        3. FOCUS only on testing real properties of the function that matter
+        4. SIMPLIFY the harness - remove anything that isn't directly testing the function
+        5. KEEP only the minimal verification needed to properly test the function
+        6. AVOID adding checks for issues that cannot occur in this function
+        
         The harness must use CBMC's special functions:
-        - __CPROVER_assert() for verification
-        - __CPROVER_assume() for constraints
+        - __CPROVER_assert() for verification of properties that actually matter
+        - __CPROVER_assume() for realistic constraints
         - nondet functions for inputs
         
-        Pay special attention to CBMC error messages and ensure the new harness properly tests for these issues.
+        Make sure your harness is complete and properly formatted.
         
-        Make sure your harness is complete - include all necessary closing braces and proper formatting.
-        The harness must compile and execute correctly in the CBMC environment.
-        
-        Provide only the improved harness code without explanation.
+        Provide only the improved, minimal harness code without explanation.
         """
     
-    # Generate the harness - using the proper Anthropic API format
+    # Generate the harness
     try:
-        # Fix: Correctly setup messages for the LLM
+        # Setup messages for the LLM
         response = llm.invoke([
             HumanMessage(content=generator_prompt)
         ])
@@ -979,6 +1035,10 @@ def generator_node(state):
                 if "int main" not in harness_code and "void main" not in harness_code:
                     harness_code += "\n\nvoid main() {\n    // Auto-generated main function\n}"
         
+        # Save the new harness to history
+        if harness_code not in harness_history[func_name]:
+            harness_history[func_name].append(harness_code)
+        
         # Update the harnesses dictionary
         harnesses = state.get("harnesses", {}).copy()
         harnesses[func_name] = harness_code
@@ -988,7 +1048,6 @@ def generator_node(state):
         version_num = refinement_num + 1
         
         # Create organized directory structure for harnesses
-        # Create base directories
         harness_base_dir = "harnesses"
         os.makedirs(harness_base_dir, exist_ok=True)
         
@@ -1016,8 +1075,9 @@ def generator_node(state):
         
         # Clear improvement recommendation after processing
         return {
-            "messages": [AIMessage(content=f"{'Refined' if is_refinement else 'Generated'} harness for function {func_name} in {generation_time:.2f}s and saved to {filename}")],
+            "messages": [AIMessage(content=f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s (without unnecessary mocks)")],
             "harnesses": harnesses,
+            "harness_history": harness_history,
             "improvement_recommendation": "",
             "function_times": function_times,
             "next": "cbmc"  # Proceed to CBMC verification
@@ -1045,7 +1105,7 @@ def generator_node(state):
 
 # Node 6: CBMC - Executes CBMC tool for current function (avoiding process forking)
 def cbmc_node(state):
-    """Executes CBMC verification on the current function's harness with improved error handling."""
+    """Executes CBMC verification on the current function's harness using sources from verification/sources directory."""
     import time
     import os
     import re
@@ -1078,7 +1138,6 @@ def cbmc_node(state):
     os.makedirs(func_verification_dir, exist_ok=True)
     
     # Create proper directory structure for verification
-    # Keep all files in a flat structure to avoid path nesting issues
     verification_src_dir = os.path.join(verification_base_dir, "src")
     os.makedirs(verification_src_dir, exist_ok=True)
     
@@ -1099,8 +1158,6 @@ def cbmc_node(state):
     version_num = refinement_num + 1
     
     # Define CBMC_MAX_OBJECT_SIZE
-    # This is typically defined in the Makefile.common
-    # Set a reasonable default value that works well with most CBMC proofs
     cbmc_max_object_size = 1024 * 1024  # 1MB is a typical reasonable size
     
     # Create a header file with the CBMC_MAX_OBJECT_SIZE definition
@@ -1163,15 +1220,27 @@ def cbmc_node(state):
         with open(source_file, "w") as f:
             f.write(state.get("source_code", ""))
     
-    # Find the first source file to use as the main source file for CBMC
-    source_files = [f for f in os.listdir(verification_src_dir) if f.endswith(('.c', '.cpp'))]
-    if source_files:
-        source_file = os.path.join(verification_src_dir, source_files[0])
+    # Find source files - MODIFIED to prioritize verification/sources directory
+    source_files = []
+    
+    # First, look for files in the sources directory
+    sources_dir_files = [f for f in os.listdir(verification_sources_dir) if f.endswith(('.c', '.cpp'))]
+    if sources_dir_files:
+        # Use all files from the sources directory
+        for file in sources_dir_files:
+            source_files.append(os.path.join(verification_sources_dir, file))
     else:
-        # Create a fallback source file if no source files were found
-        source_file = os.path.join(verification_src_dir, "source.c")
-        with open(source_file, "w") as f:
-            f.write("// Fallback source file\n")
+        # Fall back to src directory if no files in sources directory
+        src_dir_files = [f for f in os.listdir(verification_src_dir) if f.endswith(('.c', '.cpp'))]
+        if src_dir_files:
+            for file in src_dir_files:
+                source_files.append(os.path.join(verification_src_dir, file))
+        else:
+            # Create a fallback source file if no source files were found
+            fallback_source = os.path.join(verification_src_dir, "source.c")
+            with open(fallback_source, "w") as f:
+                f.write("// Fallback source file\n")
+            source_files.append(fallback_source)
             
     # Write harness to file - use original function name in the filename
     harness_filename = original_func_name if ":" not in func_name else original_func_name
@@ -1243,32 +1312,35 @@ def cbmc_node(state):
                 shutil.copy2(src_file, dest_file)
                 print(f"Copied CBMC source file: {file}")
     
-    # Build list of CBMC command parameters
+    # Build list of CBMC command parameters - MODIFIED to use sources from verification/sources
     cbmc_cmd = [
         "cbmc",
-        source_file,
-        harness_file,
+    ]
+    
+    # Add source files from verification/sources first
+    for file in os.listdir(verification_sources_dir):
+        if file.endswith(('.c', '.cpp')):
+            source_file_path = os.path.join(verification_sources_dir, file)
+            cbmc_cmd.append(source_file_path)
+    
+    # Add the harness file
+    cbmc_cmd.append(harness_file)
+    
+    # Add main CBMC options
+    cbmc_cmd.extend([
         "--function", "main",
         "--memory-leak-check",
         "--memory-cleanup-check",
         "--bounds-check",
         "--pointer-overflow-check",
-        "--conversion-check",
         "--div-by-zero-check",
-        "--trace",  # Add trace for more detailed output
         f"--object-bits", "8",  # Default for CBMC_OBJECT_BITS
-    ]
+    ])
     
     # Add CBMC object size constraint definition
     cbmc_cmd.extend([
         "-DCBMC_MAX_OBJECT_SIZE=" + str(cbmc_max_object_size)
     ])
-    
-    # Add all source files from the sources directory to ensure proper verification
-    for file in os.listdir(verification_sources_dir):
-        if file.endswith(('.c', '.cpp')):
-            source_file_path = os.path.join(verification_sources_dir, file)
-            cbmc_cmd.append(source_file_path)
     
     # Add stub files as needed
     for file in os.listdir(verification_stubs_dir):
@@ -2000,10 +2072,35 @@ def output_node(state):
             if result.get("suggestions"):
                 header.append(f"Suggestions: {result['suggestions']}")
             
-            # List all harness versions
-            header.append(f"Files: ")
+            # Add harness evolution information
+            harness_history = state.get("harness_history", {}).get(func_name, [])
+            if harness_history:
+                header.append(f"Harness Evolution:")
+                for i, _ in enumerate(harness_history):
+                    header.append(f"  - Version {i+1}: harnesses/{func_name}/v{i+1}.c")
+                
+                # Add improvement metrics if there were multiple versions
+                if len(harness_history) > 1:
+                    # Compare first and last version
+                    first_version = harness_history[0]
+                    last_version = harness_history[-1]
+                    
+                    # Basic line count comparison
+                    first_lines = len(first_version.split('\n'))
+                    last_lines = len(last_version.split('\n'))
+                    line_diff = last_lines - first_lines
+                    
+                    header.append(f"  - Size evolution: Initial {first_lines} lines → Final {last_lines} lines ({'+' if line_diff > 0 else ''}{line_diff} lines)")
+                    
+                    # Check if final version addressed verification issues
+                    if result['status'] == 'SUCCESS':
+                        header.append(f"  - Refinement result: Successfully addressed all verification issues")
+                    else:
+                        header.append(f"  - Refinement result: Some issues remain after {refinements} refinements")
+            
+            # List all verification reports
+            header.append(f"Verification Reports: ")
             for i in range(1, refinements + 2):  # +2 because initial version is 1, and we need to go one past the refinement count
-                header.append(f"  - harnesses/{func_name}/v{i}.c")
                 header.append(f"  - verification/{func_name}/v{i}_results.txt")
                 header.append(f"  - verification/{func_name}/v{i}_report.md")
     
@@ -2051,7 +2148,7 @@ def output_node(state):
         # Table of function reports
         f.write("<h2>Function Reports</h2>")
         f.write("<table>")
-        f.write("<tr><th>Function</th><th>File</th><th>Status</th><th>Reports</th></tr>")
+        f.write("<tr><th>Function</th><th>File</th><th>Status</th><th>Versions</th><th>Reports</th></tr>")
         
         for func_name in state.get("vulnerable_functions", []):
             if func_name in state.get("cbmc_results", {}):
@@ -2075,15 +2172,71 @@ def output_node(state):
                 else:
                     status_style = "style='color:gray;font-weight:bold'"
                 
-                f.write(f"<tr><td>{display_name}</td><td>{file_name}</td><td {status_style}>{result['status']}</td><td>")
+                # Get version count
+                version_count = len(state.get("harness_history", {}).get(func_name, [])) or refinements + 1
+                
+                f.write(f"<tr><td>{display_name}</td><td>{file_name}</td><td {status_style}>{result['status']}</td>")
+                
+                # Add links to all harness versions 
+                f.write("<td>")
+                for i in range(1, version_count + 1):
+                    f.write(f"<a href='../harnesses/{func_name}/v{i}.c'>v{i}</a> ")
+                f.write("</td>")
                 
                 # Add links to all version reports
+                f.write("<td>")
                 for i in range(1, refinements + 2):
                     f.write(f"<a href='../verification/{func_name}/v{i}_report.md'>v{i}</a> ")
-                
                 f.write("</td></tr>")
         
         f.write("</table>")
+        
+        # Add evolution section if any functions have multiple versions
+        evolution_data = [func for func in state.get("vulnerable_functions", []) 
+                         if len(state.get("harness_history", {}).get(func, [])) > 1]
+        
+        if evolution_data:
+            f.write("<h2>Harness Evolution</h2>")
+            f.write("<p>The following functions underwent multiple iterations of refinement:</p>")
+            
+            f.write("<table>")
+            f.write("<tr><th>Function</th><th>Versions</th><th>Final Status</th><th>Line Count Evolution</th></tr>")
+            
+            for func_name in evolution_data:
+                history = state.get("harness_history", {}).get(func_name, [])
+                versions = len(history)
+                status = state.get("cbmc_results", {}).get(func_name, {}).get("status", "UNKNOWN")
+                
+                # Calculate line count evolution
+                if len(history) > 1:
+                    first_lines = len(history[0].split('\n'))
+                    last_lines = len(history[-1].split('\n'))
+                    line_diff = last_lines - first_lines
+                    line_evolution = f"{first_lines} → {last_lines} ({'+' if line_diff > 0 else ''}{line_diff})"
+                else:
+                    line_evolution = "N/A"
+                
+                # Determine status color
+                status_style = ""
+                if status == "SUCCESS":
+                    status_style = "style='color:green;font-weight:bold'"
+                elif status == "FAILED":
+                    status_style = "style='color:red;font-weight:bold'"
+                elif status == "TIMEOUT":
+                    status_style = "style='color:orange;font-weight:bold'"
+                else:
+                    status_style = "style='color:gray;font-weight:bold'"
+                
+                # Extract display name
+                display_name = func_name
+                if ":" in func_name:
+                    _, display_name = func_name.split(":", 1)
+                
+                f.write(f"<tr><td>{display_name}</td><td>{versions}</td>")
+                f.write(f"<td {status_style}>{status}</td><td>{line_evolution}</td></tr>")
+            
+            f.write("</table>")
+        
         f.write("</body></html>")
     
     return {
