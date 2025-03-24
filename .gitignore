@@ -35,8 +35,8 @@ env/
 .DS_Store
 
 # Project-specific directories
-source/
-source/*.py
+origin/
+origin/*.py
 harnesses
 verification
 reports
