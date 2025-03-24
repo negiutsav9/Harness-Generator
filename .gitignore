@@ -35,9 +35,11 @@ env/
 .DS_Store
 
 # Project-specific directories
-source/harnesses/
-source/verification/
-source/reports/
+source/
+source/*.py
+harnesses
+verification
+reports
 
 # ChromaDB files
 .chroma/

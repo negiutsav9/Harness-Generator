@@ -26,8 +26,6 @@ The system is particularly effective at detecting:
 
 The system follows a workflow design pattern with distinct processing nodes:
 
-![CBMC Harness Generation System Workflow](SystemWorkflow.png)
-
 ### Main Components
 
 - **Frontend**: Processes source code inputs
@@ -52,10 +50,43 @@ The system follows a workflow design pattern with distinct processing nodes:
 9. If no refinement is needed, Junction processes the next function
 10. After all functions are processed, Output generates comprehensive reports
 
+## Project Structure
+
+```
+├── main.py                      # Main entry point
+├── requirements.txt             # Python dependencies
+├── setup.sh                     # Setup script
+│
+├── core/                        # Core components
+│   ├── state.py                 # State definitions
+│   ├── workflow.py              # LangGraph workflow
+│   └── embedding_db.py          # Database operations
+│
+├── nodes/                       # Workflow nodes
+│   ├── frontend.py              # Frontend node
+│   ├── code_embedding.py        # Code embedding node
+│   ├── analyzer.py              # Analyzer node
+│   ├── junction.py              # Junction node
+│   ├── generator.py             # Generator node
+│   ├── cbmc.py                  # CBMC execution node
+│   ├── evaluator.py             # Harness evaluator
+│   └── output.py                # Output node
+│
+├── utils/                       # Utilities
+│   ├── code_parser.py           # Code parsing
+│   ├── file_utils.py            # File handling
+│   └── llm_utils.py             # LLM setup
+│
+├── harnesses/                   # Generated harnesses (created at runtime)
+├── verification/                # Verification results (created at runtime)
+├── reports/                     # Summary reports (created at runtime)
+```
+
 ## Requirements
 
 - Python 3.8+
 - CBMC (Model Checker for C)
+- Anthropic API key for Claude
 - Python libraries (see requirements.txt)
 
 ## Installation
@@ -66,13 +97,21 @@ git clone https://github.com/yourusername/cbmc-harness-generator.git
 cd cbmc-harness-generator
 ```
 
-2. Install Python dependencies
+2. Run the setup script
 ```bash
-pip install -r requirements.txt
+chmod +x setup.sh
+./setup.sh
 ```
 
-3. Install CBMC
-   - Ubuntu/Debian: `apt-get install cbmc`
+The setup script will:
+- Check if Python 3.8+ is installed
+- Check if CBMC is installed
+- Install Python dependencies
+- Create necessary directories
+- Help you set up your Anthropic API key
+
+3. If CBMC is not installed, follow the instructions to install it:
+   - Ubuntu/Debian: `sudo apt-get install cbmc`
    - macOS: `brew install cbmc`
    - Windows: Download from [CBMC GitHub Releases](https://github.com/diffblue/cbmc/releases)
 
@@ -81,13 +120,13 @@ pip install -r requirements.txt
 ### Analyzing a single file
 
 ```bash
-python cbmc_generation_tool.py -f path/to/your/file.c
+python main.py -f path/to/your/file.c
 ```
 
 ### Analyzing a directory of C files
 
 ```bash
-python cbmc_generation_tool.py -d path/to/your/project
+python main.py -d path/to/your/project
 ```
 
 ## Output
@@ -98,13 +137,7 @@ The tool generates several output directories:
 - `verification/`: Contains CBMC verification results and reports
 - `reports/`: Contains summary reports with an HTML index
 
-## Example
-
-```bash
-python cbmc_generation_tool.py -f examples/sample.c
-```
-
-Then open `reports/index.html` in a web browser to see the results.
+Open `reports/index.html` in a web browser to see the complete verification results.
 
 ## Features
 
@@ -112,16 +145,12 @@ Then open `reports/index.html` in a web browser to see the results.
 - **Automated refinement**: Iteratively improves harnesses based on verification results
 - **Pattern recognition**: Uses known vulnerability patterns to guide harness generation
 - **Comprehensive reporting**: Detailed HTML and Markdown reports
+- **Modular architecture**: Clean separation of concerns with LangGraph workflow
 
-## Project Structure
+## Environment Variables
 
-```
-├── cbmc_generation_tool.py  # Main tool implementation
-├── requirements.txt         # Python dependencies
-├── harnesses/               # Generated harnesses (created at runtime)
-├── verification/            # Verification results (created at runtime)
-├── reports/                 # Summary reports (created at runtime)
-```
+- `ANTHROPIC_API_KEY`: Your Anthropic API key for Claude (required)
+- `TOKENIZERS_PARALLELISM`: Set to "false" by default to avoid warnings
 
 ## License
 
