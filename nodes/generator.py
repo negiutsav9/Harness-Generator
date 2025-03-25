@@ -4,40 +4,36 @@ Generator node for CBMC harness generator workflow.
 import time
 import os
 import re
-import sys
 import json
 import logging
 from langchain_core.messages import AIMessage, HumanMessage
 from core.embedding_db import code_collection, query_pattern_db
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, 
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                   handlers=[logging.FileHandler("cbmc_generator.log"), logging.StreamHandler()])
 logger = logging.getLogger("generator")
 
 def generator_node(state):
-    """Generates or refines CBMC-compatible harness for the current function with timing."""
+    """Generates or refines CBMC-compatible harness for the current function."""
     # Get the global LLM instance
     from utils.llm_utils import setup_llm
     llm = setup_llm()
 
-    # Start timing for generation phase
+    # Start timing
     generation_start = time.time()
     
     func_name = state.get("current_function", "")
     logger.info(f"Generating harness for function: {func_name}")
     
-    # Check if this is a refinement call
+    # Check if this is a refinement
     improvement_recommendation = state.get("improvement_recommendation", "")
     is_refinement = bool(improvement_recommendation)
     
-    # Track harness history in the state if not already present
+    # Track harness history
     harness_history = state.get("harness_history", {})
     if func_name not in harness_history:
         harness_history[func_name] = []
     
-    # Get the previous harness if this is a refinement
+    # Get previous harness if refining
     previous_harness = ""
     if is_refinement and func_name in state.get("harnesses", {}):
         previous_harness = state.get("harnesses", {})[func_name]
@@ -45,7 +41,7 @@ def generator_node(state):
         if previous_harness not in harness_history[func_name]:
             harness_history[func_name].append(previous_harness)
     
-    # Get function code from CodeDB if not refining
+    # Get function code if not refining
     if not is_refinement:
         function_result = code_collection.get(ids=[func_name], include=["documents", "metadatas"])
         
@@ -53,16 +49,16 @@ def generator_node(state):
             logger.error(f"Function {func_name} not found in database")
             return {
                 "messages": [AIMessage(content=f"Error: Function {func_name} not found in database.")],
-                "next": "junction"  # Return to junction to process next function
+                "next": "junction"
             }
         
         func_code = function_result["documents"][0]
         func_metadata = function_result["metadatas"][0]
         
-        # Get pattern information from PatternDB
+        # Get pattern information
         patterns_result = query_pattern_db(func_code)
         
-        # Analyze function to determine which checks are actually needed
+        # Analyze function properties
         has_malloc = "malloc(" in func_code
         has_free = "free(" in func_code
         has_array_access = "[" in func_code and "]" in func_code
@@ -70,7 +66,7 @@ def generator_node(state):
         has_division = "/" in func_code or "%" in func_code
         has_type_conversion = "(" in func_code and ")" in func_code and any(type_name in func_code for type_name in ["int", "char", "float", "double", "size_t", "unsigned", "long"])
         
-        # Produce targeted verification guide based on actual function contents
+        # Produce targeted verification guide
         verification_checks = []
         if has_malloc or has_free:
             verification_checks.append("--memory-leak-check: Verify memory is properly allocated and freed")
@@ -83,7 +79,7 @@ def generator_node(state):
         if has_type_conversion:
             verification_checks.append("--conversion-check: Verify type conversions are safe")
         
-        # Construct the verification guide
+        # Construct verification guide
         if verification_checks:
             verification_guide = "Relevant CBMC Verification Checks for this function:\n" + "\n".join(verification_checks)
         else:
@@ -139,7 +135,7 @@ def generator_node(state):
         Provide only the minimal, focused harness code without explanation.
         """
     else:
-        # For refinement, use targeted improvement guidance
+        # For refinement, use improvement guidance
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
         You need to REFINE an existing harness based on evaluation feedback, focusing on ELIMINATING UNNECESSARY MOCKS.
@@ -153,6 +149,14 @@ def generator_node(state):
         
         Create an improved version of the harness that addresses the identified issues while REMOVING UNNECESSARY CODE.
         
+        CRITICAL INSTRUCTIONS:
+        1. REMOVE any mock implementations that aren't directly necessary for verification
+        2. ELIMINATE any test code that's just there to satisfy CBMC checklist items
+        3. FOCUS only on testing real properties of the function that matter
+        4. SIMPLIFY the harness - remove anything that isn't directly testing the function
+        5. KEEP only the minimal verification needed to properly test the function
+        6. AVOID adding checks for issues that cannot occur in this function
+
         CRITICAL INSTRUCTIONS:
         1. REMOVE any mock implementations that aren't directly necessary for verification
         2. ELIMINATE any test code that's just there to satisfy CBMC checklist items
@@ -191,9 +195,9 @@ def generator_node(state):
         balanced_braces = harness_code.count("{") <= harness_code.count("}")
         
         if not has_main or not balanced_braces:
-            logger.warning(f"Harness for {func_name} may be incomplete. Adding necessary closing elements.")
+            logger.warning(f"Incomplete harness for {func_name}, attempting to fix")
             
-            # Try to fix incomplete harnesses
+            # Fix incomplete harnesses
             if not balanced_braces:
                 missing_braces = harness_code.count("{") - harness_code.count("}")
                 if missing_braces > 0:
@@ -212,40 +216,36 @@ def generator_node(state):
         harnesses = state.get("harnesses", {}).copy()
         harnesses[func_name] = harness_code
         
-        # Determine iteration number for filename
+        # Determine version number for filename
         refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
         version_num = refinement_num + 1
         
-        # Create organized directory structure for harnesses
+        # Create harness directory
         harness_base_dir = "harnesses"
         os.makedirs(harness_base_dir, exist_ok=True)
         
-        # Create function-specific directory
         func_harness_dir = os.path.join(harness_base_dir, func_name)
         os.makedirs(func_harness_dir, exist_ok=True)
         
-        # Save harness file
+        # Save harness to file
         filename = os.path.join(func_harness_dir, f"v{version_num}.c")
-        
-        # Save harness to file with explicit buffer flushing
         with open(filename, "w") as f:
             f.write(harness_code)
             f.flush()
             os.fsync(f.fileno())  # Force flush to disk
         
-        # Calculate time spent on generation
+        # Calculate time
         generation_time = time.time() - generation_start
         
-        # Update function times dictionary
+        # Update function times
         function_times = state.get("function_times", {}).copy()
         if func_name not in function_times:
             function_times[func_name] = {}
         function_times[func_name]["generation"] = generation_time
         
-        # Clear improvement recommendation after processing
         logger.info(f"Successfully {'refined' if is_refinement else 'generated'} harness for {func_name} in {generation_time:.2f}s")
         return {
-            "messages": [AIMessage(content=f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s (without unnecessary mocks)")],
+            "messages": [AIMessage(content=f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s")],
             "harnesses": harnesses,
             "harness_history": harness_history,
             "improvement_recommendation": "",
@@ -254,13 +254,17 @@ def generator_node(state):
         }
         
     except Exception as e:
-        # Handle API errors - exit the process
+        # Handle API errors
         error_msg = str(e)
-        logger.error(f"Fatal error generating harness for {func_name}: {error_msg}")
-        print(f"\nFATAL ERROR: API call failed when processing function {func_name}")
+        logger.error(f"Error generating harness for {func_name}: {error_msg}")
+        print(f"\nERROR: API call failed when processing function {func_name}")
         print(f"Error message: {error_msg}")
-        print("\nThe process will now exit. Please check your API key and try again.")
-        sys.exit(1)  # Exit with error code
+        
+        # Return to junction to try next function
+        return {
+            "messages": [AIMessage(content=f"Error generating harness for {func_name}: {error_msg}. Skipping to next function.")],
+            "next": "junction"
+        }
 
 def route_from_generator(state):
     """Routes from generator to either cbmc or junction."""

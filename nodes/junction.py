@@ -1,47 +1,55 @@
 """
 Junction node for CBMC harness generator workflow.
 """
+import logging
 from langchain_core.messages import AIMessage
+
+# Set up logging
+logger = logging.getLogger("junction")
 
 def junction_node(state):
     """Processes vulnerable functions one at a time in sequential order."""
-    # Get the list of vulnerable functions and processed functions
+    # Get lists of functions
     vulnerable_functions = state.get("vulnerable_functions", [])
     processed_functions = state.get("processed_functions", [])
     
-    # Safety counter to prevent infinite recursion
+    # Safety counter
     loop_counter = state.get("loop_counter", 0) + 1
     
-    # Force termination if loop counter gets too high
-    if loop_counter > 50:
-        return {
-            "messages": [AIMessage(content=f"WARNING: Loop counter exceeded maximum value. Forcing termination to avoid recursion error.")],
-            "loop_counter": 0,  # Reset counter
-            "next": "output"
-        }
-    
-    # Track the progress
+    # Track progress
     total_functions = len(vulnerable_functions)
     completed_functions = len(processed_functions)
     
-    # Check if we've processed all functions
-    if completed_functions >= total_functions:
+    logger.info(f"Junction node - processed {completed_functions}/{total_functions} functions")
+    
+    # Force termination if loop counter gets too high
+    if loop_counter > 50:
+        logger.warning(f"Loop counter exceeded maximum value. Forcing termination.")
         return {
-            "messages": [AIMessage(content=f"All {total_functions} functions have been processed. Moving to final output.")],
-            "loop_counter": 0,  # Reset counter
+            "messages": [AIMessage(content=f"WARNING: Loop counter exceeded maximum value. Forcing termination to avoid recursion error.")],
+            "loop_counter": 0,
             "next": "output"
         }
     
-    # Get current function being processed
+    # Check if all functions processed
+    if completed_functions >= total_functions:
+        logger.info(f"All {total_functions} functions processed. Moving to output.")
+        return {
+            "messages": [AIMessage(content=f"All {total_functions} functions have been processed. Moving to final output.")],
+            "loop_counter": 0,
+            "next": "output"
+        }
+    
+    # Get current function
     current_function = state.get("current_function", "")
     
-    # Important fix: If current function is in processed_functions, clear it
+    # If current function is in processed_functions, clear it
     if current_function and current_function in processed_functions:
-        # This should never happen, but if it does, reset the current function
         current_function = ""
     
-    # If we have a valid current function that's not processed, continue with it
+    # If valid current function, continue with it
     if current_function and current_function in vulnerable_functions and current_function not in processed_functions:
+        logger.info(f"Continuing with function: {current_function}")
         return {
             "messages": [AIMessage(content=f"Continuing processing of function: {current_function}")],
             "current_function": current_function,
@@ -49,10 +57,10 @@ def junction_node(state):
             "next": "generator"
         }
     
-    # Find the next unprocessed function
+    # Find next unprocessed function
     for func in vulnerable_functions:
         if func not in processed_functions:
-            # Select this function as the next to process
+            logger.info(f"Selected next function: {func} ({completed_functions + 1}/{total_functions})")
             return {
                 "messages": [AIMessage(content=f"Processing function {completed_functions + 1} of {total_functions}: {func}")],
                 "current_function": func,
@@ -60,10 +68,11 @@ def junction_node(state):
                 "next": "generator"
             }
     
-    # Fallback (should not reach here if logic is correct)
+    # Fallback - should not reach here
+    logger.warning("Junction fallback - all functions appear processed")
     return {
         "messages": [AIMessage(content="All functions appear to be processed. Moving to output.")],
-        "loop_counter": 0,  # Reset counter
+        "loop_counter": 0,
         "next": "output"
     }
 
