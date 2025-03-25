@@ -2,8 +2,17 @@
 Harness evaluator node for CBMC harness generator workflow.
 """
 import time
-from langchain_core.messages import AIMessage
+import sys
+import re
+import logging
+from langchain_core.messages import AIMessage, HumanMessage
 from core.embedding_db import code_collection
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                   handlers=[logging.FileHandler("cbmc_evaluator.log"), logging.StreamHandler()])
+logger = logging.getLogger("evaluator")
 
 def harness_evaluator_node(state):
     """Evaluates the quality of generated harnesses based on CBMC output and suggests improvements."""
@@ -11,7 +20,7 @@ def harness_evaluator_node(state):
     
     # SAFETY: Get and increment loop counter to prevent infinite recursion
     loop_counter = state.get("loop_counter", 0)
-    print(f"DEBUG: Evaluator node - function: {state.get('current_function', '')}, loop: {loop_counter}")
+    logger.info(f"Evaluator node - function: {state.get('current_function', '')}, loop: {loop_counter}")
     
     func_name = state.get("current_function", "")
     harnesses = state.get("harnesses", {})
@@ -30,7 +39,7 @@ def harness_evaluator_node(state):
     
     # Get current attempts count
     current_attempts = refinement_attempts.get(func_name, 0)
-    print(f"DEBUG: Current refinement attempts for {func_name}: {current_attempts}")
+    logger.info(f"Current refinement attempts for {func_name}: {current_attempts}")
     
     # SAFETY: Force progression after max attempts regardless of other conditions
     max_refinements = 3
@@ -38,7 +47,7 @@ def harness_evaluator_node(state):
         processed_functions = state.get("processed_functions", []).copy()
         if func_name not in processed_functions:
             processed_functions.append(func_name)
-            print(f"DEBUG: Max refinements reached, marking {func_name} as processed")
+            logger.info(f"Max refinements reached, marking {func_name} as processed")
         
         return {
             "messages": [AIMessage(content=f"Maximum refinement attempts ({max_refinements}) reached for {func_name}. Moving to next function.")],
@@ -57,7 +66,7 @@ def harness_evaluator_node(state):
         processed_functions = state.get("processed_functions", []).copy()
         if func_name and func_name not in processed_functions:
             processed_functions.append(func_name)
-            print(f"DEBUG: Missing harness/CBMC data, marking {func_name} as processed")
+            logger.info(f"Missing harness/CBMC data, marking {func_name} as processed")
         
         return {
             "messages": [AIMessage(content=f"Error: Missing harness or CBMC result for function {func_name}. Marking as processed.")],
@@ -73,7 +82,7 @@ def harness_evaluator_node(state):
         processed_functions = state.get("processed_functions", []).copy()
         if func_name not in processed_functions:
             processed_functions.append(func_name)
-            print(f"DEBUG: Function metadata not found, marking {func_name} as processed")
+            logger.info(f"Function metadata not found, marking {func_name} as processed")
         
         return {
             "messages": [AIMessage(content=f"Error: Function {func_name} metadata not found. Marking as processed.")],
@@ -87,14 +96,17 @@ def harness_evaluator_node(state):
     
     # Get CBMC output
     cbmc_stdout = cbmc_result.get("stdout", "")
+    cbmc_stderr = cbmc_result.get("stderr", "")
     cbmc_status = cbmc_result.get("status", "UNKNOWN")
     verification_message = cbmc_result.get("message", "")
     suggestions = cbmc_result.get("suggestions", "")
     
-    # Check for syntax errors, parsing issues, and other error types from CBMC
-    has_syntax_error = cbmc_result.get("has_syntax_error", False) or func_name in harness_syntax_errors
-    has_parsing_issue = cbmc_result.get("has_parsing_issue", False) or func_name in parsing_issues
-    verification_failure_types = cbmc_result.get("verification_failure_types", [])
+    # Check for specific errors in STDERR
+    include_errors = re.findall(r"function '([^']+)' is not declared", cbmc_stderr)
+    syntax_errors = re.findall(r"file ([^\s]+) line (\d+) function ([^\s]+): (.+)", cbmc_stderr)
+    nondet_errors = re.findall(r"function '(nondet_[^']+)' is not declared", cbmc_stderr)
+    no_body_errors = re.findall(r"main symbol '([^']+)' has no body", cbmc_stderr)
+    incompatible_types = re.findall(r"conversion from '([^']+)' to '([^']+)': incompatible pointer types", cbmc_stderr)
     
     # Set evaluation criteria for harness quality
     evaluation_criteria = {
@@ -106,7 +118,7 @@ def harness_evaluator_node(state):
         "checks_arithmetic": any(op in harness_code for op in ["overflow", "division", "zero"]),
         "addresses_cbmc_errors": False,
         "verification_passed": cbmc_status == "SUCCESS",
-        "syntactically_valid": not has_syntax_error and not has_parsing_issue
+        "syntactically_valid": not "syntax error" in cbmc_stderr
     }
     
     # Calculate overall quality score
@@ -117,20 +129,38 @@ def harness_evaluator_node(state):
     improvement_recommendation = ""
     needs_improvement = False
     
-    # First handle syntax errors and parsing issues
-    if has_syntax_error or has_parsing_issue:
+    # Handle include errors
+    if include_errors:
         needs_improvement = True
-        error_message = cbmc_error_messages.get(func_name, "Unknown error")
-        syntax_error = harness_syntax_errors.get(func_name, "")
+        missing_includes = {}
+        for func in include_errors:
+            if func == 'malloc' or func == 'free':
+                missing_includes['stdlib.h'] = True
+            elif func == 'memcpy' or func == 'memmove' or func == 'strncpy':
+                missing_includes['string.h'] = True
+            elif func.startswith('nondet_'):
+                missing_includes['nondet functions'] = True
         
+        include_suggestions = []
+        if 'stdlib.h' in missing_includes:
+            include_suggestions.append("Add #include <stdlib.h> for malloc/free")
+        if 'string.h' in missing_includes:
+            include_suggestions.append("Add #include <string.h> for string functions")
+        if 'nondet functions' in missing_includes:
+            include_suggestions.append("Add proper declarations for nondet functions. For example:\n" +
+                                       "extern int __CPROVER_int_nondet();\n" +
+                                       "#define nondet_int __CPROVER_int_nondet\n" +
+                                       "extern size_t __CPROVER_size_t_nondet();\n" +
+                                       "#define nondet_size_t __CPROVER_size_t_nondet")
+        
+        # First handle syntax or parsing errors
         improvement_recommendation = f"""
-        Previous harness for {func_name} has syntax or parsing errors and needs to be fixed.
+        Previous harness for {func_name} has missing include files or declarations that need to be fixed.
         
-        CBMC error: {error_message}
+        CBMC errors:
+        {', '.join([f"Function '{func}' is not declared" for func in include_errors])}
         
-        Syntax error details: {syntax_error}
-        
-        Current harness (with errors):
+        Current harness:
         ```c
         {harness_code}
         ```
@@ -140,40 +170,83 @@ def harness_evaluator_node(state):
         {func_code}
         ```
         
-        Please fix the syntax or parsing errors in the harness. Specifically:
-        1. Make sure all variables are properly declared before use
-        2. Check for balanced braces and proper function definitions
-        3. Ensure all code is complete and not truncated
-        4. Include all necessary header files
+        Please fix the harness by adding the necessary includes and declarations:
+        {', '.join(include_suggestions)}
         
-        Generate a complete, syntactically valid harness that can be properly compiled and analyzed by CBMC.
+        Generate a complete, syntactically valid harness that properly includes all necessary headers and declarations.
         """
-    # Then handle verification failures
-    elif cbmc_status != "SUCCESS" and verification_failure_types:
+    # Handle nondet function errors
+    elif nondet_errors:
+        needs_improvement = True
+        nondet_types = [func.replace('nondet_', '') for func in nondet_errors]
+        
+        improvement_recommendation = f"""
+        Previous harness for {func_name} is using nondet functions that are not properly declared.
+        
+        CBMC errors:
+        {', '.join([f"Function '{func}' is not declared" for func in nondet_errors])}
+        
+        Current harness:
+        ```c
+        {harness_code}
+        ```
+        
+        Please add the following declarations at the top of your harness:
+        
+        ```c
+        // Add CBMC nondet function declarations
+        {chr(10).join([f"extern {type}_t __CPROVER_{type}_t_nondet();" for type in nondet_types])}
+        {chr(10).join([f"#define nondet_{type} __CPROVER_{type}_t_nondet" for type in nondet_types])}
+        ```
+        
+        Generate a complete, syntactically valid harness with proper nondet function declarations.
+        """
+    # Handle no body errors
+    elif no_body_errors:
+        needs_improvement = True
+        
+        improvement_recommendation = f"""
+        CBMC cannot find the implementation of function '{no_body_errors[0]}'. This means either:
+        1. The function is not defined in the source files included in the verification, or
+        2. The verification is targeting the wrong function.
+        
+        CBMC error: main symbol '{no_body_errors[0]}' has no body
+        
+        Current harness:
+        ```c
+        {harness_code}
+        ```
+        
+        Please make sure your harness is designed to test the correct function. If needed, add a stub implementation or make sure the harness is properly designed to target the function you want to verify.
+        
+        Also, ensure you're using the main() function in your harness, not trying to directly verify the target function.
+        """
+    # Then handle other verification failures
+    elif cbmc_status != "SUCCESS" and verification_failures:
         needs_improvement = True
         
         # Analyze memory issues
         memory_issues = []
-        if "memory_leak" in verification_failure_types:
+        if "memory_leak" in verification_failures.get(func_name, []):
             memory_issues.append("Memory leaks detected - ensure all allocated memory is freed")
-        if "null_pointer" in verification_failure_types:
+        if "null_pointer" in verification_failures.get(func_name, []):
             memory_issues.append("Null pointer dereferences - add null pointer checks")
             
         # Analyze arithmetic issues
         arithmetic_issues = []
-        if "division_by_zero" in verification_failure_types:
+        if "division_by_zero" in verification_failures.get(func_name, []):
             arithmetic_issues.append("Division by zero - add checks to ensure divisors are non-zero")
-        if "arithmetic_overflow" in verification_failure_types or "pointer_overflow" in verification_failure_types:
+        if "arithmetic_overflow" in verification_failures.get(func_name, []) or "pointer_overflow" in verification_failures.get(func_name, []):
             arithmetic_issues.append("Arithmetic/pointer overflow - add bounds checking")
             
         # Analyze array bounds issues
         array_issues = []
-        if "array_bounds" in verification_failure_types:
+        if "array_bounds" in verification_failures.get(func_name, []):
             array_issues.append("Array bounds violations - verify array indices are within bounds")
             
         # Analyze type conversion issues
         type_issues = []
-        if "type_conversion" in verification_failure_types:
+        if "type_conversion" in verification_failures.get(func_name, []):
             type_issues.append("Type conversion problems - check for information loss in type conversions")
             
         improvement_recommendation = f"""
@@ -187,6 +260,9 @@ def harness_evaluator_node(state):
         
         CBMC output excerpt:
         {cbmc_stdout[:500] if len(cbmc_stdout) > 500 else cbmc_stdout}
+        
+        STDERR:
+        {cbmc_stderr[:500] if len(cbmc_stderr) > 500 else cbmc_stderr}
         
         Current harness:
         ```c
@@ -218,13 +294,17 @@ def harness_evaluator_node(state):
             not evaluation_criteria["has_nondet_inputs"] or
             not evaluation_criteria["has_assertions"] or
             (func_metadata.get("has_malloc", False) and not evaluation_criteria["checks_memory_leaks"]) or
-            not evaluation_criteria["syntactically_valid"]
+            not evaluation_criteria["syntactically_valid"] or
+            include_errors or nondet_errors or no_body_errors
         )
         
-        if needs_improvement and not has_syntax_error and not has_parsing_issue:
+        if needs_improvement:
             improvement_areas = []
             
             # Generate specific improvement suggestions
+            if include_errors or nondet_errors:
+                improvement_areas.append("Add necessary includes and function declarations")
+            
             if not evaluation_criteria["has_nondet_inputs"]:
                 improvement_areas.append("Use CBMC's nondet functions for inputs")
             
@@ -241,6 +321,8 @@ def harness_evaluator_node(state):
             Previous harness for {func_name} needs improvement. Quality score: {quality_score}%.
             
             CBMC verification status: {cbmc_status}
+            STDERR output:
+            {cbmc_stderr[:500] if len(cbmc_stderr) > 500 else cbmc_stderr}
             
             Current harness:
             ```c
@@ -273,7 +355,7 @@ def harness_evaluator_node(state):
     # This ensures we don't get stuck in an infinite loop
     if needs_improvement:
         refinement_attempts[func_name] = current_attempts + 1
-        print(f"DEBUG: Incremented refinement attempts for {func_name} to {refinement_attempts[func_name]}")
+        logger.info(f"Incremented refinement attempts for {func_name} to {refinement_attempts[func_name]}")
     
     # CRITICAL: Mark as processed if NOT going to refine
     # This ensures forward progress in the workflow
@@ -281,7 +363,7 @@ def harness_evaluator_node(state):
     if not needs_improvement:
         if func_name not in processed_functions:
             processed_functions.append(func_name)
-            print(f"DEBUG: No more improvements needed, marking {func_name} as processed")
+            logger.info(f"No more improvements needed, marking {func_name} as processed")
     
     # CRITICAL: Return loop_counter to prevent recursive error
     return {

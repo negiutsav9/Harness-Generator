@@ -53,23 +53,44 @@ pip install -r requirements.txt
 echo "Creating project directories..."
 mkdir -p harnesses verification/src verification/include verification/stubs verification/sources reports
 
-# Set up environment variable for Anthropic API key if not already set
+# Set up environment variable for API keys
+echo "Setting up API keys for LLMs..."
+
+# Anthropic API key setup
 if [ -z "$ANTHROPIC_API_KEY" ]; then
     echo "Anthropic API key is not set."
     read -p "Enter your Anthropic API key (or press Enter to skip): " api_key
     if [ ! -z "$api_key" ]; then
         export ANTHROPIC_API_KEY="$api_key"
         echo "export ANTHROPIC_API_KEY=\"$api_key\"" >> ~/.bashrc
-        echo "Added API key to ~/.bashrc. Run 'source ~/.bashrc' to apply in current session."
+        echo "Added Anthropic API key to ~/.bashrc. Run 'source ~/.bashrc' to apply in current session."
     else
-        echo "Skipping API key setup. You'll need to set ANTHROPIC_API_KEY manually before running."
+        echo "Skipping Anthropic API key setup. You can set it later or use OpenAI instead with --llm openai."
     fi
+else
+    echo "Anthropic API key is already set."
+fi
+
+# OpenAI API key setup
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "OpenAI API key is not set."
+    read -p "Enter your OpenAI API key (or press Enter to skip): " api_key
+    if [ ! -z "$api_key" ]; then
+        export OPENAI_API_KEY="$api_key"
+        echo "export OPENAI_API_KEY=\"$api_key\"" >> ~/.bashrc
+        echo "Added OpenAI API key to ~/.bashrc. Run 'source ~/.bashrc' to apply in current session."
+    else
+        echo "Skipping OpenAI API key setup. You can set it later or use Claude instead with --llm claude."
+    fi
+else
+    echo "OpenAI API key is already set."
 fi
 
 echo
 echo "Setup complete! You can now run the CBMC Harness Generator with:"
-echo "    python main.py -f path/to/your/file.c"
-echo "or:"
-echo "    python main.py -d path/to/your/project"
+echo "    python main.py -f path/to/your/file.c                # Use Claude by default"
+echo "    python main.py -f path/to/your/file.c --llm claude   # Explicitly use Claude"
+echo "    python main.py -f path/to/your/file.c --llm openai   # Use OpenAI GPT models"
+echo "    python main.py -d path/to/your/project               # Process an entire directory"
 echo
-echo "Make sure ANTHROPIC_API_KEY is set in your environment before running."
+echo "Make sure the appropriate API key is set for the LLM you want to use."

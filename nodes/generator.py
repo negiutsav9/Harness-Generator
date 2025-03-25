@@ -4,21 +4,29 @@ Generator node for CBMC harness generator workflow.
 import time
 import os
 import re
+import sys
 import json
+import logging
 from langchain_core.messages import AIMessage, HumanMessage
 from core.embedding_db import code_collection, query_pattern_db
-from utils.llm_utils import setup_llm
 
-# Initialize the LLM
-llm = setup_llm()
+# Set up logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                   handlers=[logging.FileHandler("cbmc_generator.log"), logging.StreamHandler()])
+logger = logging.getLogger("generator")
 
 def generator_node(state):
     """Generates or refines CBMC-compatible harness for the current function with timing."""
-    import time
-    import os
+    # Get the global LLM instance
+    from utils.llm_utils import setup_llm
+    llm = setup_llm()
+
+    # Start timing for generation phase
     generation_start = time.time()
     
     func_name = state.get("current_function", "")
+    logger.info(f"Generating harness for function: {func_name}")
     
     # Check if this is a refinement call
     improvement_recommendation = state.get("improvement_recommendation", "")
@@ -42,6 +50,7 @@ def generator_node(state):
         function_result = code_collection.get(ids=[func_name], include=["documents", "metadatas"])
         
         if not function_result["ids"]:
+            logger.error(f"Function {func_name} not found in database")
             return {
                 "messages": [AIMessage(content=f"Error: Function {func_name} not found in database.")],
                 "next": "junction"  # Return to junction to process next function
@@ -164,10 +173,12 @@ def generator_node(state):
     
     # Generate the harness
     try:
+        logger.info(f"Sending API request to generate harness for {func_name}")
         # Setup messages for the LLM
         response = llm.invoke([
             HumanMessage(content=generator_prompt)
         ])
+        logger.info(f"Received API response for {func_name}")
         
         # Extract the harness code
         harness_code = response.content
@@ -180,7 +191,7 @@ def generator_node(state):
         balanced_braces = harness_code.count("{") <= harness_code.count("}")
         
         if not has_main or not balanced_braces:
-            print(f"Warning: Harness for {func_name} may be incomplete. Adding necessary closing elements.")
+            logger.warning(f"Harness for {func_name} may be incomplete. Adding necessary closing elements.")
             
             # Try to fix incomplete harnesses
             if not balanced_braces:
@@ -232,6 +243,7 @@ def generator_node(state):
         function_times[func_name]["generation"] = generation_time
         
         # Clear improvement recommendation after processing
+        logger.info(f"Successfully {'refined' if is_refinement else 'generated'} harness for {func_name} in {generation_time:.2f}s")
         return {
             "messages": [AIMessage(content=f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s (without unnecessary mocks)")],
             "harnesses": harnesses,
@@ -242,24 +254,13 @@ def generator_node(state):
         }
         
     except Exception as e:
-        # Handle API errors
+        # Handle API errors - exit the process
         error_msg = str(e)
-        
-        # Calculate time even for errors
-        generation_time = time.time() - generation_start
-        
-        # Update function times dictionary
-        function_times = state.get("function_times", {}).copy()
-        if func_name not in function_times:
-            function_times[func_name] = {}
-        function_times[func_name]["generation_error"] = generation_time
-        
-        return {
-            "messages": [AIMessage(content=f"Error {'refining' if is_refinement else 'generating'} harness for function {func_name} in {generation_time:.2f}s: {error_msg}")],
-            "improvement_recommendation": "",
-            "function_times": function_times,
-            "next": "junction"  # Return to junction to process next function
-        }
+        logger.error(f"Fatal error generating harness for {func_name}: {error_msg}")
+        print(f"\nFATAL ERROR: API call failed when processing function {func_name}")
+        print(f"Error message: {error_msg}")
+        print("\nThe process will now exit. Please check your API key and try again.")
+        sys.exit(1)  # Exit with error code
 
 def route_from_generator(state):
     """Routes from generator to either cbmc or junction."""

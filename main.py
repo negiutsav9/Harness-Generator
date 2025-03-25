@@ -5,10 +5,19 @@ Main entry point for the CBMC harness generator.
 import os
 import glob
 import argparse
+import logging
+import sys
 from langchain_core.messages import HumanMessage
 
 from core.workflow import create_workflow
 from utils.file_utils import process_directory, calculate_recursion_limit, setup_verification_directories
+from utils.llm_utils import setup_llm
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                   handlers=[logging.FileHandler("cbmc_main.log"), logging.StreamHandler()])
+logger = logging.getLogger("main")
 
 def main():
     """
@@ -22,97 +31,151 @@ def main():
     parser = argparse.ArgumentParser(description='CBMC Harness Generator')
     parser.add_argument('-d', '--directory', type=str, help='Directory containing C source files to analyze')
     parser.add_argument('-f', '--file', type=str, help='Single C source file to analyze')
+    parser.add_argument('-l', '--llm', type=str, choices=['claude', 'openai'], default='claude',
+                        help='LLM to use for code analysis and harness generation (default: claude)')
+    parser.add_argument('-t', '--timeout', type=int, default=3600,
+                        help='Timeout in seconds for the entire workflow (default: 3600)')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Enable verbose logging')
     args = parser.parse_args()
     
-    # Set up workflow
-    app = create_workflow()
+    # Set logging level based on verbose flag
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
     
-    # Set up verification directories
-    setup_verification_directories()
-    
-    if args.directory:
-        # Directory mode
-        initial_message = HumanMessage(content=f"""
-        I need to analyze all C source files in the directory: {args.directory}
-        Please identify any potential memory leaks and generate CBMC harnesses for verification.
-        """)
+    try:
+        # Initialize the global LLM based on user choice - this sets up the global LLM
+        # that will be used by all nodes through the import in those nodes
+        logger.info(f"Initializing LLM: {args.llm}")
+        setup_llm(model_choice=args.llm)
         
-        # Count C source files in the directory for estimation
-        source_files_count = 0
-        source_subdir = os.path.join(args.directory, "source")
-        if not os.path.isdir(source_subdir):
-            source_subdir = args.directory
-            
-        for pattern in ['*.c', '*.cpp']:
-            source_files_count += len(glob.glob(os.path.join(source_subdir, "**", pattern), recursive=True))
+        # Set up workflow
+        app = create_workflow()
         
-        # Calculate recursion limit based on file count
-        recursion_limit = calculate_recursion_limit(source_files_count)
+        # Set up verification directories
+        setup_verification_directories()
         
-        # Run workflow with calculated limit
-        result = app.invoke(
-            {
-                "messages": [initial_message],
-                "source_code": "",
-                "embeddings": {},
-                "vulnerable_functions": [],
-                "harnesses": {},
-                "cbmc_results": {},
-                "processed_functions": []
-            },
-            {"recursion_limit": recursion_limit}
-        )
-    elif args.file:
-        # Single file mode - use a simpler estimation
-        try:
-            with open(args.file, 'r') as f:
-                source_code = f.read()
-                
-            # For a single file, use a fixed recursion limit or estimate based on file size
-            file_size = len(source_code)
-            # Rough heuristic: 1 function per 100 lines, ~50 chars per line
-            estimated_functions = max(5, file_size // 5000)
-            recursion_limit = calculate_recursion_limit(estimated_functions // 8 + 1)  # Convert back to file count
-                
+        if args.directory:
+            # Directory mode
+            logger.info(f"Processing directory: {args.directory}")
             initial_message = HumanMessage(content=f"""
-            I need to analyze the following C code for memory leaks and generate verification harnesses:
-
-            ```c
-            {source_code}
-            ```
-
+            I need to analyze all C source files in the directory: {args.directory}
             Please identify any potential memory leaks and generate CBMC harnesses for verification.
             """)
             
-            # Run workflow with calculated limit
-            result = app.invoke(
-                {
-                    "messages": [initial_message],
-                    "source_code": source_code,
-                    "embeddings": {},
-                    "vulnerable_functions": [],
-                    "harnesses": {},
-                    "cbmc_results": {},
-                    "processed_functions": []
-                },
-                {"recursion_limit": recursion_limit}
-            )
-        except Exception as e:
-            print(f"Error reading file {args.file}: {str(e)}")
-            return
-    else:
-        print("Please provide either a directory (-d) or a file (-f) to analyze")
-        return
+            # Count C source files in the directory for estimation
+            source_files_count = 0
+            source_subdir = os.path.join(args.directory, "source")
+            if not os.path.isdir(source_subdir):
+                source_subdir = args.directory
+                
+            for pattern in ['*.c', '*.cpp']:
+                source_files_count += len(glob.glob(os.path.join(source_subdir, "**", pattern), recursive=True))
+            
+            logger.info(f"Found {source_files_count} source files in {source_subdir}")
+            
+            # Calculate recursion limit based on file count
+            recursion_limit = calculate_recursion_limit(source_files_count)
+            
+            # Run workflow with calculated limit and timeout
+            try:
+                logger.info(f"Starting workflow with recursion limit {recursion_limit} and timeout {args.timeout}s")
+                result = app.invoke(
+                    {
+                        "messages": [initial_message],
+                        "source_code": "",
+                        "embeddings": {},
+                        "vulnerable_functions": [],
+                        "harnesses": {},
+                        "cbmc_results": {},
+                        "processed_functions": []
+                    },
+                    {"recursion_limit": recursion_limit, "timeout": args.timeout}
+                )
+                logger.info("Workflow completed successfully")
+            except TimeoutError:
+                logger.error(f"Workflow timed out after {args.timeout} seconds")
+                print(f"ERROR: Workflow timed out after {args.timeout} seconds. Try increasing the timeout with --timeout option.")
+                return 1
+            except Exception as e:
+                logger.error(f"Error during workflow execution: {str(e)}", exc_info=True)
+                print(f"ERROR: Workflow failed: {str(e)}")
+                return 1
+        elif args.file:
+            # Single file mode
+            logger.info(f"Processing single file: {args.file}")
+            try:
+                with open(args.file, 'r') as f:
+                    source_code = f.read()
+                    
+                # For a single file, use a fixed recursion limit or estimate based on file size
+                file_size = len(source_code)
+                # Rough heuristic: 1 function per 100 lines, ~50 chars per line
+                estimated_functions = max(5, file_size // 5000)
+                recursion_limit = calculate_recursion_limit(estimated_functions // 8 + 1)  # Convert back to file count
+                    
+                initial_message = HumanMessage(content=f"""
+                I need to analyze the following C code for memory leaks and generate verification harnesses:
+
+                ```c
+                {source_code}
+                ```
+
+                Please identify any potential memory leaks and generate CBMC harnesses for verification.
+                """)
+                
+                # Run workflow with calculated limit
+                logger.info(f"Starting workflow with recursion limit {recursion_limit} and timeout {args.timeout}s")
+                try:
+                    result = app.invoke(
+                        {
+                            "messages": [initial_message],
+                            "source_code": source_code,
+                            "embeddings": {},
+                            "vulnerable_functions": [],
+                            "harnesses": {},
+                            "cbmc_results": {},
+                            "processed_functions": []
+                        },
+                        {"recursion_limit": recursion_limit, "timeout": args.timeout}
+                    )
+                    logger.info("Workflow completed successfully")
+                except TimeoutError:
+                    logger.error(f"Workflow timed out after {args.timeout} seconds")
+                    print(f"ERROR: Workflow timed out after {args.timeout} seconds. Try increasing the timeout with --timeout option.")
+                    return 1
+                except Exception as e:
+                    logger.error(f"Error during workflow execution: {str(e)}", exc_info=True)
+                    print(f"ERROR: Workflow failed: {str(e)}")
+                    return 1
+            except Exception as e:
+                logger.error(f"Error reading file {args.file}: {str(e)}")
+                print(f"Error reading file {args.file}: {str(e)}")
+                return 1
+        else:
+            logger.error("No input provided")
+            print("Please provide either a directory (-d) or a file (-f) to analyze")
+            return 1
+        
+        # Display the conversation
+        print("=== Workflow Execution Results ===")
+        for i, message in enumerate(result["messages"]):
+            if isinstance(message, HumanMessage):
+                print(f"\n===== Human Message {i+1} =====")
+                print(message.content[:200] + "..." if len(message.content) > 200 else message.content)
+            else:  # AIMessage
+                print(f"\n===== AI Message {i+1} =====")
+                print(message.content)
+        
+        logger.info("Workflow execution results displayed")
+        
+    except Exception as e:
+        logger.critical(f"Critical error: {str(e)}", exc_info=True)
+        print(f"A critical error occurred: {str(e)}")
+        return 1
     
-    # Display the conversation
-    print("=== Workflow Execution Results ===")
-    for i, message in enumerate(result["messages"]):
-        if isinstance(message, HumanMessage):
-            print(f"\n===== Human Message {i+1} =====")
-            print(message.content[:200] + "..." if len(message.content) > 200 else message.content)
-        else:  # AIMessage
-            print(f"\n===== AI Message {i+1} =====")
-            print(message.content)
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

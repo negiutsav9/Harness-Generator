@@ -225,6 +225,10 @@ def cbmc_node(state):
     
     # Add the harness file
     cbmc_cmd.append(harness_file)
+
+    original_func_name = func_name
+    if ":" in func_name:
+        _, original_func_name = func_name.split(":", 1)
     
     # Add main CBMC options
     cbmc_cmd.extend([
