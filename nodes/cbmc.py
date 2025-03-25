@@ -7,6 +7,9 @@ import time
 import shutil
 import subprocess
 from langchain_core.messages import AIMessage
+import logging
+
+logger = logging.getLogger("cbmc")
 
 def cbmc_node(state):
     """Executes CBMC verification on the current function's harness using sources from verification/sources directory."""
@@ -15,8 +18,11 @@ def cbmc_node(state):
     func_name = state.get("current_function", "")
     harnesses = state.get("harnesses", {})
     harness_code = harnesses.get(func_name, "")
+
+    logger.info(f"Starting CBMC verification for function {func_name}")
     
     if not harness_code:
+        logger.error(f"No harness available for function {func_name}")
         return {
             "messages": [AIMessage(content=f"Error: No harness available for function {func_name}.")],
             "next": "junction"  # Return to junction to process next function

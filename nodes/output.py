@@ -4,10 +4,15 @@ Output node for CBMC harness generator workflow.
 import os
 import time
 from langchain_core.messages import AIMessage
+import logging
+
+logger = logging.getLogger("output")
 
 def output_node(state):
     """Provides final summary of all processed functions with performance metrics and generates an index report."""
     total_time = time.time() - state.get("start_time", time.time())
+
+    logger.info("Generating final report and output summaries")
     
     # Determine if we're in directory mode
     is_directory_mode = state.get("is_directory_mode", False)

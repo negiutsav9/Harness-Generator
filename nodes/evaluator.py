@@ -5,7 +5,7 @@ import time
 import re
 import json
 import logging
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 from core.embedding_db import code_collection, query_pattern_db
 
 # Set up logging - simplified
@@ -196,7 +196,7 @@ def harness_evaluator_node(state):
     llm = setup_llm()
     logger.info(f"Requesting LLM analysis of CBMC results for {func_name}")
     response = llm.invoke([
-        SystemMessage(content=prompt)
+        HumanMessage(content=prompt)
     ])
     
     # Parse LLM response

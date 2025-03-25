@@ -4,6 +4,9 @@ File handling utilities for the CBMC harness generator.
 import os
 import glob
 import shutil
+import logging
+
+logger = logging.getLogger("file_utils")
 
 def process_directory(directory_path: str) -> dict:
     """
@@ -19,16 +22,16 @@ def process_directory(directory_path: str) -> dict:
     
     # Check if the directory exists
     if not os.path.isdir(directory_path):
-        print(f"Error: Directory '{directory_path}' does not exist")
+        logger.error(f"Directory '{directory_path}' does not exist")
         return source_files
     
     # Look for source/source_code subdirectory
     source_subdir = os.path.join(directory_path, "source")
     if not os.path.isdir(source_subdir):
-        print(f"Warning: '{source_subdir}' directory not found. Using top directory.")
+        logger.warning(f"'{source_subdir}' directory not found. Using top directory.")
         source_subdir = directory_path
     
-    print(f"Looking for source files in: {source_subdir}")
+    logger.info(f"Looking for source files in: {source_subdir}")
     
     # Find all C source files in the source subdirectory
     c_file_patterns = ['*.c', '*.h', '*.cpp', '*.hpp']

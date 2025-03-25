@@ -6,11 +6,16 @@ import re
 import time
 from langchain_core.messages import AIMessage, HumanMessage
 from utils.file_utils import process_directory
+import logging
+
+logger = logging.getLogger("frontend")
 
 def frontend_node(state):
     """Extracts source code from user messages and initializes timing."""
     # Start timing the overall process
     start_time = time.time()
+
+    logger.info("Processing incoming source code request")
     
     # Check if the user specified a directory path
     directory_path = None
@@ -40,6 +45,7 @@ def frontend_node(state):
                         combined_source += f"/* File: {file_path} */\n{content}\n\n"
                         file_functions[file_path] = []  # Initialize empty function list for each file
                     
+                    logger.info(f"Found {len(multiple_files)} C source files in {directory_path}")
                     print(f"Combined source code length: {len(combined_source)} bytes")
                     
                     return {
@@ -52,6 +58,7 @@ def frontend_node(state):
                         "file_functions": file_functions  # Initialize tracking of functions per file
                     }
                 else:
+                    logger.warning(f"No C source files found in {directory_path}")
                     return {
                         "messages": [AIMessage(content=f"No C source files found in source directory of: {directory_path}")],
                         "source_code": "",

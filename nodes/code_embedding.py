@@ -4,9 +4,14 @@ Code embedding node for CBMC harness generator workflow.
 import os
 from langchain_core.messages import AIMessage
 from utils.code_parser import embed_code
+import logging
+
+logger = logging.getLogger("code_embedding")
 
 def code_embedding_node(state):
     """Embeds and stores code in the database."""
+
+    logger.info("Starting code embedding process")
     
     # Check if we're in directory mode
     if state.get("is_directory_mode", False):
@@ -27,7 +32,7 @@ def code_embedding_node(state):
                 h_files[file_path] = file_content
         
         # Process C files first (implementations)
-        print(f"Processing {len(c_files)} C source files...")
+        logger.info(f"Processing {len(c_files)} C source files for embedding")
         for file_path, file_content in c_files.items():
             print(f"Embedding file: {os.path.basename(file_path)}")
             file_result = embed_code(file_content, file_path)

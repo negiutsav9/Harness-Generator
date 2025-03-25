@@ -5,9 +5,12 @@ import os
 import sys
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+import logging
 
 # Global LLM instance
 _global_llm = None
+
+logger = logging.getLogger("llm_utils")
 
 def setup_llm(model_choice='claude'):
     """Set up the LLM with optimized parameters for harness generation.
@@ -22,7 +25,10 @@ def setup_llm(model_choice='claude'):
     
     # If already initialized, return the existing instance
     if _global_llm is not None:
+        logger.debug("Using existing LLM instance")
         return _global_llm
+    
+    logger.info(f"Initializing new {model_choice} LLM instance")
     
     # Configure system prompt to encourage complete, non-truncated code generation
     system_prompt = """

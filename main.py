@@ -13,11 +13,15 @@ from core.workflow import create_workflow
 from utils.file_utils import process_directory, calculate_recursion_limit, setup_verification_directories
 from utils.llm_utils import setup_llm
 
-# Set up logging
+# Improved logging setup:
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                    handlers=[logging.FileHandler("cbmc_main.log"), logging.StreamHandler()])
 logger = logging.getLogger("main")
+
+# Reduce verbosity of other loggers
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 def main():
     """
