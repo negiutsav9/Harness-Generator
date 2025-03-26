@@ -135,10 +135,10 @@ def generator_node(state):
         Provide only the minimal, focused harness code without explanation.
         """
     else:
-        # For refinement, use improvement guidance
+        # For refinement, use a more targeted improvement guidance
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
-        You need to REFINE an existing harness based on evaluation feedback, focusing on ELIMINATING UNNECESSARY MOCKS.
+        You need to REFINE an existing harness based on SPECIFIC CBMC verification failures.
         
         {improvement_recommendation}
         
@@ -147,32 +147,18 @@ def generator_node(state):
         {previous_harness}
         ```
         
-        Create an improved version of the harness that addresses the identified issues while REMOVING UNNECESSARY CODE.
-        
         CRITICAL INSTRUCTIONS:
-        1. REMOVE any mock implementations that aren't directly necessary for verification
-        2. ELIMINATE any test code that's just there to satisfy CBMC checklist items
-        3. FOCUS only on testing real properties of the function that matter
-        4. SIMPLIFY the harness - remove anything that isn't directly testing the function
-        5. KEEP only the minimal verification needed to properly test the function
-        6. AVOID adding checks for issues that cannot occur in this function
-
-        CRITICAL INSTRUCTIONS:
-        1. REMOVE any mock implementations that aren't directly necessary for verification
-        2. ELIMINATE any test code that's just there to satisfy CBMC checklist items
-        3. FOCUS only on testing real properties of the function that matter
-        4. SIMPLIFY the harness - remove anything that isn't directly testing the function
-        5. KEEP only the minimal verification needed to properly test the function
-        6. AVOID adding checks for issues that cannot occur in this function
+        1. ADDRESS EACH SPECIFIC ISSUE mentioned in the evaluation feedback
+        2. ADD all missing header files, function declarations, and constraints
+        3. IMPLEMENT all suggested code changes precisely
+        4. ENSURE proper memory management (allocation and freeing)
+        5. FIX all pointer dereference issues with proper initialization and checks
+        6. RESOLVE declaration errors by adding the necessary declarations
+        7. IMPLEMENT stubs for functions with missing bodies if needed
         
-        The harness must use CBMC's special functions:
-        - __CPROVER_assert() for verification of properties that actually matter
-        - __CPROVER_assume() for realistic constraints
-        - nondet functions for inputs
+        Make sure your harness is complete, properly formatted, and addresses ALL the specific issues mentioned in the feedback.
         
-        Make sure your harness is complete and properly formatted.
-        
-        Provide only the improved, minimal harness code without explanation.
+        Provide only the improved harness code without explanation.
         """
     
     # Generate the harness

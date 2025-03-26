@@ -339,32 +339,32 @@ def cbmc_node(state):
                     message = "VERIFICATION FAILED: Memory leak detected."
                     suggestions = "Ensure all allocated memory is freed in all execution paths."
                 
-                if "dereference failure" in stdout.lower() or "NULL pointer" in stdout.lower():
+                elif "dereference failure" in stdout.lower() or "NULL pointer" in stdout.lower():
                     failure_types.append("null_pointer")
                     message = "VERIFICATION FAILED: Null pointer dereference detected."
                     suggestions = "Add null pointer checks before dereferencing."
                 
-                if "array bounds" in stdout.lower():
+                elif "array bounds" in stdout.lower():
                     failure_types.append("array_bounds")
                     message = "VERIFICATION FAILED: Array bounds violation detected."
                     suggestions = "Add bounds checking for array accesses."
                 
-                if "division by zero" in stdout.lower():
+                elif "division by zero" in stdout.lower():
                     failure_types.append("division_by_zero")
                     message = "VERIFICATION FAILED: Division by zero detected."
                     suggestions = "Add checks to ensure divisors are non-zero."
                 
-                if "pointer arithmetic" in stdout.lower() and "overflow" in stdout.lower():
+                elif "pointer arithmetic" in stdout.lower() and "overflow" in stdout.lower():
                     failure_types.append("pointer_overflow")
                     message = "VERIFICATION FAILED: Pointer arithmetic overflow detected."
                     suggestions = "Ensure pointer arithmetic stays within allocated bounds."
                 
-                if "arithmetic overflow" in stdout.lower():
+                elif "arithmetic overflow" in stdout.lower():
                     failure_types.append("arithmetic_overflow")
                     message = "VERIFICATION FAILED: Arithmetic overflow detected."
                     suggestions = "Add overflow checking for arithmetic operations."
                 
-                if "type" in stdout.lower() and "conversion" in stdout.lower():
+                elif "type" in stdout.lower() and "conversion" in stdout.lower():
                     failure_types.append("type_conversion")
                     message = "VERIFICATION FAILED: Problematic type conversion detected."
                     suggestions = "Verify type conversions do not result in information loss."
