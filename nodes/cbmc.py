@@ -238,7 +238,7 @@ def cbmc_node(state):
     
     # Add main CBMC options
     cbmc_cmd.extend([
-        "--function", "main",
+        "--function", "harness",
         "--memory-leak-check",
         "--memory-cleanup-check",
         "--bounds-check",
