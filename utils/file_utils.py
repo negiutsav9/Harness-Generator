@@ -5,7 +5,6 @@ import os
 import glob
 import shutil
 import logging
-from utils.code_parser import embed_code, embed_cbmc_test_files
 
 logger = logging.getLogger("file_utils")
 
@@ -58,11 +57,6 @@ def process_directory(directory_path: str) -> dict:
             except Exception as e:
                 print(f"Error reading file {file_path}: {str(e)}")
     
-    # Also look for CBMC test files
-    cbmc_test_files_count = embed_cbmc_test_files(directory_path)
-    if cbmc_test_files_count > 0:
-        logger.info(f"Embedded {cbmc_test_files_count} CBMC test files")
-    
     return source_files
 
 def calculate_recursion_limit(num_files):
@@ -109,95 +103,3 @@ def setup_verification_directories():
         os.makedirs(directory, exist_ok=True)
     
     return directories
-
-def copy_cbmc_test_files(source_directory, dest_directory="verification"):
-    """
-    Find and copy all CBMC test files to the verification directory
-    
-    Args:
-        source_directory: Base directory to look for CBMC test files
-        dest_directory: Destination directory for CBMC test files
-    
-    Returns:
-        Number of files copied
-    """
-    # Paths to look for CBMC test files
-    cbmc_test_dirs = [
-        os.path.join(source_directory, "test", "cbmc"),
-        os.path.join(os.path.dirname(source_directory), "test", "cbmc"),
-        "test/cbmc"
-    ]
-    
-    file_count = 0
-    
-    # Process each potential CBMC test directory
-    for cbmc_dir in cbmc_test_dirs:
-        if not os.path.exists(cbmc_dir):
-            continue
-            
-        logger.info(f"Found CBMC test directory: {cbmc_dir}")
-        
-        # Process include directory
-        include_dir = os.path.join(cbmc_dir, "include")
-        if os.path.exists(include_dir):
-            dest_include_dir = os.path.join(dest_directory, "include")
-            os.makedirs(dest_include_dir, exist_ok=True)
-            
-            for root, _, files in os.walk(include_dir):
-                for file in files:
-                    if file.endswith(('.h', '.c', '.cpp', '.hpp')):
-                        src_file = os.path.join(root, file)
-                        dest_file = os.path.join(dest_include_dir, file)
-                        try:
-                            shutil.copy2(src_file, dest_file)
-                            file_count += 1
-                            logger.info(f"Copied CBMC include file: {file} to {dest_file}")
-                        except Exception as e:
-                            logger.error(f"Error copying CBMC include file {src_file}: {str(e)}")
-        
-        # Process stubs directory
-        stubs_dir = os.path.join(cbmc_dir, "stubs")
-        if os.path.exists(stubs_dir):
-            dest_stubs_dir = os.path.join(dest_directory, "stubs")
-            os.makedirs(dest_stubs_dir, exist_ok=True)
-            
-            for root, _, files in os.walk(stubs_dir):
-                for file in files:
-                    if file.endswith(('.h', '.c', '.cpp', '.hpp')):
-                        src_file = os.path.join(root, file)
-                        dest_file = os.path.join(dest_stubs_dir, file)
-                        try:
-                            shutil.copy2(src_file, dest_file)
-                            file_count += 1
-                            logger.info(f"Copied CBMC stub file: {file} to {dest_file}")
-                        except Exception as e:
-                            logger.error(f"Error copying CBMC stub file {src_file}: {str(e)}")
-        
-        # Process sources directory
-        sources_dir = os.path.join(cbmc_dir, "sources")
-        if os.path.exists(sources_dir):
-            dest_sources_dir = os.path.join(dest_directory, "sources")
-            os.makedirs(dest_sources_dir, exist_ok=True)
-            
-            for root, _, files in os.walk(sources_dir):
-                for file in files:
-                    if file.endswith(('.h', '.c', '.cpp', '.hpp')):
-                        src_file = os.path.join(root, file)
-                        dest_file = os.path.join(dest_sources_dir, file)
-                        try:
-                            shutil.copy2(src_file, dest_file)
-                            file_count += 1
-                            logger.info(f"Copied CBMC source file: {file} to {dest_file}")
-                        except Exception as e:
-                            logger.error(f"Error copying CBMC source file {src_file}: {str(e)}")
-        
-        # Found a valid CBMC test directory, so we can stop looking
-        break
-        
-    # Log summary
-    if file_count > 0:
-        logger.info(f"Successfully copied {file_count} CBMC test files to {dest_directory}")
-    else:
-        logger.warning("No CBMC test files found to copy")
-        
-    return file_count

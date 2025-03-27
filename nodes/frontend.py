@@ -5,7 +5,7 @@ import os
 import re
 import time
 from langchain_core.messages import AIMessage, HumanMessage
-from utils.file_utils import process_directory, setup_verification_directories, copy_cbmc_test_files
+from utils.file_utils import process_directory
 import logging
 
 logger = logging.getLogger("frontend")
@@ -16,9 +16,6 @@ def frontend_node(state):
     start_time = time.time()
 
     logger.info("Processing incoming source code request")
-    
-    # Set up verification directories
-    setup_verification_directories()
     
     # Check if the user specified a directory path
     directory_path = None
@@ -48,17 +45,11 @@ def frontend_node(state):
                         combined_source += f"/* File: {file_path} */\n{content}\n\n"
                         file_functions[file_path] = []  # Initialize empty function list for each file
                     
-                    # Copy CBMC test files to verification directory
-                    cbmc_files_count = copy_cbmc_test_files(directory_path)
-                    cbmc_message = ""
-                    if cbmc_files_count > 0:
-                        cbmc_message = f" Found and copied {cbmc_files_count} CBMC test files."
-                    
-                    logger.info(f"Found {len(multiple_files)} C source files in {directory_path}{' and ' + str(cbmc_files_count) + ' CBMC test files' if cbmc_files_count > 0 else ''}")
+                    logger.info(f"Found {len(multiple_files)} C source files in {directory_path}")
                     print(f"Combined source code length: {len(combined_source)} bytes")
                     
                     return {
-                        "messages": [AIMessage(content=f"Processing directory: {directory_path}. Found {len(multiple_files)} C source files in source code directory.{cbmc_message}")],
+                        "messages": [AIMessage(content=f"Processing directory: {directory_path}. Found {len(multiple_files)} C source files in source code directory.")],
                         "source_files": multiple_files,
                         "source_code": combined_source,  # For backward compatibility
                         "start_time": start_time,

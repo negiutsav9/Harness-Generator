@@ -11,13 +11,8 @@ chroma_client = chromadb.Client()
 sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
 # Initialize collections
-code_collection = None
-pattern_collection = None
-
 def initialize_collections():
     """Initialize and return the code and pattern collections."""
-    global code_collection, pattern_collection
-    
     # Create or get code collection
     try:
         code_collection = chroma_client.get_collection("code_embeddings")
@@ -220,9 +215,8 @@ def initialize_collections():
     
     return code_collection, pattern_collection
 
-# Initialize collections if not already done
-if code_collection is None or pattern_collection is None:
-    code_collection, pattern_collection = initialize_collections()
+# Initialize collections globally
+code_collection, pattern_collection = initialize_collections()
 
 def query_pattern_db(query: str) -> Dict[str, Any]:
     """Queries the ChromaDB pattern database for known memory leak patterns."""
