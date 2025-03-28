@@ -39,3 +39,10 @@ class HarnessGenerationState(MessagesState):
     harness_syntax_errors: Dict[str, str] = {}  # Track syntax errors in harnesses
     parsing_issues: Dict[str, bool] = {}  # Track which functions had parsing issues
     verification_failures: Dict[str, List[str]] = {}  # Track verification failure types by function
+    
+    # New field for unit proof metrics
+    proof_metrics: Dict[str, Dict[str, Any]] = {}  # Track unit proof metrics by function
+    
+    # New fields for result directory structure
+    result_directories: Dict[str, str] = {}  # Paths to result directories
+    llm_used: str = "claude"  # LLM model being used

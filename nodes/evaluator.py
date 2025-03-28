@@ -362,9 +362,23 @@ def harness_evaluator_node(state):
     
     try:
         logger.info(f"Requesting specific issue fixes for {func_name}")
-        recommendation_response = llm.invoke([
-            HumanMessage(content=recommendation_prompt)
-        ])
+        
+        # Check for the LLM model type to handle system prompt correctly
+        model_name = str(llm).lower()
+        
+        # Setup messages for the LLM based on the model type
+        if "gemini" in model_name:
+            # For Gemini, we need to include the system prompt in the human message
+            system_content = "You are a CBMC harness evaluator. Provide detailed analysis of verification issues in JSON format."
+            recommendation_response = llm.invoke([
+                HumanMessage(content=f"{system_content}\n\n{recommendation_prompt}")
+            ])
+        else:
+            # For Claude and OpenAI models, use separate system and human messages
+            recommendation_response = llm.invoke([
+                SystemMessage(content="You are a CBMC harness evaluator. Provide detailed analysis of verification issues in JSON format."),
+                HumanMessage(content=recommendation_prompt)
+            ])
         
         # Parse LLM response
         json_match = re.search(r'```json\n(.*?)\n```', recommendation_response.content, re.DOTALL)

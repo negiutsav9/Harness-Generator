@@ -6,7 +6,7 @@ import os
 import re
 import json
 import logging
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from core.embedding_db import code_collection, query_pattern_db
 
 # Set up logging
@@ -23,6 +23,10 @@ def generator_node(state):
     
     func_name = state.get("current_function", "")
     logger.info(f"Generating harness for function: {func_name}")
+    
+    # Get result directories from state
+    result_directories = state.get("result_directories", {})
+    harnesses_dir = result_directories.get("harnesses_dir", "harnesses")  # Default to "harnesses" if not found
     
     # Check if this is a refinement
     improvement_recommendation = state.get("improvement_recommendation", "")
@@ -164,10 +168,24 @@ def generator_node(state):
     # Generate the harness
     try:
         logger.info(f"Sending API request to generate harness for {func_name}")
-        # Setup messages for the LLM
-        response = llm.invoke([
-            HumanMessage(content=generator_prompt)
-        ])
+        
+        # Check for the LLM model type to handle system prompt correctly
+        model_name = str(llm).lower()
+        
+        # Setup messages for the LLM based on the model type
+        if "gemini" in model_name:
+            # For Gemini, we need to include the system prompt in the human message
+            system_content = "You are a specialized harness generator for CBMC verification. Generate complete, focused C code that is minimal and effective."
+            response = llm.invoke([
+                HumanMessage(content=f"{system_content}\n\n{generator_prompt}")
+            ])
+        else:
+            # For Claude and OpenAI models, use separate system and human messages
+            response = llm.invoke([
+                SystemMessage(content="You are a specialized harness generator for CBMC verification. Generate complete, focused C code that is minimal and effective."),
+                HumanMessage(content=generator_prompt)
+            ])
+            
         logger.info(f"Received API response for {func_name}")
         
         # Extract the harness code
@@ -206,11 +224,8 @@ def generator_node(state):
         refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
         version_num = refinement_num + 1
         
-        # Create harness directory
-        harness_base_dir = "harnesses"
-        os.makedirs(harness_base_dir, exist_ok=True)
-        
-        func_harness_dir = os.path.join(harness_base_dir, func_name)
+        # Create function-specific directory in harnesses dir
+        func_harness_dir = os.path.join(harnesses_dir, func_name)
         os.makedirs(func_harness_dir, exist_ok=True)
         
         # Save harness to file

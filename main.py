@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser(description='CBMC Harness Generator')
     parser.add_argument('-d', '--directory', type=str, help='Directory containing C source files to analyze')
     parser.add_argument('-f', '--file', type=str, help='Single C source file to analyze')
-    parser.add_argument('-l', '--llm', type=str, choices=['claude', 'openai'], default='claude',
+    parser.add_argument('-l', '--llm', type=str, choices=['claude', 'openai', 'gemini'], default='claude',
                         help='LLM to use for code analysis and harness generation (default: claude)')
     parser.add_argument('-t', '--timeout', type=int, default=3600,
                         help='Timeout in seconds for the entire workflow (default: 3600)')
@@ -57,8 +57,16 @@ def main():
         # Set up workflow
         app = create_workflow()
         
-        # Set up verification directories
-        setup_verification_directories()
+        # Set up verification directories with LLM model name
+        directories = setup_verification_directories(llm_used=args.llm)
+        
+        # Add directories to state for access by nodes
+        result_directories = {
+            "harnesses_dir": directories["harnesses"],
+            "verification_dir": directories["verification"],
+            "reports_dir": directories["reports"],
+            "result_base_dir": directories["result_base"]
+        }
         
         if args.directory:
             # Directory mode
@@ -93,7 +101,10 @@ def main():
                         "vulnerable_functions": [],
                         "harnesses": {},
                         "cbmc_results": {},
-                        "processed_functions": []
+                        "processed_functions": [],
+                        "proof_metrics": {},  # Initialize the proof metrics field
+                        "result_directories": result_directories,  # Add result directories
+                        "llm_used": args.llm  # Add LLM info
                     },
                     {"recursion_limit": recursion_limit, "timeout": args.timeout}
                 )
@@ -140,7 +151,10 @@ def main():
                             "vulnerable_functions": [],
                             "harnesses": {},
                             "cbmc_results": {},
-                            "processed_functions": []
+                            "processed_functions": [],
+                            "proof_metrics": {},  # Initialize the proof metrics field
+                            "result_directories": result_directories,  # Add result directories
+                            "llm_used": args.llm  # Add LLM info
                         },
                         {"recursion_limit": recursion_limit, "timeout": args.timeout}
                     )
@@ -173,6 +187,7 @@ def main():
                 print(message.content)
         
         logger.info("Workflow execution results displayed")
+        print(f"\nResults are stored in: {directories['result_base']}")
         
     except Exception as e:
         logger.critical(f"Critical error: {str(e)}", exc_info=True)

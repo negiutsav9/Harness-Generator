@@ -7,6 +7,12 @@ from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 import logging
 
+# For Gemini support
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    pass
+
 # Global LLM instance
 _global_llm = None
 
@@ -16,7 +22,7 @@ def setup_llm(model_choice='claude'):
     """Set up the LLM with optimized parameters for harness generation.
     
     Args:
-        model_choice: 'claude' or 'openai' to select which LLM to use
+        model_choice: 'claude', 'openai', or 'gemini' to select which LLM to use
     
     Returns:
         A configured LLM instance ready for use
@@ -50,7 +56,7 @@ def setup_llm(model_choice='claude'):
         if model_choice.lower() == 'claude':
             anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
             if not anthropic_api_key:
-                print("ERROR: ANTHROPIC_API_KEY not set. Set this environment variable or use --llm openai.")
+                print("ERROR: ANTHROPIC_API_KEY not set. Set this environment variable or use --llm openai or --llm gemini.")
                 sys.exit(1)
             
             _global_llm = ChatAnthropic(
@@ -64,7 +70,7 @@ def setup_llm(model_choice='claude'):
         elif model_choice.lower() == 'openai':
             openai_api_key = os.environ.get("OPENAI_API_KEY")
             if not openai_api_key:
-                print("ERROR: OPENAI_API_KEY not set. Set this environment variable or use --llm claude.")
+                print("ERROR: OPENAI_API_KEY not set. Set this environment variable or use --llm claude or --llm gemini.")
                 sys.exit(1)
             
             _global_llm = ChatOpenAI(
@@ -75,8 +81,28 @@ def setup_llm(model_choice='claude'):
                 model_kwargs={"response_format": {"type": "text"}},
             )
         
+        elif model_choice.lower() == 'gemini':
+            google_api_key = os.environ.get("GOOGLE_API_KEY")
+            if not google_api_key:
+                print("ERROR: GOOGLE_API_KEY not set. Set this environment variable or use --llm claude or --llm openai.")
+                sys.exit(1)
+            
+            try:
+                _global_llm = ChatGoogleGenerativeAI(
+                    model="gemini-2.5-pro-exp-03-25",  # Use the latest Gemini 2.5 Pro model
+                    google_api_key=google_api_key,
+                    temperature=0.2,
+                    max_output_tokens=4000,
+                    convert_system_message_to_human=True,  # Handle system prompts correctly
+                )
+                # Add a system message for consistency with other models
+                # Since Gemini doesn't support system messages directly, we'll add it in the generation calls
+            except NameError:
+                print("ERROR: langchain_google_genai package not installed. Install it with 'pip install langchain-google-genai'")
+                sys.exit(1)
+        
         else:
-            raise ValueError(f"Unknown LLM choice: {model_choice}. Use 'claude' or 'openai'.")
+            raise ValueError(f"Unknown LLM choice: {model_choice}. Use 'claude', 'openai', or 'gemini'.")
         
         return _global_llm
         

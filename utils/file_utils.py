@@ -5,6 +5,7 @@ import os
 import glob
 import shutil
 import logging
+import datetime
 
 logger = logging.getLogger("file_utils")
 
@@ -84,22 +85,38 @@ def calculate_recursion_limit(num_files):
     
     return safe_limit
 
-def setup_verification_directories():
+def setup_verification_directories(llm_used="claude"):
     """
-    Set up the directory structure for verification.
-    """
-    # Create organized directory structure
-    directories = [
-        "harnesses",
-        "verification",
-        "verification/src",
-        "verification/include",
-        "verification/stubs",
-        "verification/sources",
-        "reports"
-    ]
+    Set up the directory structure for verification with model and timestamp.
     
-    for directory in directories:
+    Args:
+        llm_used: The LLM model being used (claude, openai, or gemini)
+        
+    Returns:
+        dict: Dictionary containing the paths to the created directories
+    """
+    # Create timestamp for the run
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Create base result directory
+    result_base = os.path.join("results", llm_used, timestamp)
+    
+    # Create the directory structure
+    directories = {
+        "result_base": result_base,
+        "harnesses": os.path.join(result_base, "harnesses"),
+        "verification": os.path.join(result_base, "verification"),
+        "verification_src": os.path.join(result_base, "verification", "src"),
+        "verification_include": os.path.join(result_base, "verification", "include"),
+        "verification_stubs": os.path.join(result_base, "verification", "stubs"),
+        "verification_sources": os.path.join(result_base, "verification", "sources"),
+        "reports": os.path.join(result_base, "reports")
+    }
+    
+    # Create all directories
+    for directory in directories.values():
         os.makedirs(directory, exist_ok=True)
+        
+    logger.info(f"Created result directories in {result_base}")
     
     return directories

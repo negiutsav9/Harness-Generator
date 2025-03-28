@@ -14,12 +14,70 @@ def output_node(state):
 
     logger.info("Generating final report and output summaries")
     
+    # Get result directories from state
+    result_directories = state.get("result_directories", {})
+    reports_dir = result_directories.get("reports_dir", "reports")
+    harnesses_dir = result_directories.get("harnesses_dir", "harnesses")
+    verification_dir = result_directories.get("verification_dir", "verification")
+    result_base_dir = result_directories.get("result_base_dir", "results")
+    
+    # Get LLM model info
+    llm_used = state.get("llm_used", "claude")
+    
     # Determine if we're in directory mode
     is_directory_mode = state.get("is_directory_mode", False)
     
     # Calculate summary statistics
     function_times = state.get("function_times", {})
     total_refinements = sum(state.get("refinement_attempts", {}).values())
+    
+    # Get the proof metrics
+    proof_metrics = state.get("proof_metrics", {})
+    
+    # Calculate aggregate proof metrics
+    aggregate_metrics = {
+        "total_reachable_lines": 0,
+        "total_covered_lines": 0,
+        "func_reachable_lines": 0,
+        "func_covered_lines": 0,
+        "total_reported_errors": 0,
+        "functions_with_full_coverage": 0,
+        "functions_without_errors": 0
+    }
+    
+    # Compute the aggregated proof metrics
+    for func_name, metrics in proof_metrics.items():
+        if "timeout" not in metrics and "system_error" not in metrics:  # Skip timeouts and errors
+            aggregate_metrics["total_reachable_lines"] += metrics.get("total_reachable_lines", 0)
+            
+            # Calculate covered lines from total_reachable_lines and total_coverage
+            covered_lines = int(metrics.get("total_reachable_lines", 0) * metrics.get("total_coverage", 0) / 100)
+            aggregate_metrics["total_covered_lines"] += covered_lines
+            
+            aggregate_metrics["func_reachable_lines"] += metrics.get("func_reachable_lines", 0)
+            
+            # Calculate function covered lines
+            func_covered_lines = int(metrics.get("func_reachable_lines", 0) * metrics.get("func_coverage", 0) / 100)
+            aggregate_metrics["func_covered_lines"] += func_covered_lines
+            
+            aggregate_metrics["total_reported_errors"] += metrics.get("reported_errors", 0)
+            
+            # Count functions with full coverage
+            if metrics.get("func_coverage", 0) == 100.0:
+                aggregate_metrics["functions_with_full_coverage"] += 1
+                
+            # Count functions without errors
+            if metrics.get("reported_errors", 0) == 0:
+                aggregate_metrics["functions_without_errors"] += 1
+    
+    # Calculate overall coverage percentages
+    overall_total_coverage = 0
+    if aggregate_metrics["total_reachable_lines"] > 0:
+        overall_total_coverage = (aggregate_metrics["total_covered_lines"] / aggregate_metrics["total_reachable_lines"]) * 100
+        
+    overall_func_coverage = 0
+    if aggregate_metrics["func_reachable_lines"] > 0:
+        overall_func_coverage = (aggregate_metrics["func_covered_lines"] / aggregate_metrics["func_reachable_lines"]) * 100
     
     # Create performance metrics
     if function_times:
@@ -34,7 +92,7 @@ def output_node(state):
     if is_directory_mode:
         source_files = state.get("source_files", {})
         header = [
-            "# CBMC Harness Generation Complete - Directory Mode",
+            f"# CBMC Harness Generation Complete - Directory Mode - {llm_used.capitalize()}",
             "",
             f"Total processing time: {total_time:.2f} seconds",
             f"Processed {len(source_files)} source files.",
@@ -75,7 +133,7 @@ def output_node(state):
     else:
         # Single file mode header
         header = [
-            "# CBMC Harness Generation Complete",
+            f"# CBMC Harness Generation Complete - {llm_used.capitalize()}",
             "",
             f"Total processing time: {total_time:.2f} seconds",
             f"Analyzed {len(state.get('embeddings', {}).get('functions', {}))} functions.",
@@ -83,6 +141,24 @@ def output_node(state):
             f"Generated {len(state.get('harnesses', {}))} verification harnesses.",
             f"Performed {total_refinements} harness refinements (average {avg_refinements:.2f} per function).",
         ]
+    
+    # Add unit proof metrics summary
+    header.extend([
+        "",
+        "## Unit Proof Metrics Summary",
+        f"Total reachable lines: {aggregate_metrics['total_reachable_lines']}",
+        f"Total coverage: {overall_total_coverage:.2f}%",
+        f"Total reachable lines for harnessed functions only: {aggregate_metrics['func_reachable_lines']}",
+        f"Coverage of harnessed functions only: {overall_func_coverage:.2f}%",
+        f"Number of reported errors: {aggregate_metrics['total_reported_errors']}",
+        f"Functions with full coverage: {aggregate_metrics['functions_with_full_coverage']} of {len(proof_metrics)}",
+        f"Functions without errors: {aggregate_metrics['functions_without_errors']} of {len(proof_metrics)}",
+        "",
+        "### Note on Error Reporting:",
+        "- Errors are grouped by line number (one error per line)",
+        "- Errors about missing function bodies are excluded",
+        "- Loop unwinding assertions are excluded from error count",
+    ])
     
     # Add performance metrics
     header.extend([
@@ -116,12 +192,38 @@ def output_node(state):
             if result.get("suggestions"):
                 header.append(f"Suggestions: {result['suggestions']}")
             
+            # Add proof metrics for this function
+            if func_name in proof_metrics:
+                metrics = proof_metrics[func_name]
+                header.append(f"\n#### Unit Proof Metrics")
+                
+                if "timeout" in metrics or "system_error" in metrics:
+                    status = "timeout" if "timeout" in metrics else "system error"
+                    header.append(f"- Total reachable lines: N/A ({status})")
+                    header.append(f"- Total coverage: N/A ({status})")
+                    header.append(f"- Function reachable lines: N/A ({status})")
+                    header.append(f"- Function coverage: N/A ({status})")
+                    header.append(f"- Reported errors: N/A ({status})")
+                else:
+                    header.append(f"- Total reachable lines: {metrics.get('total_reachable_lines', 'N/A')}")
+                    header.append(f"- Total coverage: {metrics.get('total_coverage', 0):.2f}%")
+                    header.append(f"- Function reachable lines: {metrics.get('func_reachable_lines', 'N/A')}")
+                    header.append(f"- Function coverage: {metrics.get('func_coverage', 0):.2f}%")
+                    header.append(f"- Reported errors: {metrics.get('reported_errors', 0)}")
+                
+                # Add error details if any
+                if metrics.get('reported_errors', 0) > 0 and metrics.get('error_lines'):
+                    header.append(f"\n#### Error Details")
+                    for file_name, line_nums in metrics.get('error_lines', {}).items():
+                        header.append(f"- File: {file_name}")
+                        header.append(f"  - Error lines: {', '.join(map(str, sorted(line_nums)))}")
+            
             # Add harness evolution information
             harness_history = state.get("harness_history", {}).get(func_name, [])
             if harness_history:
-                header.append(f"Harness Evolution:")
+                header.append(f"\n#### Harness Evolution:")
                 for i, _ in enumerate(harness_history):
-                    header.append(f"  - Version {i+1}: harnesses/{func_name}/v{i+1}.c")
+                    header.append(f"  - Version {i+1}: {os.path.join(harnesses_dir, func_name, f'v{i+1}.c')}")
                 
                 # Add improvement metrics if there were multiple versions
                 if len(harness_history) > 1:
@@ -142,20 +244,20 @@ def output_node(state):
                     else:
                         header.append(f"  - Refinement result: Some issues remain after {refinements} refinements")
             
-            # List all verification reports
-            header.append(f"Verification Reports: ")
+            # List all verification reports with updated paths
+            header.append(f"\n#### Verification Reports: ")
             for i in range(1, refinements + 2):  # +2 because initial version is 1, and we need to go one past the refinement count
-                header.append(f"  - verification/{func_name}/v{i}_results.txt")
-                header.append(f"  - verification/{func_name}/v{i}_report.md")
+                header.append(f"  - {os.path.join(verification_dir, func_name, f'v{i}_results.txt')}")
+                header.append(f"  - {os.path.join(verification_dir, func_name, f'v{i}_report.md')}")
     
     final_summary = "\n".join(header)
     
-    # Create a main index report file
-    report_dir = "reports"
-    os.makedirs(report_dir, exist_ok=True)
+    # Create the report file
+    os.makedirs(reports_dir, exist_ok=True)
     
     # Save final report
-    with open(f"{report_dir}/final_report.md", "w") as f:
+    final_report_path = os.path.join(reports_dir, "final_report.md")
+    with open(final_report_path, "w") as f:
         f.write(final_summary)
         f.flush()
         os.fsync(f.fileno())
@@ -164,7 +266,8 @@ def output_node(state):
     try:
         # Try to generate HTML report if markdown is available
         import markdown
-        with open(f"{report_dir}/final_report.html", "w") as f:
+        html_report_path = os.path.join(reports_dir, "final_report.html")
+        with open(html_report_path, "w") as f:
             f.write("<html><head><title>CBMC Verification Report</title>")
             f.write("<style>body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px}h1{color:#2c3e50}h2{color:#3498db}h3{color:#2980b9}pre{background:#f8f8f8;border:1px solid #ddd;padding:10px;overflow:auto;border-radius:3px}table{border-collapse:collapse;width:100%}table,th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}tr:nth-child(even){background-color:#f9f9f9}</style>")
             f.write("</head><body>")
@@ -172,27 +275,43 @@ def output_node(state):
             f.write("</body></html>")
     except ImportError:
         # If markdown is not available, create a simple HTML version
-        with open(f"{report_dir}/final_report.html", "w") as f:
+        html_report_path = os.path.join(reports_dir, "final_report.html")
+        with open(html_report_path, "w") as f:
             f.write("<html><head><title>CBMC Verification Report</title></head><body>")
             f.write("<pre>" + final_summary + "</pre>")
             f.write("</body></html>")
     
     # Generate index.html that links to all reports
-    with open(f"{report_dir}/index.html", "w") as f:
+    index_path = os.path.join(reports_dir, "index.html")
+    with open(index_path, "w") as f:
         f.write("<html><head><title>CBMC Verification Index</title>")
         f.write("<style>body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px}h1{color:#2c3e50}h2{color:#3498db}h3{color:#2980b9}table{border-collapse:collapse;width:100%}table,th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}tr:nth-child(even){background-color:#f9f9f9}a{color:#3498db;text-decoration:none}a:hover{text-decoration:underline}</style>")
         f.write("</head><body>")
         f.write("<h1>CBMC Verification Reports</h1>")
         f.write("<p>This index provides links to all verification reports generated.</p>")
+        f.write(f"<p><strong>LLM Model Used:</strong> {llm_used.capitalize()}</p>")
         
         # Link to final report
         f.write("<h2>Final Summary Report</h2>")
-        f.write("<p><a href='final_report.html'>View Complete Summary Report</a></p>")
+        f.write(f"<p><a href='final_report.html'>View Complete Summary Report</a></p>")
+        
+        # Add proof metrics summary table
+        f.write("<h2>Unit Proof Metrics Summary</h2>")
+        f.write("<table>")
+        f.write("<tr><th>Metric</th><th>Value</th></tr>")
+        f.write(f"<tr><td>Total reachable lines</td><td>{aggregate_metrics['total_reachable_lines']}</td></tr>")
+        f.write(f"<tr><td>Total coverage</td><td>{overall_total_coverage:.2f}%</td></tr>")
+        f.write(f"<tr><td>Harnessed functions reachable lines</td><td>{aggregate_metrics['func_reachable_lines']}</td></tr>")
+        f.write(f"<tr><td>Harnessed functions coverage</td><td>{overall_func_coverage:.2f}%</td></tr>")
+        f.write(f"<tr><td>Total reported errors</td><td>{aggregate_metrics['total_reported_errors']}</td></tr>")
+        f.write(f"<tr><td>Functions with full coverage</td><td>{aggregate_metrics['functions_with_full_coverage']} of {len(proof_metrics)}</td></tr>")
+        f.write(f"<tr><td>Functions without errors</td><td>{aggregate_metrics['functions_without_errors']} of {len(proof_metrics)}</td></tr>")
+        f.write("</table>")
         
         # Table of function reports
         f.write("<h2>Function Reports</h2>")
         f.write("<table>")
-        f.write("<tr><th>Function</th><th>File</th><th>Status</th><th>Versions</th><th>Reports</th></tr>")
+        f.write("<tr><th>Function</th><th>File</th><th>Status</th><th>Coverage</th><th>Errors</th><th>Versions</th><th>Reports</th></tr>")
         
         for func_name in state.get("vulnerable_functions", []):
             if func_name in state.get("cbmc_results", {}):
@@ -219,18 +338,51 @@ def output_node(state):
                 # Get version count
                 version_count = len(state.get("harness_history", {}).get(func_name, [])) or refinements + 1
                 
-                f.write(f"<tr><td>{display_name}</td><td>{file_name}</td><td {status_style}>{result['status']}</td>")
+                # Get function metrics
+                metrics = proof_metrics.get(func_name, {})
+                func_coverage = metrics.get("func_coverage", 0)
+                reported_errors = metrics.get("reported_errors", 0)
                 
-                # Add links to all harness versions 
+                # Determine coverage color
+                coverage_style = ""
+                if func_coverage >= 90:
+                    coverage_style = "style='color:green;font-weight:bold'"
+                elif func_coverage >= 70:
+                    coverage_style = "style='color:orange;font-weight:bold'"
+                elif func_coverage > 0:
+                    coverage_style = "style='color:red;font-weight:bold'"
+                else:
+                    coverage_style = "style='color:gray;font-weight:bold'"
+                
+                # Determine error color
+                error_style = ""
+                if reported_errors == 0:
+                    error_style = "style='color:green;font-weight:bold'"
+                else:
+                    error_style = "style='color:red;font-weight:bold'"
+                
+                # Get coverage and error display values
+                coverage_display = f"{func_coverage:.2f}%" if "timeout" not in metrics and "system_error" not in metrics else "N/A"
+                errors_display = str(reported_errors) if "timeout" not in metrics and "system_error" not in metrics else "N/A"
+                
+                f.write(f"<tr><td>{display_name}</td><td>{file_name}</td><td {status_style}>{result['status']}</td>")
+                f.write(f"<td {coverage_style}>{coverage_display}</td>")
+                f.write(f"<td {error_style}>{errors_display}</td>")
+                
+                # Add links to all harness versions
                 f.write("<td>")
                 for i in range(1, version_count + 1):
-                    f.write(f"<a href='../harnesses/{func_name}/v{i}.c'>v{i}</a> ")
+                    harness_path = os.path.join(harnesses_dir, func_name, f"v{i}.c")
+                    relative_path = os.path.relpath(harness_path, reports_dir)
+                    f.write(f"<a href='../{relative_path}'>v{i}</a> ")
                 f.write("</td>")
                 
                 # Add links to all version reports
                 f.write("<td>")
                 for i in range(1, refinements + 2):
-                    f.write(f"<a href='../verification/{func_name}/v{i}_report.md'>v{i}</a> ")
+                    report_path = os.path.join(verification_dir, func_name, f"v{i}_report.md")
+                    relative_path = os.path.relpath(report_path, reports_dir)
+                    f.write(f"<a href='../{relative_path}'>v{i}</a> ")
                 f.write("</td></tr>")
         
         f.write("</table>")
@@ -244,7 +396,7 @@ def output_node(state):
             f.write("<p>The following functions underwent multiple iterations of refinement:</p>")
             
             f.write("<table>")
-            f.write("<tr><th>Function</th><th>Versions</th><th>Final Status</th><th>Line Count Evolution</th></tr>")
+            f.write("<tr><th>Function</th><th>Versions</th><th>Final Status</th><th>Line Count Evolution</th><th>Coverage Evolution</th></tr>")
             
             for func_name in evolution_data:
                 history = state.get("harness_history", {}).get(func_name, [])
@@ -276,13 +428,22 @@ def output_node(state):
                 if ":" in func_name:
                     _, display_name = func_name.split(":", 1)
                 
+                # Coverage evolution - only available if we have it
+                coverage_evolution = "N/A"
+                metrics = proof_metrics.get(func_name, {})
+                if "timeout" not in metrics and "system_error" not in metrics and metrics.get("func_coverage") is not None:
+                    coverage_evolution = f"{metrics.get('func_coverage', 0):.2f}%"
+                
                 f.write(f"<tr><td>{display_name}</td><td>{versions}</td>")
-                f.write(f"<td {status_style}>{status}</td><td>{line_evolution}</td></tr>")
+                f.write(f"<td {status_style}>{status}</td><td>{line_evolution}</td><td>{coverage_evolution}</td></tr>")
             
             f.write("</table>")
         
         f.write("</body></html>")
     
+    # Calculate relative path for displaying in message
+    result_path = os.path.relpath(result_base_dir)
+    
     return {
-        "messages": [AIMessage(content=f"Analysis complete! Reports generated in the 'reports' directory. View the main index at reports/index.html")]
+        "messages": [AIMessage(content=f"Analysis complete! Reports generated in '{result_path}'. Main index at {os.path.join(result_path, 'reports', 'index.html')}")]
     }

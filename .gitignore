@@ -40,7 +40,8 @@ origin/*.py
 harnesses
 verification
 reports
-coreHTTP/
+coreHTTP
+coreHTTP/*
 demo
 
 # ChromaDB files

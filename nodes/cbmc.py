@@ -21,6 +21,11 @@ def cbmc_node(state):
 
     logger.info(f"Starting CBMC verification for function {func_name}")
     
+    # Get result directories from state
+    result_directories = state.get("result_directories", {})
+    verification_base_dir = result_directories.get("verification_dir", "verification")
+    harnesses_dir = result_directories.get("harnesses_dir", "harnesses")
+    
     if not harness_code:
         logger.error(f"No harness available for function {func_name}")
         return {
@@ -34,10 +39,6 @@ def cbmc_node(state):
     
     if ":" in func_name:
         file_basename, original_func_name = func_name.split(":", 1)
-    
-    # Create organized directory structure for verification
-    verification_base_dir = "verification"
-    os.makedirs(verification_base_dir, exist_ok=True)
     
     # Create function-specific directory
     func_verification_dir = os.path.join(verification_base_dir, func_name)
@@ -247,6 +248,11 @@ def cbmc_node(state):
         f"--object-bits", "8",  # Default for CBMC_OBJECT_BITS
     ])
     
+    # Add coverage metrics options
+    cbmc_cmd.extend([
+        "--cover", "location", # For line coverage
+    ])
+    
     # Add CBMC object size constraint definition
     cbmc_cmd.extend([
         "-DCBMC_MAX_OBJECT_SIZE=" + str(cbmc_max_object_size)
@@ -268,7 +274,7 @@ def cbmc_node(state):
     
     # Save the command for debugging
     cmd_file = os.path.join(func_verification_dir, f"v{version_num}_command.txt")
-    with open(cmd_file, 'w') as f:
+    with open(cmd_file, "w") as f:
         f.write(" ".join(cbmc_cmd))
     
     # Initialize dictionaries for tracking errors if they don't exist
@@ -276,6 +282,11 @@ def cbmc_node(state):
     harness_syntax_errors = state.get("harness_syntax_errors", {}).copy()
     parsing_issues = state.get("parsing_issues", {}).copy()
     verification_failures = state.get("verification_failures", {}).copy()
+    
+    # Initialize proof metrics dictionary
+    proof_metrics = state.get("proof_metrics", {}).copy()
+    if func_name not in proof_metrics:
+        proof_metrics[func_name] = {}
     
     try:
         # Use subprocess.run for more reliable output capture
@@ -401,6 +412,78 @@ def cbmc_node(state):
                         message += f" Error: {stderr[:200]}..."
                     suggestions = suggestions or "Check the CBMC command and harness for errors."
         
+        # Extract unit proof metrics
+        
+        # 1. Total reachable lines
+        total_reachable_lines = 0
+        total_reachable_match = re.search(r'(\d+) of (\d+) lines covered \((\d+\.\d+)%\)', stdout)
+        if total_reachable_match:
+            total_covered_lines = int(total_reachable_match.group(1))
+            total_reachable_lines = int(total_reachable_match.group(2))
+            total_coverage = float(total_reachable_match.group(3))
+        else:
+            # Try alternative format or calculation method
+            # Fallback approach
+            coverage_lines = [line for line in stdout.split('\n') if "% coverage" in line]
+            if coverage_lines:
+                for line in coverage_lines:
+                    match = re.search(r'(\d+)/(\d+) lines covered \((\d+\.\d+)%\)', line)
+                    if match:
+                        total_covered_lines = int(match.group(1))
+                        total_reachable_lines = int(match.group(2))
+                        total_coverage = float(match.group(3))
+                        break
+        
+        # 2. Total coverage already extracted above as total_coverage
+        
+        # 3 & 4. Function-specific coverage
+        func_reachable_lines = 0
+        func_covered_lines = 0
+        func_coverage = 0.0
+        
+        # Look for coverage info for the specific function
+        func_coverage_pattern = r'('+re.escape(original_func_name)+r')[^:]*:\s+(\d+)/(\d+)\s+lines covered\s+\((\d+\.\d+)%\)'
+        func_coverage_match = re.search(func_coverage_pattern, stdout)
+        
+        if func_coverage_match:
+            func_covered_lines = int(func_coverage_match.group(2))
+            func_reachable_lines = int(func_coverage_match.group(3))
+            func_coverage = float(func_coverage_match.group(4))
+        
+        # 5. Number of reported errors (grouped by line)
+        # Extract all error lines, excluding unwinding assertions and missing function bodies
+        error_lines = {}
+        
+        # Find all error lines that don't match the exclusion criteria
+        for line in stdout.split('\n'):
+            # First, collect line numbers with errors
+            if "VERIFICATION FAILED" in line:
+                # Exclude specific error types
+                if "unwinding assertion" in line or "no body for function" in line:
+                    continue
+                
+                # Extract location information
+                loc_match = re.search(r'file ([^:]+):(\d+)', line)
+                if loc_match:
+                    file_name = loc_match.group(1)
+                    line_num = int(loc_match.group(2))
+                    if file_name not in error_lines:
+                        error_lines[file_name] = set()
+                    error_lines[file_name].add(line_num)
+        
+        # Count total unique line errors
+        total_unique_errors = sum(len(lines) for lines in error_lines.values())
+        
+        # Store the proof metrics
+        proof_metrics[func_name] = {
+            "total_reachable_lines": total_reachable_lines,
+            "total_coverage": total_coverage if 'total_coverage' in locals() else 0.0,
+            "func_reachable_lines": func_reachable_lines,
+            "func_coverage": func_coverage,
+            "reported_errors": total_unique_errors,
+            "error_lines": error_lines  # Store the actual line numbers for reference
+        }
+        
         # Update the results dictionary
         cbmc_results = state.get("cbmc_results", {}).copy()
         cbmc_results[func_name] = {
@@ -425,6 +508,12 @@ def cbmc_node(state):
             f.write(f"Message: {message}\n")
             if suggestions:
                 f.write(f"Suggestions: {suggestions}\n")
+            f.write("\n=== PROOF METRICS ===\n")
+            f.write(f"Total reachable lines: {total_reachable_lines}\n")
+            f.write(f"Total coverage: {proof_metrics[func_name]['total_coverage']:.2f}%\n")
+            f.write(f"Function reachable lines: {func_reachable_lines}\n")
+            f.write(f"Function coverage: {func_coverage:.2f}%\n")
+            f.write(f"Reported errors: {total_unique_errors}\n")
             f.write("\nDetailed Output:\n")
             f.write(full_output)
         
@@ -443,8 +532,27 @@ def cbmc_node(state):
             if suggestions:
                 f.write(f"**Suggestions:** {suggestions}\n\n")
             
+            # Add Proof Metrics section
+            f.write(f"## Proof Metrics\n\n")
+            f.write(f"| Metric | Value |\n")
+            f.write(f"|--------|-------|\n")
+            f.write(f"| Total reachable lines | {total_reachable_lines} |\n")
+            f.write(f"| Total coverage | {proof_metrics[func_name]['total_coverage']:.2f}% |\n")
+            f.write(f"| Function reachable lines | {func_reachable_lines} |\n")
+            f.write(f"| Function coverage | {func_coverage:.2f}% |\n")
+            f.write(f"| Reported errors | {total_unique_errors} |\n\n")
+            
+            # Add error details if any
+            if total_unique_errors > 0:
+                f.write(f"### Error Details\n\n")
+                for file_name, line_nums in error_lines.items():
+                    f.write(f"**File:** {file_name}\n\n")
+                    f.write(f"Error lines: {', '.join(map(str, sorted(line_nums)))}\n\n")
+            
+            # Update path to harness file to reflect new structure
+            harness_path = os.path.join(harnesses_dir, func_name, f"v{version_num}.c")
             f.write(f"## Harness Details\n\n")
-            f.write(f"The harness file is located at: `harnesses/{func_name}/v{version_num}.c`\n\n")
+            f.write(f"The harness file is located at: `{harness_path}`\n\n")
             
             f.write(f"## Verification Command\n\n")
             f.write(f"```\n{' '.join(cbmc_cmd)}\n```\n\n")
@@ -482,6 +590,17 @@ def cbmc_node(state):
             e.process.kill()
             e.process.wait()
         
+        # Initialize metrics with default values for timeout
+        proof_metrics[func_name] = {
+            "total_reachable_lines": 0,
+            "total_coverage": 0.0,
+            "func_reachable_lines": 0,
+            "func_coverage": 0.0,
+            "reported_errors": 0,
+            "error_lines": {},
+            "timeout": True
+        }
+        
         # Handle timeout
         cbmc_results = state.get("cbmc_results", {}).copy()
         cbmc_results[func_name] = {
@@ -502,6 +621,12 @@ def cbmc_node(state):
             f.write(f"Function: {func_name}\n")
             f.write(f"Version: {version_num}\n")
             f.write(f"Status: TIMEOUT\n")
+            f.write(f"=== PROOF METRICS ===\n")
+            f.write(f"Total reachable lines: N/A (timeout)\n")
+            f.write(f"Total coverage: N/A (timeout)\n")
+            f.write(f"Function reachable lines: N/A (timeout)\n")
+            f.write(f"Function coverage: N/A (timeout)\n")
+            f.write(f"Reported errors: N/A (timeout)\n")
             f.write(f"Error: CBMC verification timed out after 60 seconds\n")
             f.write(f"Suggestions: The function may have complex paths requiring longer verification time. Consider simplifying.\n")
             
@@ -514,6 +639,21 @@ def cbmc_node(state):
             f.write(f"**Message:** CBMC verification timed out after 60 seconds.\n\n")
             f.write(f"**Suggestions:** The function may have complex paths requiring longer verification time. Consider simplifying.\n\n")
             
+            # Add empty proof metrics section
+            f.write(f"## Proof Metrics\n\n")
+            f.write(f"| Metric | Value |\n")
+            f.write(f"|--------|-------|\n")
+            f.write(f"| Total reachable lines | N/A (timeout) |\n")
+            f.write(f"| Total coverage | N/A (timeout) |\n")
+            f.write(f"| Function reachable lines | N/A (timeout) |\n")
+            f.write(f"| Function coverage | N/A (timeout) |\n")
+            f.write(f"| Reported errors | N/A (timeout) |\n\n")
+            
+            # Update path to harness file to reflect new structure
+            harness_path = os.path.join(harnesses_dir, func_name, f"v{version_num}.c")
+            f.write(f"## Harness Details\n\n")
+            f.write(f"The harness file is located at: `{harness_path}`\n\n")
+            
             f.write(f"## Analysis\n\n")
             f.write(f"The verification process timed out, which typically happens when the function has many complex paths or loops that CBMC needs to analyze. You may need to simplify the harness or consider using loop unwinding bounds to limit the verification scope.\n\n")
             
@@ -521,46 +661,6 @@ def cbmc_node(state):
             f.write(f"1. Review the harness implementation and simplify if possible\n")
             f.write(f"2. Add loop unwinding bounds if there are loops in the function\n")
             f.write(f"3. Consider breaking the verification into smaller parts\n")
-    
-    except Exception as e:
-        # Handle errors
-        cbmc_results = state.get("cbmc_results", {}).copy()
-        cbmc_results[func_name] = {
-            "function": func_name,
-            "status": "ERROR",
-            "message": f"Error running CBMC: {str(e)}",
-            "suggestions": "Check if CBMC is installed correctly.",
-            "stdout": f"ERROR: {str(e)}",
-            "version": version_num,
-            "has_syntax_error": False,
-            "has_parsing_issue": False,
-            "verification_failure_types": ["system_error"]
-        }
-        
-        # Save error to file
-        verification_file = os.path.join(func_verification_dir, f"v{version_num}_results.txt")
-        with open(verification_file, "w") as f:
-            f.write(f"Function: {func_name}\n")
-            f.write(f"Version: {version_num}\n")
-            f.write(f"Status: ERROR\n")
-            f.write(f"Error: {str(e)}\n")
-            
-        # Generate error report
-        report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
-        with open(report_file, "w") as f:
-            f.write(f"# CBMC Verification Report - {func_name} (Version {version_num})\n\n")
-            f.write(f"## Summary\n\n")
-            f.write(f"**Status:** ERROR\n\n")
-            f.write(f"**Message:** Error running CBMC: {str(e)}\n\n")
-            f.write(f"**Suggestions:** Check if CBMC is installed correctly.\n\n")
-            
-            f.write(f"## Analysis\n\n")
-            f.write(f"The verification process encountered an error. This is typically due to issues with the CBMC installation or with the harness itself.\n\n")
-            
-            f.write(f"## Next Steps\n\n")
-            f.write(f"1. Verify your CBMC installation is working correctly\n")
-            f.write(f"2. Check the harness for syntax errors\n")
-            f.write(f"3. Review the error message for specific issues to fix\n")
     
     # Calculate verification time
     verification_time = time.time() - verification_start
@@ -571,17 +671,24 @@ def cbmc_node(state):
         function_times[func_name] = {}
     function_times[func_name]["verification"] = verification_time
     
+    # Update result message with new paths
+    result_base_dir = result_directories.get("result_base_dir", "results")
+    result_message = f"CBMC verification for function {func_name} v{version_num} complete in {verification_time:.2f}s. Status: {cbmc_results[func_name]['status']}."
+    result_message += f" Results saved to {func_verification_dir}/v{version_num}_results.txt"
+    
     return {
-        "messages": [AIMessage(content=f"CBMC verification for function {func_name} v{version_num} complete in {verification_time:.2f}s. Status: {cbmc_results[func_name]['status']}. Results saved to {func_verification_dir}/v{version_num}_results.txt")],
+        "messages": [AIMessage(content=result_message)],
         "cbmc_results": cbmc_results,
         "function_times": function_times,
         "cbmc_error_messages": cbmc_error_messages,
         "harness_syntax_errors": harness_syntax_errors,
         "parsing_issues": parsing_issues,
         "verification_failures": verification_failures,
+        "proof_metrics": proof_metrics,  # Pass the proof metrics through the state
         "next": "evaluator"  # Always proceed to evaluator
     }
 
 def route_from_cbmc(state):
-    """Routes from CBMC to harness evaluator."""
+    """Routes from CBMC to harness evaluator and passes proof metrics."""
+    # Always route to evaluator
     return "evaluator"
