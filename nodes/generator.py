@@ -89,28 +89,132 @@ def generator_node(state):
         else:
             verification_guide = "This function doesn't appear to need special CBMC verification checks beyond basic assertions."
         
-        # Clear guidance about avoiding unnecessary mocks
-        cbmc_verification_info = f"""
-        {verification_guide}
+        # Access the CBMC framework info from state
+        cbmc_framework = state.get("cbmc_framework", {
+            "has_framework": False,
+            "utility_functions": {},
+            "cbmc_headers": [],
+            "harness_naming_patterns": {}
+        })
         
-        IMPORTANT GUIDELINES:
+        # Process CBMC framework information if available
+        if cbmc_framework.get("has_framework", False):
+            # Format CBMC headers information
+            cbmc_headers_list = cbmc_framework.get("cbmc_headers", [])
+            cbmc_headers_text = ""
+            if cbmc_headers_list:
+                cbmc_headers_text = "Available CBMC Headers:\n"
+                for header in cbmc_headers_list:
+                    cbmc_headers_text += f"- {header}\n"
+            
+            # Format utility functions information
+            utility_functions = cbmc_framework.get("utility_functions", {})
+            utility_functions_text = ""
+            if utility_functions:
+                utility_functions_text = "Available CBMC Utility Functions:\n"
+                for func_name, func_info in utility_functions.items():
+                    header = func_info.get("header", "unknown")
+                    utility_functions_text += f"- {func_name} (from {header})\n"
+            
+            # Determine appropriate harness naming pattern
+            original_func_name = func_name.split(":")[-1] if ":" in func_name else func_name
+            harness_name = f"{original_func_name}_harness"
+            naming_patterns = cbmc_framework.get("harness_naming_patterns", {})
+            if original_func_name in naming_patterns:
+                harness_name = naming_patterns[original_func_name]
+            
+            # Create framework guidance
+            framework_section = f"""
+            CBMC verification framework detected. Use these resources for better verification:
+            
+            {cbmc_headers_text}
+            {utility_functions_text}
+            
+            Recommended harness structure:
+            1. Include the necessary CBMC headers listed above
+            2. Use CBMC utility functions for memory allocation and validation
+            3. Name your harness function: {harness_name}()
+            4. Use "__CPROVER_assume()" for input constraints
+            5. If the function has local implementations, provide them
+            """
+        else:
+            # Standard guidance if no CBMC framework detected
+            framework_section = """
+            No specialized CBMC framework detected. Use standard CBMC harness approach:
+            1. Create a main() function that calls the target function
+            2. Use malloc() with appropriate size checks
+            3. Use __CPROVER_assume() for input constraints
+            4. Free any allocated memory
+            """
         
-        1. Do NOT create mock implementations that aren't necessary for verification.
-        2. Focus ONLY on testing the actual function behavior, not on artificial scenarios.
-        3. Only implement verification checks that are relevant to this specific function.
-        4. Avoid creating test cases for verification types that don't apply to this function.
-        5. Keep the harness minimal and focused on real potential issues.
+        # Get function dependencies
+        func_dependencies = state.get("function_dependencies", {}).get(func_name, [])
         
-        The harness should:
-        - Use __CPROVER_assert() only for properties that could actually fail in this function
-        - Use __CPROVER_assume() to specify realistic input constraints
-        - Use nondet functions like nondet_int() for inputs that need to be nondeterministic
-        """
+        # Build dependency information for the generator
+        dependency_info = []
+        dependency_code_examples = []
+        for dep_name in func_dependencies:
+            # Query for the dependency by name
+            dep_results = code_collection.query(
+                query_texts=[dep_name], 
+                n_results=1
+            )
+            
+            if dep_results["ids"] and len(dep_results["ids"][0]) > 0:
+                dep_id = dep_results["ids"][0][0]
+                dep_result = code_collection.get(ids=[dep_id], include=["documents", "metadatas"])
+                if dep_result["ids"]:
+                    dep_code = dep_result["documents"][0]
+                    dep_metadata = dep_result["metadatas"][0]
+                    
+                    # Extract function signature
+                    dep_return_type = dep_metadata.get("return_type", "unknown")
+                    dep_params = dep_metadata.get("params", "")
+                    
+                    # Add to dependencies list
+                    dep_info = {
+                        "name": dep_name,
+                        "id": dep_id,
+                        "return_type": dep_return_type,
+                        "params": dep_params,
+                        "exists_in_codebase": True
+                    }
+                    dependency_info.append(dep_info)
+                    
+                    # Add example code showing how to call it
+                    # Extract minimal signature for reference
+                    dep_signature = f"{dep_return_type} {dep_name}({dep_params});"
+                    dependency_code_examples.append(dep_signature)
         
-        # Build generator prompt with focused verification
+        # Create dependency section
+        if dependency_info:
+            dependency_section = "FUNCTION DEPENDENCIES:\nThe following functions are called by this function and are available in the codebase:\n"
+            for dep in dependency_info:
+                dependency_section += f"\n- {dep['return_type']} {dep['name']}({dep['params']})"
+            
+            # Add example code section if we have dependencies
+            dependency_section += "\n\nFunction declarations (for reference only):\n"
+            for example in dependency_code_examples:
+                dependency_section += f"\n{example}"
+        else:
+            dependency_section = "FUNCTION DEPENDENCIES:\nNo external function dependencies found for this function in the codebase."
+        
+        # Get available headers from state
+        available_headers = state.get("embeddings", {}).get("available_headers", [])
+        
+        # Build a clear list of available headers
+        headers_section = "AVAILABLE HEADER FILES:\n"
+        if available_headers:
+            for header in available_headers:
+                headers_section += f"- {header}\n"
+        else:
+            headers_section += "No header files found in the codebase. You will need to include standard library headers only.\n"
+        headers_section += "\nNOTE: Only include header files that actually exist in the codebase or standard libraries."
+        
+        # Build generator prompt with focused verification and dependency info
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
-        Create a MINIMAL, FOCUSED harness for the following function WITHOUT unnecessary mocks:
+        Create a MINIMAL, FOCUSED harness for the following function:
         
         ```c
         {func_code}
@@ -122,19 +226,28 @@ def generator_node(state):
         - Contains malloc: {has_malloc}
         - Contains free: {has_free}
         
+        {headers_section}
+        
+        {dependency_section}
+        
+        {framework_section}
+        
         Matching vulnerability patterns:
         {json.dumps(patterns_result.get('matching_patterns', {}), indent=2)}
         
-        {cbmc_verification_info}
+        {verification_guide}
         
         CRITICAL INSTRUCTIONS:
-        1. DO NOT create mock implementations of functions that aren't directly related to verification
-        2. DO NOT implement stubs or test code just to satisfy CBMC checklist items
-        3. ONLY verify properties that are relevant to this specific function
-        4. DO NOT add checks for issues that cannot occur in this function
-        5. Keep the harness SMALL and FOCUSED - don't add anything that isn't necessary
-        6. If function dependencies are unavailable, minimize assumptions rather than creating elaborate mocks
-        7. Follow CBMC's harness structure with a void main() function
+        1. ONLY include header files that actually exist in the codebase or standard libraries
+        2. DO NOT create mock implementations for any functions - use only real functions from the codebase
+        3. If you need to call a function that isn't confirmed to exist, use a standard library alternative
+        4. FOCUS ONLY on verifying actual properties of the function under test
+        5. USE __CPROVER_assume() only for realistic input constraints
+        6. USE nondet functions for inputs that need to be nondeterministic: nondet_int(), nondet_size_t(), etc.
+        7. INCLUDE only headers that are definitely needed
+        8. The function under test is '{func_name}' - make sure to call this exact function with appropriate parameters
+        
+        Your harness must be minimal and focused - only create what's necessary to test the function.
         
         Provide only the minimal, focused harness code without explanation.
         """
@@ -152,13 +265,16 @@ def generator_node(state):
         ```
         
         CRITICAL INSTRUCTIONS:
-        1. ADDRESS EACH SPECIFIC ISSUE mentioned in the evaluation feedback
-        2. ADD all missing header files, function declarations, and constraints
-        3. IMPLEMENT all suggested code changes precisely
-        4. ENSURE proper memory management (allocation and freeing)
-        5. FIX all pointer dereference issues with proper initialization and checks
-        6. RESOLVE declaration errors by adding the necessary declarations
-        7. IMPLEMENT stubs for functions with missing bodies if needed
+        1. DO NOT create mock implementations of any functions - all required functions already exist in the code database
+        2. ADDRESS EACH SPECIFIC ISSUE mentioned in the evaluation feedback
+        3. ADD all missing header files, function declarations, and constraints
+        4. IMPLEMENT all suggested code changes precisely
+        5. ENSURE proper memory management (allocation and freeing)
+        6. FIX all pointer dereference issues with proper initialization and checks
+        7. RESOLVE declaration errors by adding the necessary declarations
+        8. NEVER implement stubs or mocks for functions that should exist in the codebase
+        9. REMOVE any existing mock implementations or stubs you find in the previous harness
+        10. Focus ONLY on creating a direct test of the function with appropriate inputs
         
         Make sure your harness is complete, properly formatted, and addresses ALL the specific issues mentioned in the feedback.
         
@@ -172,17 +288,32 @@ def generator_node(state):
         # Check for the LLM model type to handle system prompt correctly
         model_name = str(llm).lower()
         
+        # Enhanced system prompt to strongly discourage mocks and stubs
+        system_prompt = """
+        You are a specialized harness generator for CBMC verification. Generate complete, correct, minimal code.
+
+        IMPORTANT RULES:
+        1. ALWAYS create a function named 'void main()' as the ONLY entry point
+        2. DO NOT create functions named 'harness()', 'test_harness()', or any other entry point
+        3. NEVER create mock implementations or stubs - use existing functions from the codebase
+        4. ONLY include headers that actually exist in the codebase or standard libraries
+        5. AVOID creating any helper functions or utility code
+        6. Create DIRECT tests of the function behavior with appropriate inputs
+        7. FOCUS on real verification concerns, not artificial test scenarios
+
+        Your code must be minimal, focused, and use ONLY 'void main()' as the entry point.
+        """
+        
         # Setup messages for the LLM based on the model type
         if "gemini" in model_name:
             # For Gemini, we need to include the system prompt in the human message
-            system_content = "You are a specialized harness generator for CBMC verification. Generate complete, focused C code that is minimal and effective."
             response = llm.invoke([
-                HumanMessage(content=f"{system_content}\n\n{generator_prompt}")
+                HumanMessage(content=f"{system_prompt}\n\n{generator_prompt}")
             ])
         else:
             # For Claude and OpenAI models, use separate system and human messages
             response = llm.invoke([
-                SystemMessage(content="You are a specialized harness generator for CBMC verification. Generate complete, focused C code that is minimal and effective."),
+                SystemMessage(content=system_prompt),
                 HumanMessage(content=generator_prompt)
             ])
             
@@ -195,9 +326,10 @@ def generator_node(state):
             harness_code = match.group(1)
         
         # Validate harness completeness
+        # Validate harness completeness
         has_main = "void main(" in harness_code or "int main(" in harness_code
         balanced_braces = harness_code.count("{") <= harness_code.count("}")
-        
+
         if not has_main or not balanced_braces:
             logger.warning(f"Incomplete harness for {func_name}, attempting to fix")
             
@@ -209,8 +341,65 @@ def generator_node(state):
             
             # Make sure there's a main function
             if not has_main:
-                if "int main" not in harness_code and "void main" not in harness_code:
-                    harness_code += "\n\nvoid main() {\n    // Auto-generated main function\n}"
+                # Always add a void main() function regardless of CBMC framework
+                harness_code += "\n\nvoid main() {\n    // Auto-generated main function\n}"
+            
+        
+        # Detect and remove potential stubs/mocks
+        harness_lines = harness_code.split('\n')
+        filtered_lines = []
+        in_stub_implementation = False
+        stub_markers = ["// Stub implementation", "/* Stub ", "/* Mock ",
+                     "// Mock implementation", "// Mock function"]
+        
+        for line in harness_lines:
+            # Check if this line starts a stub implementation
+            if any(marker in line for marker in stub_markers) or (line.strip().startswith("//") and "stub" in line.lower()):
+                in_stub_implementation = True
+                continue
+                
+            # Check if we're at the end of a stubbed function
+            if in_stub_implementation and "}" in line and not line.strip().startswith("//"):
+                # This might be the end of a stub function
+                in_stub_implementation = False
+                continue
+                
+            # If we're not in a stub implementation, keep the line
+            if not in_stub_implementation:
+                filtered_lines.append(line)
+        
+        # Reconstruct the harness without stub implementations
+        harness_code = '\n'.join(filtered_lines)
+        
+        # Check for non-existent headers
+        available_headers = state.get("embeddings", {}).get("available_headers", [])
+        standard_headers = ["stdio.h", "stdlib.h", "string.h", "stddef.h", "stdint.h", 
+                           "stdbool.h", "math.h", "ctype.h", "time.h", "limits.h",
+                           "assert.h", "errno.h", "float.h", "signal.h"]
+        
+        updated_lines = []
+        for line in harness_code.split('\n'):
+            if line.strip().startswith("#include"):
+                include_match = re.search(r'#include\s+[<"]([^>"]+)[>"]', line)
+                if include_match:
+                    header_name = include_match.group(1)
+                    # Keep the line if it's a standard header or in available headers
+                    if header_name in standard_headers or header_name in available_headers:
+                        updated_lines.append(line)
+                    else:
+                        # Skip the non-existent header
+                        logger.warning(f"Removing non-existent header: {header_name}")
+                        # Add comment explaining the removal
+                        updated_lines.append(f"// Removed non-existent header: {header_name}")
+                else:
+                    # Keep the line if it doesn't match the pattern (unlikely)
+                    updated_lines.append(line)
+            else:
+                # Keep all non-include lines
+                updated_lines.append(line)
+        
+        # Reconstruct the harness without non-existent headers
+        harness_code = '\n'.join(updated_lines)
         
         # Save the new harness to history
         if harness_code not in harness_history[func_name]:

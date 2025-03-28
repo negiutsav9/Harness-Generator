@@ -127,27 +127,37 @@ def cbmc_node(state):
         with open(source_file, "w") as f:
             f.write(state.get("source_code", ""))
     
-    # Find source files - prioritize verification/sources directory
+    # Find source files with more priority for CBMC test files
     source_files = []
-    
-    # First, look for files in the sources directory
+
+    # First priority: Look for files in the verification/sources directory
     sources_dir_files = [f for f in os.listdir(verification_sources_dir) if f.endswith(('.c', '.cpp'))]
     if sources_dir_files:
         # Use all files from the sources directory
         for file in sources_dir_files:
             source_files.append(os.path.join(verification_sources_dir, file))
     else:
-        # Fall back to src directory if no files in sources directory
-        src_dir_files = [f for f in os.listdir(verification_src_dir) if f.endswith(('.c', '.cpp'))]
-        if src_dir_files:
-            for file in src_dir_files:
-                source_files.append(os.path.join(verification_src_dir, file))
+        # Second priority: Look for CBMC test files in the source directory
+        cbmc_test_files = []
+        for root, dirs, files in os.walk(verification_src_dir):
+            for file in files:
+                if file.endswith(('.c', '.cpp')) and "test/cbmc" in root:
+                    cbmc_test_files.append(os.path.join(root, file))
+        
+        if cbmc_test_files:
+            source_files.extend(cbmc_test_files)
         else:
-            # Create a fallback source file if no source files were found
-            fallback_source = os.path.join(verification_src_dir, "source.c")
-            with open(fallback_source, "w") as f:
-                f.write("// Fallback source file\n")
-            source_files.append(fallback_source)
+            # Third priority: Use regular source files
+            src_dir_files = [f for f in os.listdir(verification_src_dir) if f.endswith(('.c', '.cpp'))]
+            if src_dir_files:
+                for file in src_dir_files:
+                    source_files.append(os.path.join(verification_src_dir, file))
+            else:
+                # Create a fallback source file if no source files were found
+                fallback_source = os.path.join(verification_src_dir, "source.c")
+                with open(fallback_source, "w") as f:
+                    f.write("// Fallback source file\n")
+                source_files.append(fallback_source)
             
     # Write harness to file - use original function name in the filename
     harness_filename = original_func_name if ":" not in func_name else original_func_name

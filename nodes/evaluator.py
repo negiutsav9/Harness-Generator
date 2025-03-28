@@ -43,7 +43,7 @@ def harness_evaluator_node(state):
         state_refinement_attempts[func_name] = 0
     
     current_attempts = state_refinement_attempts.get(func_name, 0)
-    max_refinements = 3
+    max_refinements = 6
     
     # Get processed functions from state
     state_processed_functions = state.get("processed_functions", []).copy()
@@ -178,8 +178,41 @@ def harness_evaluator_node(state):
         elif "free" in line:
             free_operations.append(line.strip())
     
+    # Check for stub implementations
+    stub_markers = ["// Stub implementation", "/* Stub ", "/* Mock ", "// Mock implementation"]
+    contains_stubs = any(marker in harness_code for marker in stub_markers)
+    
+    # Look for function implementations
+    func_impl_pattern = r"(\w+)\s+(\w+)\s*\([^)]*\)\s*\{[^}]+\}"
+    potential_stubs = re.findall(func_impl_pattern, harness_code)
+    # Filter out main function
+    potential_stubs = [f for f in potential_stubs if f[1] != "main"]
+    
+    # Check for non-existent headers
+    available_headers = state.get("embeddings", {}).get("available_headers", [])
+    standard_headers = ["stdio.h", "stdlib.h", "string.h", "stddef.h", "stdint.h", 
+                       "stdbool.h", "math.h", "ctype.h", "time.h", "limits.h",
+                       "assert.h", "errno.h", "float.h", "signal.h"]
+    
+    non_existent_headers = []
+    for line in harness_code.split('\n'):
+        if line.strip().startswith("#include"):
+            include_match = re.search(r'#include\s+[<"]([^>"]+)[>"]', line)
+            if include_match:
+                header_name = include_match.group(1)
+                if (header_name not in available_headers and header_name not in standard_headers):
+                    non_existent_headers.append(header_name)
+    
     # Determine specific issues based on failures and errors
     specific_issues = []
+    
+    # Add issues for non-existent headers if any
+    if non_existent_headers:
+        specific_issues.append(f"Harness includes non-existent header files: {', '.join(non_existent_headers)}")
+    
+    # Check if harness contains stubs/mocks that should be eliminated
+    if contains_stubs or potential_stubs:
+        specific_issues.append("Harness contains unnecessary mock/stub implementations")
     
     # Check for memory leaks
     if "__CPROVER__start.memory-leak" in "".join(failure_lines):
@@ -223,6 +256,17 @@ def harness_evaluator_node(state):
     
     # Determine specific fixes based on the issues
     specific_fixes = []
+    
+    # First recommend removing non-existent headers if any exist
+    if non_existent_headers:
+        specific_fixes.append("Remove non-existent header files or replace them with standard headers")
+        for header in non_existent_headers:
+            specific_fixes.append(f"Remove include: #include \"{header}\"")
+    
+    # Next recommend removing stubs if any exist
+    if contains_stubs or potential_stubs:
+        specific_fixes.append("Remove all mock and stub implementations from the harness")
+        specific_fixes.append("Use only actual functions from the codebase")
     
     # Check for missing header includes
     missing_headers = set()
@@ -286,7 +330,7 @@ def harness_evaluator_node(state):
     
     # Check for no body errors
     if no_body_matches:
-        specific_fixes.append("Add stubs or mock implementations for functions with missing bodies")
+        specific_fixes.append("Use only functions that exist in the codebase - do not call functions that aren't implemented")
     
     # Check for assertion failures
     if assertion_matches:
@@ -344,7 +388,15 @@ def harness_evaluator_node(state):
     CURRENT FREE OPERATIONS:
     {chr(10).join(free_operations) if free_operations else "No free operations found"}
     
-    Please provide very specific, concrete code changes to fix these issues. Do NOT try to categorize them into types - focus on fixing the exact issues shown in the CBMC output.
+    NON-EXISTENT HEADERS:
+    {chr(10).join(non_existent_headers) if non_existent_headers else "No non-existent headers found"}
+    
+    THE MOST CRITICAL ISSUE: 
+    Check for and remove any mock implementations or stubs. Do not implement functions that should already exist in the codebase.
+    Instead of creating stubs, assume the function exists and just declare its prototype if needed.
+    Also remove any non-existent header files that don't exist in the codebase.
+    
+    Please provide very specific, concrete code changes to fix these issues. Focus on removing stubs/mocks and using actual functions from the codebase.
     
     Respond with a JSON object containing:
     {{
@@ -352,6 +404,8 @@ def harness_evaluator_node(state):
         "explanation": "Brief explanation of the main issues",
         "specific_issues": ["issue1", "issue2", ...],
         "specific_fixes": ["fix1", "fix2", ...],
+        "has_stubs_or_mocks": true or false,
+        "has_nonexistent_headers": true or false,
         "code_changes": {{
             "add_includes": ["<header1.h>", ...],
             "add_declarations": ["type func(args);", ...],
@@ -365,6 +419,12 @@ def harness_evaluator_node(state):
             ],
             "free_operations": [
                 "free(ptr);"
+            ],
+            "remove_headers": [
+                "header_name.h"
+            ],
+            "remove_stubs": [
+                {{"start_line": "// Stub implementation for func1", "end_line": "}} // End of stub"}}
             ]
         }}
     }}
@@ -383,14 +443,14 @@ def harness_evaluator_node(state):
         # Setup messages for the LLM based on the model type
         if "gemini" in model_name:
             # For Gemini, we need to include the system prompt in the human message
-            system_content = "You are a CBMC harness evaluator. Provide detailed analysis of verification issues in JSON format."
+            system_content = "You are a CBMC harness evaluator. Focus on removing mock implementations and using real functions from the codebase. Provide detailed analysis of verification issues in JSON format."
             recommendation_response = llm.invoke([
                 HumanMessage(content=f"{system_content}\n\n{recommendation_prompt}")
             ])
         else:
             # For Claude and OpenAI models, use separate system and human messages
             recommendation_response = llm.invoke([
-                SystemMessage(content="You are a CBMC harness evaluator. Provide detailed analysis of verification issues in JSON format."),
+                SystemMessage(content="You are a CBMC harness evaluator. Focus on removing mock implementations and using real functions from the codebase. Provide detailed analysis of verification issues in JSON format."),
                 HumanMessage(content=recommendation_prompt)
             ])
         
@@ -406,7 +466,23 @@ def harness_evaluator_node(state):
         explanation = recommendations.get("explanation", "")
         specific_issues = recommendations.get("specific_issues", [])
         specific_fixes = recommendations.get("specific_fixes", [])
+        has_stubs_or_mocks = recommendations.get("has_stubs_or_mocks", False)
+        has_nonexistent_headers = recommendations.get("has_nonexistent_headers", False)
         code_changes = recommendations.get("code_changes", {})
+        
+        # Prioritize stub/mock removal if detected
+        if has_stubs_or_mocks:
+            if "Harness contains unnecessary mock/stub implementations" not in specific_issues:
+                specific_issues.insert(0, "Harness contains unnecessary mock/stub implementations")
+            if "Remove all mock and stub implementations" not in specific_fixes:
+                specific_fixes.insert(0, "Remove all mock and stub implementations from the harness")
+                
+        # Prioritize non-existent header removal if detected
+        if has_nonexistent_headers:
+            if not any("non-existent header" in issue for issue in specific_issues):
+                specific_issues.insert(0, "Harness includes non-existent header files")
+            if not any("non-existent header" in fix for fix in specific_fixes):
+                specific_fixes.insert(0, "Remove non-existent header files and use only standard headers or headers from the codebase")
         
         logger.info(f"Generated fixes for {func_name} - needs improvement: {needs_improvement}")
         
@@ -417,12 +493,15 @@ def harness_evaluator_node(state):
         explanation = "CBMC verification failed with specific issues detected in the output."
         specific_issues = specific_issues if specific_issues else ["CBMC verification failed"]
         specific_fixes = specific_fixes if specific_fixes else ["Review CBMC output and fix identified issues"]
+        has_stubs_or_mocks = contains_stubs or bool(potential_stubs)
+        has_nonexistent_headers = bool(non_existent_headers)
         code_changes = {
             "add_includes": list(missing_headers),
             "add_declarations": list(missing_nondets),
             "add_constraints": [],
             "buffer_size_changes": [],
-            "free_operations": []
+            "free_operations": [],
+            "remove_headers": non_existent_headers,
         }
     
     # Construct improvement recommendation if needed
@@ -435,6 +514,12 @@ def harness_evaluator_node(state):
         proposed_changes_text = ""
         if code_changes:
             proposed_changes_text = "\n\nProposed code changes:\n"
+            
+            # Add headers to remove
+            if "remove_headers" in code_changes and code_changes["remove_headers"]:
+                proposed_changes_text += "\nRemove non-existent headers:\n"
+                for header in code_changes["remove_headers"]:
+                    proposed_changes_text += f"- Remove: #include \"{header}\"\n"
             
             # Add includes
             if "add_includes" in code_changes and code_changes["add_includes"]:
@@ -477,9 +562,29 @@ def harness_evaluator_node(state):
                 proposed_changes_text += "\nAdd free operations:\n"
                 for free_op in code_changes["free_operations"]:
                     proposed_changes_text += f"- Add: {free_op}\n"
+            
+            # Remove stubs
+            if "remove_stubs" in code_changes and code_changes["remove_stubs"]:
+                proposed_changes_text += "\nRemove stub implementations:\n"
+                for stub in code_changes["remove_stubs"]:
+                    proposed_changes_text += f"- Remove from: {stub.get('start_line', '')}\n  To: {stub.get('end_line', '')}\n"
         
         # Add raw failures for context
         raw_failures_text = "\n".join(failure_lines[:15]) if failure_lines else "No specific failure lines found"
+
+        # Add raw failures for context
+        if failure_lines:
+            raw_failures_text = "\n".join(failure_lines[:20])  # Show more failure lines
+            failure_summary = "\n\nFAILURE SUMMARY:\n"
+            
+            # Group failures by category
+            for category, details in failure_details.items():
+                failure_summary += f"\n{category} failures ({len(details)}):\n"
+                for detail in details[:3]:  # Show first 3 of each category
+                    failure_summary += f"- {detail}\n"
+        else:
+            raw_failures_text = "No specific failure lines found"
+            failure_summary = ""
         
         # Build the full improvement recommendation
         improvement_recommendation = f"""
@@ -495,6 +600,8 @@ def harness_evaluator_node(state):
         Recommended fixes:
         {fixes_text}
         {proposed_changes_text}
+
+        {failure_summary}
         
         Raw CBMC verification failures:
         {raw_failures_text}
@@ -509,10 +616,16 @@ def harness_evaluator_node(state):
         {func_code}
         ```
         
-        Please refine the harness to address these SPECIFIC issues. Focus on:
-        1. Fixing the exact failures shown in the CBMC output
-        2. Adding the recommended includes, declarations, and constraints
-        3. Making the specific code changes suggested above
+        CRITICAL INSTRUCTIONS:
+        1. DO NOT CREATE ANY MOCK OR STUB IMPLEMENTATIONS
+        2. Use only functions that actually exist in the codebase
+        3. Only include header files that actually exist in the codebase or standard libraries
+        4. Focus on creating a minimal test harness with appropriate inputs
+        5. Fix the exact failures shown in the CBMC output
+        6. Add the recommended includes, declarations, and constraints
+        7. If you need to call a function, assume it exists and just declare its prototype
+        8. REMOVE any existing stubs or mocks from the previous harness
+        9. Make the harness as minimal and focused as possible
         
         Generate a complete, working harness that passes CBMC verification.
         """

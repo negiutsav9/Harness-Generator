@@ -30,6 +30,29 @@ def frontend_node(state):
                 print(f"Directory path detected: {directory_path}")
                 multiple_files = process_directory(directory_path)
                 
+                # Add CBMC test files to embedding
+                cbmc_dirs = [
+                    os.path.join(directory_path, "test", "cbmc", "include"),
+                    os.path.join(directory_path, "test", "cbmc", "stubs"),
+                    os.path.join(directory_path, "test", "cbmc", "sources")
+                ]
+
+                # Look one level up if not found
+                if not any(os.path.exists(d) for d in cbmc_dirs):
+                    cbmc_dirs = [
+                        os.path.join(os.path.dirname(directory_path), "test", "cbmc", "include"),
+                        os.path.join(os.path.dirname(directory_path), "test", "cbmc", "stubs"),
+                        os.path.join(os.path.dirname(directory_path), "test", "cbmc", "sources")
+                    ]
+
+                # Process CBMC files
+                for cbmc_dir in cbmc_dirs:
+                    if os.path.exists(cbmc_dir):
+                        print(f"Adding CBMC test files from {cbmc_dir}")
+                        cbmc_files = process_directory(cbmc_dir)
+                        # Add to our source files dictionary
+                        multiple_files.update(cbmc_files)
+                
                 if multiple_files:
                     # Determine source subdirectory for reporting
                     source_subdir = os.path.join(directory_path, "source")
