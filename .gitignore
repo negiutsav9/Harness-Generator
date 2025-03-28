@@ -39,10 +39,10 @@ origin/
 origin/*.py
 harnesses
 verification
-reports
 coreHTTP
 coreHTTP/*
 demo
+notes.txt
 
 # ChromaDB files
 .chroma/

@@ -34,6 +34,9 @@ def harness_evaluator_node(state):
     parsing_issues = state.get("parsing_issues", {})
     verification_failures = state.get("verification_failures", {})
     
+    # Get proof metrics to ensure we pass them through
+    proof_metrics = state.get("proof_metrics", {}).copy()
+    
     # Safety: Initialize refinement_attempts if not present
     state_refinement_attempts = state.get("refinement_attempts", {}).copy()
     if func_name not in state_refinement_attempts:
@@ -55,6 +58,7 @@ def harness_evaluator_node(state):
             "messages": [AIMessage(content=f"Maximum refinement attempts ({max_refinements}) reached for {func_name}. Moving to next function.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
+            "proof_metrics": proof_metrics,  # Ensure we pass the proof metrics forward
             "loop_counter": loop_counter,
             "next": "junction"
         }
@@ -71,6 +75,7 @@ def harness_evaluator_node(state):
         return {
             "messages": [AIMessage(content=f"Error: Missing harness or CBMC result for function {func_name}. Marking as processed.")],
             "processed_functions": state_processed_functions,
+            "proof_metrics": proof_metrics,  # Pass proof metrics even on error
             "loop_counter": loop_counter,
             "next": "junction"
         }
@@ -85,6 +90,7 @@ def harness_evaluator_node(state):
         return {
             "messages": [AIMessage(content=f"Error: Function {func_name} metadata not found. Marking as processed.")],
             "processed_functions": state_processed_functions,
+            "proof_metrics": proof_metrics,  # Pass proof metrics even on error
             "loop_counter": loop_counter,
             "next": "junction"
         }
@@ -109,11 +115,19 @@ def harness_evaluator_node(state):
         if func_name not in state_processed_functions:
             state_processed_functions.append(func_name)
         logger.info(f"CBMC verification successful for {func_name}, marking as processed and moving to next function")
+        
+        # Log the proof metrics for successful verifications
+        if func_name in proof_metrics:
+            metrics = proof_metrics[func_name]
+            logger.info(f"Proof metrics for {func_name}: reachable_lines={metrics.get('total_reachable_lines', 0)}, " 
+                       f"coverage={metrics.get('total_coverage', 0):.2f}%, errors={metrics.get('reported_errors', 0)}")
+        
         return {
             "messages": [AIMessage(content=f"CBMC verification successful for {func_name}. Moving to next function.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
             "function_times": function_times,
+            "proof_metrics": proof_metrics,  # Explicitly pass the proof metrics
             "loop_counter": loop_counter,
             "next": "junction"
         }
@@ -514,6 +528,12 @@ def harness_evaluator_node(state):
     # Update function times
     function_times[func_name]["evaluation"] = evaluation_time
     
+    # Log proof metrics
+    if func_name in proof_metrics:
+        metrics = proof_metrics[func_name]
+        logger.info(f"Current proof metrics for {func_name}: reachable_lines={metrics.get('total_reachable_lines', 0)}, " 
+                   f"coverage={metrics.get('total_coverage', 0):.2f}%, errors={metrics.get('reported_errors', 0)}")
+    
     # Update refinement attempts if needed - using refined logic
     if needs_improvement:
         if current_attempts < max_refinements - 1:  # Allow one more attempt
@@ -525,6 +545,7 @@ def harness_evaluator_node(state):
                 "processed_functions": state_processed_functions,
                 "improvement_recommendation": improvement_recommendation,
                 "function_times": function_times,
+                "proof_metrics": proof_metrics,  # Explicitly pass the proof metrics
                 "loop_counter": loop_counter,
                 "next": "generator"
             }
@@ -538,6 +559,7 @@ def harness_evaluator_node(state):
                 "messages": [AIMessage(content=f"Final refinement attempt for {func_name} completed. Moving to next function.")],
                 "refinement_attempts": state_refinement_attempts,
                 "processed_functions": state_processed_functions,
+                "proof_metrics": proof_metrics,  # Explicitly pass the proof metrics
                 "loop_counter": loop_counter,
                 "next": "junction"
             }
@@ -550,6 +572,7 @@ def harness_evaluator_node(state):
             "messages": [AIMessage(content=f"Evaluation successful for {func_name}. No improvements needed.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
+            "proof_metrics": proof_metrics,  # Explicitly pass the proof metrics
             "loop_counter": loop_counter,
             "next": "junction"
         }

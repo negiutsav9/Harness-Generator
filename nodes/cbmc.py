@@ -240,17 +240,7 @@ def cbmc_node(state):
     # Add main CBMC options
     cbmc_cmd.extend([
         "--function", "main",
-        "--memory-leak-check",
-        "--memory-cleanup-check",
-        "--bounds-check",
-        "--pointer-overflow-check",
-        "--div-by-zero-check",
         f"--object-bits", "8",  # Default for CBMC_OBJECT_BITS
-    ])
-    
-    # Add coverage metrics options
-    cbmc_cmd.extend([
-        "--cover", "location", # For line coverage
     ])
     
     # Add CBMC object size constraint definition
@@ -288,25 +278,110 @@ def cbmc_node(state):
     if func_name not in proof_metrics:
         proof_metrics[func_name] = {}
     
+    # First, run property checking (based on coreHTTP's approach)
+    property_cmd = cbmc_cmd.copy()
+    property_cmd.extend([
+        "--memory-leak-check",
+        "--memory-cleanup-check",
+        "--bounds-check",
+        "--pointer-overflow-check",
+        "--div-by-zero-check",
+        "--unwinding-assertions"
+    ])
+
+    # Create a separate command for coverage with compatible flags, also based on coreHTTP
+    coverage_cmd = cbmc_cmd.copy()
+    coverage_cmd.extend([
+        "--cover", "location",
+        "--xml-ui",  # Using XML format for consistent parsing
+        "--no-unwinding-assertions"
+    ])
+
     try:
-        # Use subprocess.run for more reliable output capture
-        process = subprocess.run(
-            cbmc_cmd,
+        # First run the property checking
+        logger.info(f"Running property checking for {func_name}")
+        property_process = subprocess.run(
+            property_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             timeout=60,
-            check=False  # Don't raise exception on non-zero return
+            check=False
         )
         
-        stdout = process.stdout
-        stderr = process.stderr
-        returncode = process.returncode
+        stdout = property_process.stdout
+        stderr = property_process.stderr
+        returncode = property_process.returncode
         
-        # Combine stdout and stderr for more complete output
-        full_output = stdout
-        if stderr:
-            full_output += "\n--- STDERR ---\n" + stderr
+        # Then run the coverage checking separately
+        logger.info(f"Running coverage checking for {func_name}")
+        coverage_process = subprocess.run(
+            coverage_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+            check=False
+        )
+        
+        coverage_stdout = coverage_process.stdout
+        coverage_stderr = coverage_process.stderr
+        
+        # Extract coverage metrics using an approach similar to coreHTTP
+        logger.info(f"Extracting coverage metrics for {func_name}")
+        
+        # Initialize metrics
+        total_blocks = 0
+        covered_blocks = 0
+        impl_blocks = 0
+        impl_covered = 0
+        
+        # Parse coverage output - look for both XML and text formats
+        if "<coverage" in coverage_stdout:
+            # XML format parsing
+            coverage_lines = coverage_stdout.split('\n')
+            
+            for line in coverage_lines:
+                if '<coverage' in line and 'location' in line:
+                    total_blocks += 1
+                    if 'status="satisfied"' in line:
+                        covered_blocks += 1
+                        
+                    # Check if this is an implementation block
+                    if "_harness.c" not in line and ".c:" in line:
+                        impl_blocks += 1
+                        if 'status="satisfied"' in line:
+                            impl_covered += 1
+        else:
+            # Text format parsing as backup
+            coverage_lines = [line for line in coverage_stdout.split('\n') if "coverage" in line.lower()]
+            
+            # Count coverage blocks
+            total_blocks = sum(1 for line in coverage_lines if "coverage." in line)
+            covered_blocks = sum(1 for line in coverage_lines if "SATISFIED" in line)
+            
+            # Count implementation blocks
+            impl_coverage_lines = [line for line in coverage_lines 
+                                if "_harness.c" not in line and ".c:" in line]
+            impl_blocks = len(impl_coverage_lines)
+            impl_covered = sum(1 for line in impl_coverage_lines if "SATISFIED" in line)
+        
+        # Calculate coverage percentages
+        if total_blocks > 0:
+            total_coverage = (covered_blocks / total_blocks) * 100
+        else:
+            total_coverage = 0.0
+            
+        if impl_blocks > 0:
+            func_coverage = (impl_covered / impl_blocks) * 100
+        else:
+            func_coverage = 0.0
+        
+        # Set the metrics values
+        total_reachable_lines = total_blocks
+        total_covered_lines = covered_blocks
+        func_reachable_lines = impl_blocks
+        func_covered_lines = impl_covered
         
         # Process results
         status = "SUCCESS" if returncode == 0 else "FAILED"
@@ -412,46 +487,7 @@ def cbmc_node(state):
                         message += f" Error: {stderr[:200]}..."
                     suggestions = suggestions or "Check the CBMC command and harness for errors."
         
-        # Extract unit proof metrics
-        
-        # 1. Total reachable lines
-        total_reachable_lines = 0
-        total_reachable_match = re.search(r'(\d+) of (\d+) lines covered \((\d+\.\d+)%\)', stdout)
-        if total_reachable_match:
-            total_covered_lines = int(total_reachable_match.group(1))
-            total_reachable_lines = int(total_reachable_match.group(2))
-            total_coverage = float(total_reachable_match.group(3))
-        else:
-            # Try alternative format or calculation method
-            # Fallback approach
-            coverage_lines = [line for line in stdout.split('\n') if "% coverage" in line]
-            if coverage_lines:
-                for line in coverage_lines:
-                    match = re.search(r'(\d+)/(\d+) lines covered \((\d+\.\d+)%\)', line)
-                    if match:
-                        total_covered_lines = int(match.group(1))
-                        total_reachable_lines = int(match.group(2))
-                        total_coverage = float(match.group(3))
-                        break
-        
-        # 2. Total coverage already extracted above as total_coverage
-        
-        # 3 & 4. Function-specific coverage
-        func_reachable_lines = 0
-        func_covered_lines = 0
-        func_coverage = 0.0
-        
-        # Look for coverage info for the specific function
-        func_coverage_pattern = r'('+re.escape(original_func_name)+r')[^:]*:\s+(\d+)/(\d+)\s+lines covered\s+\((\d+\.\d+)%\)'
-        func_coverage_match = re.search(func_coverage_pattern, stdout)
-        
-        if func_coverage_match:
-            func_covered_lines = int(func_coverage_match.group(2))
-            func_reachable_lines = int(func_coverage_match.group(3))
-            func_coverage = float(func_coverage_match.group(4))
-        
-        # 5. Number of reported errors (grouped by line)
-        # Extract all error lines, excluding unwinding assertions and missing function bodies
+        # Find all error lines, excluding unwinding assertions and missing function bodies
         error_lines = {}
         
         # Find all error lines that don't match the exclusion criteria
@@ -475,9 +511,16 @@ def cbmc_node(state):
         total_unique_errors = sum(len(lines) for lines in error_lines.values())
         
         # Store the proof metrics
+        logger.info(f"Proof metrics for {func_name}:")
+        logger.info(f"  Total reachable lines: {total_reachable_lines}")
+        logger.info(f"  Total coverage: {total_coverage:.2f}%")
+        logger.info(f"  Function reachable lines: {func_reachable_lines}")
+        logger.info(f"  Function coverage: {func_coverage:.2f}%")
+        logger.info(f"  Reported errors: {total_unique_errors}")
+        
         proof_metrics[func_name] = {
             "total_reachable_lines": total_reachable_lines,
-            "total_coverage": total_coverage if 'total_coverage' in locals() else 0.0,
+            "total_coverage": total_coverage,
             "func_reachable_lines": func_reachable_lines,
             "func_coverage": func_coverage,
             "reported_errors": total_unique_errors,
@@ -491,7 +534,7 @@ def cbmc_node(state):
             "status": status,
             "message": message,
             "suggestions": suggestions,
-            "stdout": full_output,
+            "stdout": stdout,
             "returncode": returncode,
             "version": version_num,
             "has_syntax_error": func_name in harness_syntax_errors,
@@ -515,12 +558,12 @@ def cbmc_node(state):
             f.write(f"Function coverage: {func_coverage:.2f}%\n")
             f.write(f"Reported errors: {total_unique_errors}\n")
             f.write("\nDetailed Output:\n")
-            f.write(full_output)
+            f.write(stdout)
         
         # Also save raw output for debugging
         raw_output_file = os.path.join(func_verification_dir, f"v{version_num}_raw_output.txt")
         with open(raw_output_file, "w") as f:
-            f.write(full_output)
+            f.write(stdout)
         
         # Generate a verification report for this version
         report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
@@ -555,18 +598,18 @@ def cbmc_node(state):
             f.write(f"The harness file is located at: `{harness_path}`\n\n")
             
             f.write(f"## Verification Command\n\n")
-            f.write(f"```\n{' '.join(cbmc_cmd)}\n```\n\n")
+            f.write(f"```\n{' '.join(property_cmd)}\n```\n\n")
             
             f.write(f"## Detailed Output\n\n")
             f.write("```\n")
             # Only include the first 20 lines and last 20 lines if output is very long
-            if len(full_output.split('\n')) > 50:
-                output_lines = full_output.split('\n')
+            if len(stdout.split('\n')) > 50:
+                output_lines = stdout.split('\n')
                 trimmed_output = '\n'.join(output_lines[:20] + ["\n... [output trimmed] ...\n"] + output_lines[-20:])
                 f.write(trimmed_output)
-                f.write("\n\nNote: Output has been trimmed. See full output in v{version_num}_raw_output.txt\n")
+                f.write(f"\n\nNote: Output has been trimmed. See full output in v{version_num}_raw_output.txt\n")
             else:
-                f.write(full_output)
+                f.write(stdout)
             f.write("\n```\n\n")
             
             if returncode != 0:

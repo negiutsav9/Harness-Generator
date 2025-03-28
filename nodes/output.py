@@ -45,32 +45,70 @@ def output_node(state):
         "functions_without_errors": 0
     }
     
-    # Compute the aggregated proof metrics
+    # Compute the aggregated proof metrics with improved error handling
     for func_name, metrics in proof_metrics.items():
         if "timeout" not in metrics and "system_error" not in metrics:  # Skip timeouts and errors
-            aggregate_metrics["total_reachable_lines"] += metrics.get("total_reachable_lines", 0)
+            # Add better error handling for metrics extraction
+            total_reachable = metrics.get("total_reachable_lines", 0)
+            if not isinstance(total_reachable, int):
+                try:
+                    total_reachable = int(total_reachable)
+                except (ValueError, TypeError):
+                    total_reachable = 0
+                    
+            aggregate_metrics["total_reachable_lines"] += total_reachable
             
             # Calculate covered lines from total_reachable_lines and total_coverage
-            covered_lines = int(metrics.get("total_reachable_lines", 0) * metrics.get("total_coverage", 0) / 100)
+            total_coverage_pct = metrics.get("total_coverage", 0)
+            if isinstance(total_coverage_pct, str):
+                try:
+                    total_coverage_pct = float(total_coverage_pct.strip('%'))
+                except (ValueError, TypeError):
+                    total_coverage_pct = 0
+            
+            covered_lines = int(total_reachable * total_coverage_pct / 100) if total_reachable > 0 else 0
             aggregate_metrics["total_covered_lines"] += covered_lines
             
-            aggregate_metrics["func_reachable_lines"] += metrics.get("func_reachable_lines", 0)
+            # Handle function-specific metrics
+            func_reachable = metrics.get("func_reachable_lines", 0)
+            if not isinstance(func_reachable, int):
+                try:
+                    func_reachable = int(func_reachable)
+                except (ValueError, TypeError):
+                    func_reachable = 0
+                    
+            aggregate_metrics["func_reachable_lines"] += func_reachable
             
             # Calculate function covered lines
-            func_covered_lines = int(metrics.get("func_reachable_lines", 0) * metrics.get("func_coverage", 0) / 100)
+            func_coverage_pct = metrics.get("func_coverage", 0)
+            if isinstance(func_coverage_pct, str):
+                try:
+                    func_coverage_pct = float(func_coverage_pct.strip('%'))
+                except (ValueError, TypeError):
+                    func_coverage_pct = 0
+                    
+            func_covered_lines = int(func_reachable * func_coverage_pct / 100) if func_reachable > 0 else 0
             aggregate_metrics["func_covered_lines"] += func_covered_lines
             
-            aggregate_metrics["total_reported_errors"] += metrics.get("reported_errors", 0)
+            # Add error counts
+            reported_errors = metrics.get("reported_errors", 0)
+            if not isinstance(reported_errors, int):
+                try:
+                    reported_errors = int(reported_errors)
+                except (ValueError, TypeError):
+                    reported_errors = 0
+                    
+            aggregate_metrics["total_reported_errors"] += reported_errors
             
-            # Count functions with full coverage
-            if metrics.get("func_coverage", 0) == 100.0:
+            # Count functions with full coverage (100%)
+            if func_coverage_pct == 100.0:
                 aggregate_metrics["functions_with_full_coverage"] += 1
                 
             # Count functions without errors
-            if metrics.get("reported_errors", 0) == 0:
+            if reported_errors == 0:
                 aggregate_metrics["functions_without_errors"] += 1
     
-    # Calculate overall coverage percentages
+    # Calculate overall coverage percentages with safeguards against division by zero
     overall_total_coverage = 0
     if aggregate_metrics["total_reachable_lines"] > 0:
         overall_total_coverage = (aggregate_metrics["total_covered_lines"] / aggregate_metrics["total_reachable_lines"]) * 100
