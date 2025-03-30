@@ -1,13 +1,10 @@
-# CBMC Harness Generation Complete - Directory Mode - Openai
+# CBMC Harness Generation Complete - Openai
 
-Total processing time: 0.29 seconds
-Processed 23 source files.
-Analyzed 223 functions.
+Total processing time: 0.00 seconds
+Analyzed 0 functions.
 Identified 0 functions with memory or arithmetic operations.
 Generated 0 verification harnesses.
 Performed 0 harness refinements (average 0.00 per function).
-
-## File Analysis
 
 ## Unit Proof Metrics Summary
 Total reachable lines: 0

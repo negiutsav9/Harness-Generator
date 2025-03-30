@@ -87,6 +87,9 @@ def embed_code(code: str, file_path: str = None) -> dict:
     functions = {}
     header_chunks = {}
     
+    # Add this import at the top of the file
+    import json
+    
     # Skip if code is empty
     if not code:
         logger.warning("Empty code provided for embedding")
@@ -280,7 +283,7 @@ def embed_code(code: str, file_path: str = None) -> dict:
                     "has_free": "free(" in body,
                     "allocation_without_free": "malloc(" in body and "free(" not in body,
                     "file_path": file_path if file_path else "inline",
-                    "function_calls": function_calls,
+                    "function_calls": json.dumps(function_calls),  # Convert list to JSON string
                     "is_implementation": True
                 })
                 
