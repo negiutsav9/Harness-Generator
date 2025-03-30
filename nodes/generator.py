@@ -58,6 +58,50 @@ def generator_node(state):
     func_code = function_result["documents"][0]
     func_metadata = function_result["metadatas"][0]
     
+    # Extract function dependencies from metadata if available
+    function_calls = func_metadata.get("function_calls", "[]")
+    try:
+        if isinstance(function_calls, str):
+            function_calls = json.loads(function_calls)
+        else:
+            function_calls = []
+    except json.JSONDecodeError:
+        function_calls = []
+    
+    # NEW: Find and add implementations for function dependencies
+    dependency_implementations = {}
+    for called_func in function_calls:
+        # Skip standard library functions and control flow statements
+        if called_func in ["if", "for", "while", "switch", "return", "malloc", "free",
+                          "memset", "memcpy", "printf", "fprintf", "sprintf"]:
+            continue
+            
+        # Search for the function in the database
+        dep_results = code_collection.query(
+            query_texts=[called_func], 
+            n_results=5
+        )
+        
+        if dep_results["ids"] and len(dep_results["ids"][0]) > 0:
+            for i, dep_id in enumerate(dep_results["ids"][0]):
+                # Check if this is an exact match
+                if called_func in dep_id:
+                    dep_result = code_collection.get(ids=[dep_id], include=["documents", "metadatas"])
+                    if dep_result["ids"]:
+                        dep_code = dep_result["documents"][0]
+                        dep_metadata = dep_result["metadatas"][0]
+                        
+                        # Check if this is just a declaration or a full implementation
+                        if not dep_metadata.get("is_declaration_only", True):
+                            logger.info(f"Found implementation for dependency: {called_func}")
+                            dependency_implementations[called_func] = {
+                                "code": dep_code,
+                                "metadata": dep_metadata
+                            }
+                            break
+                            
+    logger.info(f"Found {len(dependency_implementations)} function dependencies with implementations")
+    
     # Get pattern information
     patterns_result = query_pattern_db(func_code)
     
@@ -146,57 +190,15 @@ def generator_node(state):
         4. Free any allocated memory
         """
     
-    # Get function dependencies
-    func_dependencies = state.get("function_dependencies", {}).get(func_name, [])
-    
-    # Build dependency information for the generator
-    dependency_info = []
-    dependency_code_examples = []
-    for dep_name in func_dependencies:
-        # Query for the dependency by name
-        dep_results = code_collection.query(
-            query_texts=[dep_name], 
-            n_results=1
-        )
+    # Generate dependency information section
+    dependency_section = ""
+    if dependency_implementations:
+        dependency_section = "FUNCTION IMPLEMENTATIONS NEEDED:\n"
+        dependency_section += "The following functions are called by this function and need their implementations included:\n\n"
         
-        if dep_results["ids"] and len(dep_results["ids"][0]) > 0:
-            dep_id = dep_results["ids"][0][0]
-            dep_result = code_collection.get(ids=[dep_id], include=["documents", "metadatas"])
-            if dep_result["ids"]:
-                dep_code = dep_result["documents"][0]
-                dep_metadata = dep_result["metadatas"][0]
-                
-                # Extract function signature
-                dep_return_type = dep_metadata.get("return_type", "unknown")
-                dep_params = dep_metadata.get("params", "")
-                
-                # Add to dependencies list
-                dep_info = {
-                    "name": dep_name,
-                    "id": dep_id,
-                    "return_type": dep_return_type,
-                    "params": dep_params,
-                    "exists_in_codebase": True
-                }
-                dependency_info.append(dep_info)
-                
-                # Add example code showing how to call it
-                # Extract minimal signature for reference
-                dep_signature = f"{dep_return_type} {dep_name}({dep_params});"
-                dependency_code_examples.append(dep_signature)
-    
-    # Create dependency section
-    if dependency_info:
-        dependency_section = "FUNCTION DEPENDENCIES:\nThe following functions are called by this function and are available in the codebase:\n"
-        for dep in dependency_info:
-            dependency_section += f"\n- {dep['return_type']} {dep['name']}({dep['params']})"
-        
-        # Add example code section if we have dependencies
-        dependency_section += "\n\nFunction declarations (for reference only):\n"
-        for example in dependency_code_examples:
-            dependency_section += f"\n{example}"
-    else:
-        dependency_section = "FUNCTION DEPENDENCIES:\nNo external function dependencies found for this function in the codebase."
+        for dep_name, dep_info in dependency_implementations.items():
+            dependency_section += f"Function: {dep_name}\n"
+            dependency_section += f"```c\n{dep_info['code']}\n```\n\n"
     
     # Get available headers from state
     available_headers = state.get("embeddings", {}).get("available_headers", [])
@@ -224,6 +226,8 @@ def generator_node(state):
         ```c
         {func_code}
         ```
+        
+        {dependency_section}
 
         Function metadata:
         - Return type: {func_metadata.get("return_type", "void")}
@@ -232,8 +236,6 @@ def generator_node(state):
         - Contains free: {has_free}
         
         {headers_section}
-        
-        {dependency_section}
         
         {framework_section}
         
@@ -244,15 +246,18 @@ def generator_node(state):
         
         CRITICAL INSTRUCTIONS:
         1. INCLUDE THE COMPLETE FUNCTION IMPLEMENTATION from above in your harness file
-        2. Place the function implementation BEFORE the main() function after the includes
-        3. ONLY include header files that actually exist in the codebase or standard libraries
-        4. DO NOT create mock implementations for any functions - use only real functions from the codebase
-        5. If you need to call a function that isn't confirmed to exist, use a standard library alternative
-        6. FOCUS ONLY on verifying actual properties of the function under test
-        7. USE __CPROVER_assume() only for realistic input constraints
-        8. USE nondet functions for inputs that need to be nondeterministic: nondet_int(), nondet_size_t(), etc.
-        9. INCLUDE only headers that are definitely needed
-        10. The function under test is '{func_name}' - make sure to call this exact function with appropriate parameters
+        2. Place the function implementation AFTER any necessary TYPE DEFINITIONS and DECLARATIONS but BEFORE the main() function
+        3. ENSURE all necessary TYPE DEFINITIONS (enums, structs, etc.) come before any function that uses them
+        4. DECLARE functions before calling them (especially important for addHeader and similar functions)
+        5. DO NOT duplicate function implementations - include the function code exactly ONCE
+        6. INCLUDE ALL REQUIRED FUNCTION IMPLEMENTATIONS that were found and provided above
+        7. ONLY include header files that actually exist in the codebase or standard libraries
+        8. DO NOT create mock implementations for any functions - use the real implementations provided above
+        9. If you need to call a function that isn't provided, use a standard library alternative
+        10. FOCUS ONLY on verifying actual properties of the function under test
+        11. USE __CPROVER_assume() only for realistic input constraints
+        12. USE nondet functions for inputs that need to be nondeterministic: nondet_int(), nondet_size_t(), etc.
+        13. The function under test is '{func_name}' - make sure to call this exact function with appropriate parameters
         
         Your harness must be minimal and focused - only create what's necessary to test the function.
         
@@ -277,19 +282,25 @@ def generator_node(state):
         {func_code}
         ```
         
+        {dependency_section}
+        
         CRITICAL INSTRUCTIONS:
         1. ENSURE THE COMPLETE FUNCTION IMPLEMENTATION is present in your harness file
-        2. Place the function implementation BEFORE the main() function after the includes
-        3. DO NOT create mock implementations of any functions - all required functions already exist in the code database
-        4. ADDRESS EACH SPECIFIC ISSUE mentioned in the evaluation feedback
-        5. ADD all missing header files, function declarations, and constraints
-        6. IMPLEMENT all suggested code changes precisely
-        7. ENSURE proper memory management (allocation and freeing)
-        8. FIX all pointer dereference issues with proper initialization and checks
-        9. RESOLVE declaration errors by adding the necessary declarations
-        10. NEVER implement stubs or mocks for functions that should exist in the codebase
-        11. REMOVE any existing mock implementations or stubs you find in the previous harness
-        12. Focus ONLY on creating a direct test of the function with appropriate inputs
+        2. Place the function implementation AFTER any necessary TYPE DEFINITIONS and DECLARATIONS but BEFORE the main() function 
+        3. ENSURE all type definitions (enums, structs, etc.) come before any function that uses them
+        4. DECLARE all helper functions before they are called
+        5. DO NOT duplicate function implementations - include the function code exactly ONCE
+        6. INCLUDE ALL REQUIRED FUNCTION IMPLEMENTATIONS that were found and provided above
+        7. DO NOT create mock implementations of any functions - use the real implementations provided
+        8. ADDRESS EACH SPECIFIC ISSUE mentioned in the evaluation feedback
+        9. ADD all missing header files, function declarations, and constraints
+        10. IMPLEMENT all suggested code changes precisely
+        11. ENSURE proper memory management (allocation and freeing)
+        12. FIX all pointer dereference issues with proper initialization and checks
+        13. RESOLVE declaration errors by adding the necessary declarations
+        14. NEVER implement stubs or mocks for functions that should exist in the codebase
+        15. REMOVE any existing mock implementations or stubs you find in the previous harness
+        16. Focus ONLY on creating a direct test of the function with appropriate inputs
         
         Make sure your harness is complete, properly formatted, and addresses ALL the specific issues mentioned in the feedback.
         
@@ -316,6 +327,14 @@ def generator_node(state):
         6. Create DIRECT tests of the function behavior with appropriate inputs
         7. FOCUS on real verification concerns, not artificial test scenarios
         8. ALWAYS include the original function implementation in the harness file
+        9. FOLLOW PROPER C CODE STRUCTURE:
+           - Include directives first
+           - Type definitions (typedef, enum, struct) next
+           - Function declarations next
+           - Function implementations next
+           - Main function last
+        10. DO NOT duplicate function implementations
+        11. INCLUDE ALL REQUIRED FUNCTION IMPLEMENTATIONS that were found in the codebase
 
         Your code must be minimal, focused, and use ONLY 'void main()' as the entry point.
         """
@@ -341,7 +360,6 @@ def generator_node(state):
         if match:
             harness_code = match.group(1)
         
-        # Validate harness completeness
         # Validate harness completeness
         has_main = "void main(" in harness_code or "int main(" in harness_code
         balanced_braces = harness_code.count("{") <= harness_code.count("}")
@@ -417,29 +435,37 @@ def generator_node(state):
         # Reconstruct the harness without non-existent headers
         harness_code = '\n'.join(updated_lines)
         
-        # Check if function implementation is included
-        original_func_name = func_name.split(":")[-1] if ":" in func_name else func_name
-        return_type = func_metadata.get("return_type", "").strip()
-        params_text = func_metadata.get("params", "").strip()
-        
-        # Create a pattern that will match the function signature
-        # Handle cases where return type might contain spaces (like "unsigned int")
-        func_signature_pattern = rf"{return_type}\s+{re.escape(original_func_name)}\s*\(\s*{re.escape(params_text)}\s*\)"
-        
-        # Check if function implementation is included
-        if not re.search(func_signature_pattern, harness_code):
-            logger.warning(f"Function implementation not found in harness for {func_name}, adding it")
+        # Check for missing function dependencies in the harness
+        # For each dependency, check if it's included in the harness
+        for dep_name, dep_info in dependency_implementations.items():
+            # Create a pattern to match the function signature (approximately)
+            dep_signature_pattern = rf"\b{re.escape(dep_name)}\s*\([^)]*\)\s*\{{"
             
-            # Add function at the beginning of the harness (before any includes)
-            # Find the first include directive
-            include_match = re.search(r'(#include\s+[<"][^>"]+[>"])', harness_code)
-            if include_match:
-                # Insert function before the first include
-                include_pos = harness_code.find(include_match.group(1))
-                harness_code = harness_code[:include_pos] + f"{func_code}\n\n" + harness_code[include_pos:]
-            else:
-                # No includes found, add to the beginning
-                harness_code = f"{func_code}\n\n{harness_code}"
+            # Check if this function is already in the harness
+            if not re.search(dep_signature_pattern, harness_code):
+                # If not, log the issue
+                logger.warning(f"Dependency {dep_name} not included in harness, adding it manually")
+                
+                # Find a suitable place to add it - after the includes and declarations
+                # but before the main function
+                
+                # First check for main function position
+                main_match = re.search(r"\b(?:void|int)\s+main\s*\([^)]*\)\s*\{", harness_code)
+                if main_match:
+                    main_pos = main_match.start()
+                    
+                    # Find last function implementation before main
+                    func_matches = list(re.finditer(r"\}\s*\n", harness_code[:main_pos]))
+                    if func_matches:
+                        last_func_end = func_matches[-1].end()
+                        # Add dependency after last function before main
+                        harness_code = harness_code[:last_func_end] + "\n" + dep_info["code"] + "\n\n" + harness_code[last_func_end:]
+                    else:
+                        # No other functions, add before main
+                        harness_code = harness_code[:main_pos] + "\n" + dep_info["code"] + "\n\n" + harness_code[main_pos:]
+                else:
+                    # No main function found, add at end
+                    harness_code += "\n\n" + dep_info["code"]
         
         # Save the new harness to history
         if harness_code not in harness_history[func_name]:

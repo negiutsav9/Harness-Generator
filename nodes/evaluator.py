@@ -156,6 +156,22 @@ def harness_evaluator_node(state):
         if "function" in line and ("not declared" in line or "implicit" in line):
             declaration_errors.append(line.strip())
     
+    # Check for redeclaration errors in stderr
+    redeclaration_errors = []
+    redeclared_items = set()
+    for line in cbmc_stderr.split('\n'):
+        if "redeclaration" in line:
+            redeclaration_errors.append(line.strip())
+            match = re.search(r'redeclaration of \'([^\']+)\'', line)
+            if match:
+                redeclared_items.add(match.group(1))
+    
+    # Check for conversion errors
+    conversion_errors = []
+    for line in cbmc_stderr.split('\n'):
+        if "CONVERSION ERROR" in line:
+            conversion_errors.append(line.strip())
+    
     # Extract current code patterns
     includes = []
     nondet_declarations = []
@@ -163,20 +179,24 @@ def harness_evaluator_node(state):
     existing_constraints = []
     buffer_allocations = []
     free_operations = []
+    type_definitions = []
     
     for line in harness_code.split('\n'):
-        if line.strip().startswith("#include"):
-            includes.append(line.strip())
+        line = line.strip()
+        if line.startswith("#include"):
+            includes.append(line)
         elif "nondet_" in line and "(" in line and ")" in line and "=" not in line:
-            nondet_declarations.append(line.strip())
+            nondet_declarations.append(line)
         elif re.search(r'nondet_\w+\(', line) and '=' in line:
-            nondet_assignments.append(line.strip())
+            nondet_assignments.append(line)
         elif "__CPROVER_assume" in line:
-            existing_constraints.append(line.strip())
+            existing_constraints.append(line)
         elif "malloc" in line or "calloc" in line:
-            buffer_allocations.append(line.strip())
+            buffer_allocations.append(line)
         elif "free" in line:
-            free_operations.append(line.strip())
+            free_operations.append(line)
+        elif line.startswith("typedef") or line.startswith("enum") or line.startswith("struct"):
+            type_definitions.append(line)
     
     # Check for stub implementations
     stub_markers = ["// Stub implementation", "/* Stub ", "/* Mock ", "// Mock implementation"]
@@ -205,6 +225,15 @@ def harness_evaluator_node(state):
     
     # Determine specific issues based on failures and errors
     specific_issues = []
+    
+    # First check for redeclaration errors as they're critical
+    if redeclaration_errors:
+        for item in redeclared_items:
+            specific_issues.append(f"Redeclaration of '{item}' - type defined multiple times")
+    
+    # Add issues for conversion errors
+    if conversion_errors:
+        specific_issues.append("CONVERSION ERROR detected - check for type compatibility issues")
     
     # Add issues for non-existent headers if any
     if non_existent_headers:
@@ -256,6 +285,17 @@ def harness_evaluator_node(state):
     
     # Determine specific fixes based on the issues
     specific_fixes = []
+    
+    # First handle redeclaration errors as they're critical
+    if redeclaration_errors:
+        for item in redeclared_items:
+            specific_fixes.append(f"Remove duplicate definitions of '{item}' - make sure it's only defined once")
+        specific_fixes.append("Use header files instead of redefining types in the harness")
+        specific_fixes.append("Make sure types are not defined both in included headers and in the harness itself")
+    
+    # Add fixes for conversion errors
+    if conversion_errors:
+        specific_fixes.append("Fix type conflicts and ensure proper type compatibility")
     
     # First recommend removing non-existent headers if any exist
     if non_existent_headers:
@@ -350,6 +390,25 @@ def harness_evaluator_node(state):
         specific_fixes.append("Use adequate buffer sizes instead of malloc(1)")
         specific_fixes.append("Add: size_t bufferSize = nondet_size_t(); __CPROVER_assume(bufferSize >= 50 && bufferSize <= 1024);")
     
+    # Prepare special messages for critical errors
+    critical_error_message = ""
+    
+    # Special handling for redeclaration errors
+    if redeclaration_errors:
+        redeclared_list = ", ".join([f"'{item}'" for item in redeclared_items])
+        critical_error_message = f"""
+        CRITICAL ERROR: The harness has duplicate declarations of {redeclared_list}. 
+        This is preventing CBMC from running.
+        
+        You MUST fix this by:
+        1. Remove ALL typedefs, enums, and struct definitions from the harness that are already defined in headers
+        2. Include ONLY the necessary header files that contain these definitions
+        3. If you need to define custom types, ensure they have unique names that don't conflict
+        4. Ensure the original function implementation does not include duplicate type definitions
+        
+        This is the most critical issue to fix - your harness will not work until this is resolved.
+        """
+    
     # Create a detailed improvement recommendation
     recommendation_prompt = f"""
     Analyze the following CBMC verification failures for function '{func_name}' and suggest specific code improvements:
@@ -364,17 +423,28 @@ def harness_evaluator_node(state):
     {harness_code}
     ```
     
+    {critical_error_message if critical_error_message else ""}
+    
     CBMC VERIFICATION FAILURES:
     {chr(10).join(failure_lines[:30]) if failure_lines else "No specific failure lines found"}
     
+    CBMC STDERR OUTPUT:
+    {chr(10).join(cbmc_stderr.split('\n')[:20]) if cbmc_stderr else "No stderr output captured"}
+    
     DECLARATION ERRORS:
     {chr(10).join(declaration_errors[:10]) if declaration_errors else "No declaration errors found"}
+    
+    REDECLARATION ERRORS:
+    {chr(10).join(redeclaration_errors[:10]) if redeclaration_errors else "No redeclaration errors found"}
     
     IDENTIFIED ISSUES:
     {chr(10).join(specific_issues)}
     
     CURRENT INCLUDES:
     {chr(10).join(includes) if includes else "No includes found"}
+    
+    CURRENT TYPE DEFINITIONS:
+    {chr(10).join(type_definitions) if type_definitions else "No type definitions found"}
     
     CURRENT NONDET DECLARATIONS:
     {chr(10).join(nondet_declarations) if nondet_declarations else "No nondet declarations found"}
@@ -392,11 +462,12 @@ def harness_evaluator_node(state):
     {chr(10).join(non_existent_headers) if non_existent_headers else "No non-existent headers found"}
     
     THE MOST CRITICAL ISSUE: 
-    Check for and remove any mock implementations or stubs. Do not implement functions that should already exist in the codebase.
-    Instead of creating stubs, assume the function exists and just declare its prototype if needed.
-    Also remove any non-existent header files that don't exist in the codebase.
+    {f"Redeclaration errors: {', '.join(redeclared_items)}" if redeclaration_errors else 
+    "Check for and remove any mock implementations or stubs. Do not implement functions that should already exist in the codebase."}
     
-    Please provide very specific, concrete code changes to fix these issues. Focus on removing stubs/mocks and using actual functions from the codebase.
+    Please provide very specific, concrete code changes to fix these issues. Focus on {
+    "removing duplicate type definitions and ensuring proper code structure" if redeclaration_errors else 
+    "removing stubs/mocks and using actual functions from the codebase"}.
     
     Respond with a JSON object containing:
     {{
@@ -406,6 +477,8 @@ def harness_evaluator_node(state):
         "specific_fixes": ["fix1", "fix2", ...],
         "has_stubs_or_mocks": true or false,
         "has_nonexistent_headers": true or false,
+        "has_redeclaration_errors": true or false,
+        "redeclared_items": ["item1", "item2", ...],
         "code_changes": {{
             "add_includes": ["<header1.h>", ...],
             "add_declarations": ["type func(args);", ...],
@@ -422,6 +495,9 @@ def harness_evaluator_node(state):
             ],
             "remove_headers": [
                 "header_name.h"
+            ],
+            "remove_types": [
+                {{"name": "HTTPSuccess", "reason": "Already defined in included header"}}
             ],
             "remove_stubs": [
                 {{"start_line": "// Stub implementation for func1", "end_line": "}} // End of stub"}}
@@ -443,14 +519,14 @@ def harness_evaluator_node(state):
         # Setup messages for the LLM based on the model type
         if "gemini" in model_name:
             # For Gemini, we need to include the system prompt in the human message
-            system_content = "You are a CBMC harness evaluator. Focus on removing mock implementations and using real functions from the codebase. Provide detailed analysis of verification issues in JSON format."
+            system_content = "You are a CBMC harness evaluator. Focus on fixing critical errors like redeclarations before anything else. Provide detailed analysis of verification issues in JSON format."
             recommendation_response = llm.invoke([
                 HumanMessage(content=f"{system_content}\n\n{recommendation_prompt}")
             ])
         else:
             # For Claude and OpenAI models, use separate system and human messages
             recommendation_response = llm.invoke([
-                SystemMessage(content="You are a CBMC harness evaluator. Focus on removing mock implementations and using real functions from the codebase. Provide detailed analysis of verification issues in JSON format."),
+                SystemMessage(content="You are a CBMC harness evaluator. Focus on fixing critical errors like redeclarations before anything else. Provide detailed analysis of verification issues in JSON format."),
                 HumanMessage(content=recommendation_prompt)
             ])
         
@@ -468,6 +544,8 @@ def harness_evaluator_node(state):
         specific_fixes = recommendations.get("specific_fixes", [])
         has_stubs_or_mocks = recommendations.get("has_stubs_or_mocks", False)
         has_nonexistent_headers = recommendations.get("has_nonexistent_headers", False)
+        has_redeclaration_errors = recommendations.get("has_redeclaration_errors", False)
+        redeclared_items = recommendations.get("redeclared_items", [])
         code_changes = recommendations.get("code_changes", {})
         
         # Prioritize stub/mock removal if detected
@@ -484,6 +562,13 @@ def harness_evaluator_node(state):
             if not any("non-existent header" in fix for fix in specific_fixes):
                 specific_fixes.insert(0, "Remove non-existent header files and use only standard headers or headers from the codebase")
         
+        # Prioritize redeclaration errors above all else
+        if has_redeclaration_errors or redeclaration_errors:
+            if not any("redeclaration" in issue.lower() for issue in specific_issues):
+                specific_issues.insert(0, f"Redeclaration errors: Types defined multiple times")
+            if not any("duplicate" in fix.lower() for fix in specific_fixes):
+                specific_fixes.insert(0, "Remove duplicate type definitions and ensure each type is only defined once")
+        
         logger.info(f"Generated fixes for {func_name} - needs improvement: {needs_improvement}")
         
     except Exception as e:
@@ -495,6 +580,7 @@ def harness_evaluator_node(state):
         specific_fixes = specific_fixes if specific_fixes else ["Review CBMC output and fix identified issues"]
         has_stubs_or_mocks = contains_stubs or bool(potential_stubs)
         has_nonexistent_headers = bool(non_existent_headers)
+        has_redeclaration_errors = bool(redeclaration_errors)
         code_changes = {
             "add_includes": list(missing_headers),
             "add_declarations": list(missing_nondets),
@@ -502,6 +588,7 @@ def harness_evaluator_node(state):
             "buffer_size_changes": [],
             "free_operations": [],
             "remove_headers": non_existent_headers,
+            "remove_types": [{"name": item, "reason": "Already defined in included header"} for item in redeclared_items]
         }
     
     # Construct improvement recommendation if needed
@@ -514,6 +601,12 @@ def harness_evaluator_node(state):
         proposed_changes_text = ""
         if code_changes:
             proposed_changes_text = "\n\nProposed code changes:\n"
+            
+            # Prioritize removing duplicate types if needed
+            if "remove_types" in code_changes and code_changes["remove_types"]:
+                proposed_changes_text += "\nRemove duplicate type definitions:\n"
+                for type_info in code_changes["remove_types"]:
+                    proposed_changes_text += f"- Remove: {type_info.get('name', '')} ({type_info.get('reason', '')})\n"
             
             # Add headers to remove
             if "remove_headers" in code_changes and code_changes["remove_headers"]:
@@ -586,6 +679,11 @@ def harness_evaluator_node(state):
             raw_failures_text = "No specific failure lines found"
             failure_summary = ""
         
+        # Add stderr if available (especially important for redeclaration errors)
+        stderr_text = ""
+        if cbmc_stderr:
+            stderr_text = "\nCBMC STDERR OUTPUT:\n" + "\n".join(cbmc_stderr.split('\n')[:20])
+        
         # Build the full improvement recommendation
         improvement_recommendation = f"""
         Previous harness for {func_name} needs improvement. Refinement attempt {current_attempts + 1} of {max_refinements}.
@@ -593,6 +691,8 @@ def harness_evaluator_node(state):
         CBMC verification status: {cbmc_status}
         
         EXPLANATION: {explanation}
+        
+        {critical_error_message if critical_error_message else ""}
         
         Specific issues detected:
         {issues_text}
@@ -605,6 +705,8 @@ def harness_evaluator_node(state):
         
         Raw CBMC verification failures:
         {raw_failures_text}
+        
+        {stderr_text}
         
         Current harness:
         ```c
@@ -626,6 +728,13 @@ def harness_evaluator_node(state):
         7. If you need to call a function, assume it exists and just declare its prototype
         8. REMOVE any existing stubs or mocks from the previous harness
         9. Make the harness as minimal and focused as possible
+        10. FOLLOW PROPER C CODE STRUCTURE:
+           - Include directives first
+           - Type definitions (typedef, enum, struct) next ONLY IF not already defined in headers
+           - Function declarations next
+           - Function implementations next
+           - Main function last
+        11. DO NOT duplicate type definitions from header files - if a type is already defined in a header, just include the header
         
         Generate a complete, working harness that passes CBMC verification.
         """

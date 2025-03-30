@@ -6,6 +6,7 @@ import re
 import time
 import shutil
 import subprocess
+import glob
 from langchain_core.messages import AIMessage
 import logging
 
@@ -44,21 +45,19 @@ def cbmc_node(state):
     func_verification_dir = os.path.join(verification_base_dir, func_name)
     os.makedirs(func_verification_dir, exist_ok=True)
     
-    # Create proper directory structure for verification
-    verification_src_dir = os.path.join(verification_base_dir, "src")
-    os.makedirs(verification_src_dir, exist_ok=True)
-    
-    # Create include directory for headers
-    verification_include_dir = os.path.join(verification_base_dir, "include")
-    os.makedirs(verification_include_dir, exist_ok=True)
-    
-    # Create stubs directory for stubs
+    # Create proper directory structure for verification (with clearer names)
+    verification_harness_dir = os.path.join(verification_base_dir, "harness_files")  # Renamed from "src"
+    verification_include_dir = os.path.join(verification_base_dir, "includes")
     verification_stubs_dir = os.path.join(verification_base_dir, "stubs")
+    verification_cbmc_utils_dir = os.path.join(verification_base_dir, "cbmc_utils")  # Renamed from "sources"
+    os.makedirs(verification_harness_dir, exist_ok=True)
+    os.makedirs(verification_include_dir, exist_ok=True)
     os.makedirs(verification_stubs_dir, exist_ok=True)
+    os.makedirs(verification_cbmc_utils_dir, exist_ok=True)
     
-    # Create sources directory for CBMC sources
-    verification_sources_dir = os.path.join(verification_base_dir, "sources")
-    os.makedirs(verification_sources_dir, exist_ok=True)
+    # Create a separate directory for project source files
+    verification_project_src_dir = os.path.join(verification_base_dir, "project_src")
+    os.makedirs(verification_project_src_dir, exist_ok=True)
     
     # Determine version number from refinement attempts
     refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
@@ -97,180 +96,132 @@ def cbmc_node(state):
     if state.get("is_directory_mode", False):
         # Get original source directory from state
         original_source_dir = state.get("source_directory", "")
+        directory_path = os.path.dirname(original_source_dir) if original_source_dir else ""
         
-        if original_source_dir and os.path.exists(original_source_dir):
-            # First, copy only the necessary source files to avoid duplication
-            for root, dirs, files in os.walk(original_source_dir):
-                for file in files:
-                    # Only copy .c and .h files to corresponding directories
-                    if file.endswith(('.c', '.cpp')):
-                        src_file = os.path.join(root, file)
-                        dest_file = os.path.join(verification_src_dir, file)
-                        shutil.copy2(src_file, dest_file)
-                    elif file.endswith(('.h', '.hpp')):
-                        src_file = os.path.join(root, file)
-                        dest_file = os.path.join(verification_include_dir, file)
-                        shutil.copy2(src_file, dest_file)
-        
-        # Get specific source file for this function from embeddings if available
-        file_path = None
+        # Find the specific source file for this function from embeddings
         embeddings = state.get("embeddings", {})
         functions = embeddings.get("functions", {})
         
         if func_name in functions and "file_path" in functions[func_name]:
             file_path = functions[func_name]["file_path"]
             if file_path and os.path.exists(file_path):
-                source_file = os.path.join(verification_src_dir, os.path.basename(file_path))
+                # Copy to the project source directory
+                dest_file = os.path.join(verification_project_src_dir, os.path.basename(file_path))
+                shutil.copy2(file_path, dest_file)
+                print(f"Copied main source file: {file_path} → {dest_file}")
+        
+        # Copy necessary headers to include directory
+        if original_source_dir and os.path.exists(original_source_dir):
+            for root, dirs, files in os.walk(original_source_dir):
+                for file in files:
+                    # Copy headers to include directory
+                    if file.endswith(('.h', '.hpp')):
+                        src_file = os.path.join(root, file)
+                        dest_file = os.path.join(verification_include_dir, file)
+                        shutil.copy2(src_file, dest_file)
+                        print(f"Copied header: {file}")
+                    
+                    # Copy implementation files 
+                    elif file.endswith('.c') and file == "core_http_client.c":
+                        src_file = os.path.join(root, file)
+                        dest_file = os.path.join(verification_project_src_dir, file)
+                        shutil.copy2(src_file, dest_file)
+                        print(f"Copied implementation: {file}")
     else:
         # Original single-file mode - write source to a flat file
-        source_file = os.path.join(verification_src_dir, "source.c")
+        source_file = os.path.join(verification_project_src_dir, "source.c")
         with open(source_file, "w") as f:
             f.write(state.get("source_code", ""))
     
-    # Find source files with more priority for CBMC test files
-    source_files = []
-
-    # First priority: Look for files in the verification/sources directory
-    sources_dir_files = [f for f in os.listdir(verification_sources_dir) if f.endswith(('.c', '.cpp'))]
-    if sources_dir_files:
-        # Use all files from the sources directory
-        for file in sources_dir_files:
-            source_files.append(os.path.join(verification_sources_dir, file))
-    else:
-        # Second priority: Look for CBMC test files in the source directory
-        cbmc_test_files = []
-        for root, dirs, files in os.walk(verification_src_dir):
-            for file in files:
-                if file.endswith(('.c', '.cpp')) and "test/cbmc" in root:
-                    cbmc_test_files.append(os.path.join(root, file))
-        
-        if cbmc_test_files:
-            source_files.extend(cbmc_test_files)
-        else:
-            # Third priority: Use regular source files
-            src_dir_files = [f for f in os.listdir(verification_src_dir) if f.endswith(('.c', '.cpp'))]
-            if src_dir_files:
-                for file in src_dir_files:
-                    source_files.append(os.path.join(verification_src_dir, file))
-            else:
-                # Create a fallback source file if no source files were found
-                fallback_source = os.path.join(verification_src_dir, "source.c")
-                with open(fallback_source, "w") as f:
-                    f.write("// Fallback source file\n")
-                source_files.append(fallback_source)
+    # Look for CBMC files from standard locations and copy them if they exist
+    source_project_dir = os.path.dirname(state.get("source_directory", ""))
+    
+    # Copy CBMC include files
+    for cbmc_dir_name in ["test/cbmc/include", "cbmc/include"]:
+        cbmc_include_dir = os.path.join(source_project_dir, cbmc_dir_name)
+        if os.path.exists(cbmc_include_dir):
+            for file in os.listdir(cbmc_include_dir):
+                if os.path.isfile(os.path.join(cbmc_include_dir, file)):
+                    shutil.copy2(os.path.join(cbmc_include_dir, file), os.path.join(verification_include_dir, file))
+                    print(f"Copied CBMC include file: {file}")
+            break
+    
+    # Copy CBMC stub files
+    for cbmc_dir_name in ["test/cbmc/stubs", "cbmc/stubs"]:
+        cbmc_stubs_dir = os.path.join(source_project_dir, cbmc_dir_name)
+        if os.path.exists(cbmc_stubs_dir):
+            for file in os.listdir(cbmc_stubs_dir):
+                if os.path.isfile(os.path.join(cbmc_stubs_dir, file)):
+                    shutil.copy2(os.path.join(cbmc_stubs_dir, file), os.path.join(verification_stubs_dir, file))
+                    print(f"Copied CBMC stub file: {file}")
+            break
+    
+    # Copy CBMC utility source files
+    for cbmc_dir_name in ["test/cbmc/sources", "cbmc/sources"]:
+        cbmc_sources_dir = os.path.join(source_project_dir, cbmc_dir_name)
+        if os.path.exists(cbmc_sources_dir):
+            for file in os.listdir(cbmc_sources_dir):
+                if os.path.isfile(os.path.join(cbmc_sources_dir, file)):
+                    shutil.copy2(os.path.join(cbmc_sources_dir, file), os.path.join(verification_cbmc_utils_dir, file))
+                    print(f"Copied CBMC utility file: {file}")
+            break
             
-    # Write harness to file - use original function name in the filename
+    # Write harness to file
     harness_filename = original_func_name if ":" not in func_name else original_func_name
-    harness_file = os.path.join(verification_src_dir, f"{harness_filename}_harness.c")
+    harness_file = os.path.join(verification_harness_dir, f"{harness_filename}_harness.c")
     with open(harness_file, "w") as f:
         # Add include for the CBMC definitions header
         f.write("#include \"cbmc_defs.h\"\n\n")
         f.write(harness_code)
-
-    # Copy necessary CBMC include files for verification
-    # Look for test/cbmc directory relative to the project source
-    project_dir = os.path.dirname(state.get("source_directory", ""))
-    cbmc_include_dir = os.path.join(project_dir, "test", "cbmc", "include")
     
-    # If not found, try looking one level up
-    if not os.path.exists(cbmc_include_dir):
-        cbmc_include_dir = os.path.join(os.path.dirname(project_dir), "test", "cbmc", "include")
-    
-    # If still not found, try looking in the current directory structure
-    if not os.path.exists(cbmc_include_dir):
-        cbmc_include_dir = "test/cbmc/include"
-    
-    if os.path.exists(cbmc_include_dir):
-        # Copy all CBMC include files
-        for file in os.listdir(cbmc_include_dir):
-            src_file = os.path.join(cbmc_include_dir, file)
-            dest_file = os.path.join(verification_include_dir, file)
-            if os.path.isfile(src_file):
-                shutil.copy2(src_file, dest_file)
-                print(f"Copied CBMC include file: {file}")
-                
-    # Also check for stubs directory
-    cbmc_stubs_dir = os.path.join(project_dir, "test", "cbmc", "stubs")
-    
-    # If not found, try looking one level up
-    if not os.path.exists(cbmc_stubs_dir):
-        cbmc_stubs_dir = os.path.join(os.path.dirname(project_dir), "test", "cbmc", "stubs")
-    
-    # If still not found, try looking in the current directory structure
-    if not os.path.exists(cbmc_stubs_dir):
-        cbmc_stubs_dir = "test/cbmc/stubs"
-    
-    if os.path.exists(cbmc_stubs_dir):
-        # Copy all CBMC stub files
-        for file in os.listdir(cbmc_stubs_dir):
-            src_file = os.path.join(cbmc_stubs_dir, file)
-            dest_file = os.path.join(verification_stubs_dir, file)
-            if os.path.isfile(src_file):
-                shutil.copy2(src_file, dest_file)
-                print(f"Copied CBMC stub file: {file}")
-                
-    # Check for sources directory
-    cbmc_sources_dir = os.path.join(project_dir, "test", "cbmc", "sources")
-    
-    # If not found, try looking one level up
-    if not os.path.exists(cbmc_sources_dir):
-        cbmc_sources_dir = os.path.join(os.path.dirname(project_dir), "test", "cbmc", "sources")
-    
-    # If still not found, try looking in the current directory structure
-    if not os.path.exists(cbmc_sources_dir):
-        cbmc_sources_dir = "test/cbmc/sources"
-    
-    if os.path.exists(cbmc_sources_dir):
-        # Copy all CBMC source files
-        for file in os.listdir(cbmc_sources_dir):
-            src_file = os.path.join(cbmc_sources_dir, file)
-            dest_file = os.path.join(verification_sources_dir, file)
-            if os.path.isfile(src_file):
-                shutil.copy2(src_file, dest_file)
-                print(f"Copied CBMC source file: {file}")
-    
-    # Build list of CBMC command parameters - use sources from verification/sources
+    # Build list of CBMC command parameters with clearer organization
     cbmc_cmd = [
         "cbmc",
+        "--function", "main",  # Use main as the entry point in generated harnesses
+        "--object-bits", "8",
+        "-DCBMC_MAX_OBJECT_SIZE=" + str(cbmc_max_object_size)
     ]
     
-    # Add source files from verification/sources first
-    for file in os.listdir(verification_sources_dir):
-        if file.endswith(('.c', '.cpp')):
-            source_file_path = os.path.join(verification_sources_dir, file)
-            cbmc_cmd.append(source_file_path)
-    
-    # Add the harness file
+    # Add source files in the correct order:
+    # 1. First add harness file (most important)
     cbmc_cmd.append(harness_file)
-
-    original_func_name = func_name
-    if ":" in func_name:
-        _, original_func_name = func_name.split(":", 1)
     
-    # Add main CBMC options
+    # 2. Add original project source files
+    project_src_files = glob.glob(os.path.join(verification_project_src_dir, "*.c"))
+    cbmc_cmd.extend(project_src_files)
+    
+    # 3. Add CBMC utility source files from the cbmc_utils directory
+    cbmc_util_files = glob.glob(os.path.join(verification_cbmc_utils_dir, "*.c"))
+    cbmc_cmd.extend(cbmc_util_files)
+    
+    # 4. Add stub files
+    stub_files = glob.glob(os.path.join(verification_stubs_dir, "*.c"))
+    cbmc_cmd.extend(stub_files)
+    
+    # Add verification flags
     cbmc_cmd.extend([
-        "--function", "main",
-        f"--object-bits", "8",  # Default for CBMC_OBJECT_BITS
+        "--memory-leak-check",
+        "--memory-cleanup-check",
+        "--bounds-check",
+        "--pointer-overflow-check",
+        "--div-by-zero-check",
+        "--unwinding-assertions"
     ])
-    
-    # Add CBMC object size constraint definition
-    cbmc_cmd.extend([
-        "-DCBMC_MAX_OBJECT_SIZE=" + str(cbmc_max_object_size)
-    ])
-    
-    # Add stub files as needed
-    for file in os.listdir(verification_stubs_dir):
-        if file.endswith(('.c', '.cpp')):
-            stub_file_path = os.path.join(verification_stubs_dir, file)
-            cbmc_cmd.append(stub_file_path)
     
     # Add necessary include paths in the correct order
     cbmc_cmd.extend([
         "-I", verification_include_dir,
-        "-I", verification_src_dir,
+        "-I", verification_harness_dir,
         "-I", verification_stubs_dir,
-        "-I", verification_sources_dir
+        "-I", verification_cbmc_utils_dir,
+        "-I", verification_project_src_dir
     ])
+    
+    # Add original project include paths if available
+    source_project_dir = os.path.dirname(state.get("source_directory", ""))
+    for include_path in ["source/include", "include", "source/interface"]:
+        if os.path.exists(os.path.join(source_project_dir, include_path)):
+            cbmc_cmd.extend(["-I", os.path.join(source_project_dir, include_path)])
     
     # Save the command for debugging
     cmd_file = os.path.join(func_verification_dir, f"v{version_num}_command.txt")
@@ -288,18 +239,10 @@ def cbmc_node(state):
     if func_name not in proof_metrics:
         proof_metrics[func_name] = {}
     
-    # First, run property checking (based on coreHTTP's approach)
+    # First, run property checking
     property_cmd = cbmc_cmd.copy()
-    property_cmd.extend([
-        "--memory-leak-check",
-        "--memory-cleanup-check",
-        "--bounds-check",
-        "--pointer-overflow-check",
-        "--div-by-zero-check",
-        "--unwinding-assertions"
-    ])
-
-    # Create a separate command for coverage with compatible flags, also based on coreHTTP
+    
+    # Create a separate command for coverage with compatible flags
     coverage_cmd = cbmc_cmd.copy()
     coverage_cmd.extend([
         "--cover", "location",
@@ -337,7 +280,7 @@ def cbmc_node(state):
         coverage_stdout = coverage_process.stdout
         coverage_stderr = coverage_process.stderr
         
-        # Extract coverage metrics using an approach similar to coreHTTP
+        # Extract coverage metrics
         logger.info(f"Extracting coverage metrics for {func_name}")
         
         # Initialize metrics
@@ -637,8 +580,7 @@ def cbmc_node(state):
                 f.write(f"The verification was successful. No issues were detected with the current harness implementation.\n\n")
         
     except subprocess.TimeoutExpired as e:
-        # Handle timeout - make sure process exists before trying to kill it
-        # The 'e' parameter will contain the process
+        # Handle timeout
         if hasattr(e, 'process'):
             e.process.kill()
             e.process.wait()
