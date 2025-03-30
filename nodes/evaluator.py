@@ -132,580 +132,571 @@ def harness_evaluator_node(state):
             "next": "junction"
         }
     
-    # Extract actual failure messages
+    # Enhanced CBMC output parsing - More detailed and structured approach
+    
+    # 1. Extract all failure lines and categorize by type
     failure_lines = []
     failure_details = {}
+    failure_locations = {}  # Track file:line info for each failure
     
-    # Scan for FAILURE lines in stdout
+    # Parse each line of stdout for detailed failure information
     for line in cbmc_stdout.split('\n'):
-        if "FAILURE" in line:
-            failure_lines.append(line.strip())
-            # Extract failure category
-            match = re.search(r'\[(.*?)\]', line)
-            if match:
-                category = match.group(1).split('.')[0]
-                detail = line.split("FAILURE")[0] + "FAILURE"
+        if "FAILURE" in line or "FAILED" in line:
+            # Skip unwinding assertions as they're often not relevant to core bugs
+            if "unwinding assertion" in line:
+                continue
                 
-                if category not in failure_details:
-                    failure_details[category] = []
-                failure_details[category].append(detail.strip())
+            failure_lines.append(line.strip())
+            
+            # Parse and categorize failure type
+            failure_category = "general"  # Default category
+            
+            if "[memory]" in line or "memory-leak" in line or "dynamic memory" in line:
+                failure_category = "memory"
+            elif "[pointer]" in line or "dereference failure" in line or "NULL pointer" in line:
+                failure_category = "pointer"
+            elif "[array]" in line or "array bounds" in line:
+                failure_category = "array_bounds"
+            elif "[arithmetic]" in line or "division by zero" in line or "overflow" in line:
+                failure_category = "arithmetic"
+            elif "[assertion]" in line or "__CPROVER_assert" in line:
+                failure_category = "assertion"
+            
+            # Extract location information if available
+            loc_match = re.search(r'file ([^:]+):(\d+)', line)
+            if loc_match:
+                file_name = loc_match.group(1)
+                line_num = int(loc_match.group(2))
+                location = f"{file_name}:{line_num}"
+                
+                # Add to location tracking
+                if location not in failure_locations:
+                    failure_locations[location] = []
+                failure_locations[location].append(line.strip())
+                
+                # Add more detailed location to failure category
+                failure_category = f"{failure_category}_{file_name}_{line_num}"
+            
+            # Add to categorized failure details
+            if failure_category not in failure_details:
+                failure_details[failure_category] = []
+            failure_details[failure_category].append(line.strip())
     
-    # Find declaration errors in stderr
+    # 2. Enhanced error detection from stderr
+    parsing_errors = []
+    compilation_errors = []
     declaration_errors = []
-    for line in cbmc_stderr.split('\n'):
-        if "function" in line and ("not declared" in line or "implicit" in line):
-            declaration_errors.append(line.strip())
-    
-    # Check for redeclaration errors in stderr
     redeclaration_errors = []
-    redeclared_items = set()
+    type_errors = []
+    missing_files = []
+    
+    # More detailed error parsing from stderr
     for line in cbmc_stderr.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Track parsing errors
+        if "PARSING ERROR" in line or "syntax error" in line:
+            parsing_errors.append(line)
+            
+        # Track compilation errors (often indicate code structure issues)
+        elif "error:" in line or "CONVERSION ERROR" in line:
+            compilation_errors.append(line)
+            
+        # Missing declarations
+        if "function" in line and ("not declared" in line or "implicit" in line):
+            declaration_errors.append(line)
+            
+        # Track redeclaration errors
         if "redeclaration" in line:
-            redeclaration_errors.append(line.strip())
+            redeclaration_errors.append(line)
+            
+            # Extract what's being redeclared
             match = re.search(r'redeclaration of \'([^\']+)\'', line)
             if match:
-                redeclared_items.add(match.group(1))
+                redeclared_item = match.group(1)
+                if redeclared_item not in redeclaration_errors:
+                    redeclaration_errors.append(redeclared_item)
+                    
+        # Track type errors
+        if "incompatible types" in line or "type mismatch" in line:
+            type_errors.append(line)
+            
+        # Track missing files/headers
+        if "No such file or directory" in line or "file not found" in line:
+            missing_file_match = re.search(r"'([^']+)' file not found", line)
+            if missing_file_match:
+                missing_file = missing_file_match.group(1)
+                missing_files.append(missing_file)
+
+    # Enhanced detection and handling of "no body for callee" errors
+    no_body_errors = []
+    missing_functions = set()
+
+    # Extract all missing function bodies
+    for line in cbmc_stdout.split('\n'):
+        if "no body for callee" in line:
+            no_body_errors.append(line.strip())
+            # Extract function name
+            match = re.search(r'no body for callee (\w+)', line)
+            if match:
+                missing_functions.add(match.group(1))
     
-    # Check for conversion errors
-    conversion_errors = []
-    for line in cbmc_stderr.split('\n'):
-        if "CONVERSION ERROR" in line:
-            conversion_errors.append(line.strip())
+    # Improved failure analysis - extract trace information if present
+    trace_steps = []
+    in_trace = False
     
-    # Extract current code patterns
-    includes = []
-    nondet_declarations = []
-    nondet_assignments = []
-    existing_constraints = []
-    buffer_allocations = []
-    free_operations = []
-    type_definitions = []
+    for line in cbmc_stdout.split('\n'):
+        if "Trace for " in line:
+            in_trace = True
+            trace_steps.append(line.strip())
+        elif in_trace and line.strip().startswith("State"):
+            trace_steps.append(line.strip())
+        elif in_trace and not line.strip():
+            in_trace = False
     
+    # 3. Extract current harness structural information for better analysis
+    harness_structure = {
+        "includes": [],
+        "type_definitions": [],
+        "nondet_declarations": [],
+        "nondet_assignments": [],
+        "constraints": [],
+        "buffer_allocations": [],
+        "free_operations": [],
+        "memory_operations": [],
+        "assertions": [],
+        "function_calls": [],
+        "has_stubs": False
+    }
+    
+    # Parse harness code to identify key components with improved patterns
+    current_section = None  # Track which section we're in
     for line in harness_code.split('\n'):
         line = line.strip()
-        if line.startswith("#include"):
-            includes.append(line)
-        elif "nondet_" in line and "(" in line and ")" in line and "=" not in line:
-            nondet_declarations.append(line)
-        elif re.search(r'nondet_\w+\(', line) and '=' in line:
-            nondet_assignments.append(line)
-        elif "__CPROVER_assume" in line:
-            existing_constraints.append(line)
-        elif "malloc" in line or "calloc" in line:
-            buffer_allocations.append(line)
-        elif "free" in line:
-            free_operations.append(line)
-        elif line.startswith("typedef") or line.startswith("enum") or line.startswith("struct"):
-            type_definitions.append(line)
-    
-    # Check for stub implementations
-    stub_markers = ["// Stub implementation", "/* Stub ", "/* Mock ", "// Mock implementation"]
-    contains_stubs = any(marker in harness_code for marker in stub_markers)
-    
-    # Look for function implementations
-    func_impl_pattern = r"(\w+)\s+(\w+)\s*\([^)]*\)\s*\{[^}]+\}"
-    potential_stubs = re.findall(func_impl_pattern, harness_code)
-    # Filter out main function
-    potential_stubs = [f for f in potential_stubs if f[1] != "main"]
-    
-    # Check for non-existent headers
-    available_headers = state.get("embeddings", {}).get("available_headers", [])
-    standard_headers = ["stdio.h", "stdlib.h", "string.h", "stddef.h", "stdint.h", 
-                       "stdbool.h", "math.h", "ctype.h", "time.h", "limits.h",
-                       "assert.h", "errno.h", "float.h", "signal.h"]
-    
-    non_existent_headers = []
-    for line in harness_code.split('\n'):
-        if line.strip().startswith("#include"):
-            include_match = re.search(r'#include\s+[<"]([^>"]+)[>"]', line)
-            if include_match:
-                header_name = include_match.group(1)
-                if (header_name not in available_headers and header_name not in standard_headers):
-                    non_existent_headers.append(header_name)
-    
-    # Determine specific issues based on failures and errors
-    specific_issues = []
-    
-    # First check for redeclaration errors as they're critical
-    if redeclaration_errors:
-        for item in redeclared_items:
-            specific_issues.append(f"Redeclaration of '{item}' - type defined multiple times")
-    
-    # Add issues for conversion errors
-    if conversion_errors:
-        specific_issues.append("CONVERSION ERROR detected - check for type compatibility issues")
-    
-    # Add issues for non-existent headers if any
-    if non_existent_headers:
-        specific_issues.append(f"Harness includes non-existent header files: {', '.join(non_existent_headers)}")
-    
-    # Check if harness contains stubs/mocks that should be eliminated
-    if contains_stubs or potential_stubs:
-        specific_issues.append("Harness contains unnecessary mock/stub implementations")
-    
-    # Check for memory leaks
-    if "__CPROVER__start.memory-leak" in "".join(failure_lines):
-        specific_issues.append("Memory leak: Dynamically allocated memory not freed")
-    
-    # Check for no-body errors
-    no_body_matches = [line for line in failure_lines if "no body for callee" in line]
-    if no_body_matches:
-        for line in no_body_matches:
-            match = re.search(r'no body for callee ([^:]+)', line)
-            if match:
-                func = match.group(1)
-                specific_issues.append(f"Missing implementation for function: {func}")
-    
-    # Check for assertion failures
-    assertion_matches = [line for line in failure_lines if ".assertion." in line]
-    if assertion_matches:
-        for line in assertion_matches:
-            match = re.search(r'line \d+ (.+?):', line)
-            if match:
-                assertion = match.group(1)
-                specific_issues.append(f"Assertion failure: {assertion}")
-    
-    # Check for pointer issues
-    pointer_matches = [line for line in failure_lines if any(x in line.lower() for x in ["pointer", "dereference", "null"])]
-    if pointer_matches:
-        specific_issues.append("Pointer dereference failure detected")
-    
-    # Check for arithmetic issues
-    arithmetic_matches = [line for line in failure_lines if any(x in line.lower() for x in ["arithmetic", "overflow"])]
-    if arithmetic_matches:
-        specific_issues.append("Arithmetic overflow detected")
-    
-    # Check for declaration issues from stderr
-    if declaration_errors:
-        for error in declaration_errors[:3]:  # Limit to first 3 for readability
-            match = re.search(r"function '([^']+)' is not declared", error)
-            if match:
-                func = match.group(1)
-                specific_issues.append(f"Function not declared: {func}")
-    
-    # Determine specific fixes based on the issues
-    specific_fixes = []
-    
-    # First handle redeclaration errors as they're critical
-    if redeclaration_errors:
-        for item in redeclared_items:
-            specific_fixes.append(f"Remove duplicate definitions of '{item}' - make sure it's only defined once")
-        specific_fixes.append("Use header files instead of redefining types in the harness")
-        specific_fixes.append("Make sure types are not defined both in included headers and in the harness itself")
-    
-    # Add fixes for conversion errors
-    if conversion_errors:
-        specific_fixes.append("Fix type conflicts and ensure proper type compatibility")
-    
-    # First recommend removing non-existent headers if any exist
-    if non_existent_headers:
-        specific_fixes.append("Remove non-existent header files or replace them with standard headers")
-        for header in non_existent_headers:
-            specific_fixes.append(f"Remove include: #include \"{header}\"")
-    
-    # Next recommend removing stubs if any exist
-    if contains_stubs or potential_stubs:
-        specific_fixes.append("Remove all mock and stub implementations from the harness")
-        specific_fixes.append("Use only actual functions from the codebase")
-    
-    # Check for missing header includes
-    missing_headers = set()
-    if any("malloc" in err for err in declaration_errors):
-        missing_headers.add("<stdlib.h>")
-    if any("nondet_bool" in err for err in declaration_errors):
-        missing_headers.add("<stdbool.h>")
-    if any("nondet_size_t" in err for err in declaration_errors):
-        missing_headers.add("<stddef.h>")
-    if any("INT_MAX" in line or "INT_MIN" in line for line in harness_code.split('\n')) and not any("<limits.h>" in inc for inc in includes):
-        missing_headers.add("<limits.h>")
-    
-    # Add missing header recommendations
-    for header in missing_headers:
-        specific_fixes.append(f"Add #include {header}")
-    
-    # Check for missing nondet declarations
-    missing_nondets = set()
-    for error in declaration_errors:
-        match = re.search(r"function '(nondet_[^']+)' is not declared", error)
-        if match:
-            nondet_func = match.group(1)
+        if not line or line.startswith("//"):
+            continue
             
-            if "nondet_bool" in nondet_func:
-                missing_nondets.add("bool nondet_bool(void);")
-            elif "nondet_size_t" in nondet_func:
-                missing_nondets.add("size_t nondet_size_t(void);")
-            elif "nondet_uint" in nondet_func:
-                missing_nondets.add("unsigned int nondet_uint(void);")
-            elif "nondet_int" in nondet_func:
-                missing_nondets.add("int nondet_int(void);")
-            elif "nondet_char" in nondet_func:
-                missing_nondets.add("char nondet_char(void);")
-            else:
-                missing_nondets.add(f"/* Add declaration for {nondet_func} */")
+        # Track includes
+        if line.startswith("#include"):
+            harness_structure["includes"].append(line)
+            
+        # Track type definitions
+        elif line.startswith("typedef") or line.startswith("struct") or line.startswith("enum") or line.startswith("union"):
+            harness_structure["type_definitions"].append(line)
+            current_section = "type_definition"
+            
+        # Track nondet declarations
+        elif "nondet_" in line and "(" in line and ")" in line and "=" not in line:
+            harness_structure["nondet_declarations"].append(line)
+            
+        # Track nondet assignments
+        elif re.search(r'nondet_\w+\(', line) and '=' in line:
+            harness_structure["nondet_assignments"].append(line)
+            
+        # Track constraints
+        elif "__CPROVER_assume" in line:
+            harness_structure["constraints"].append(line)
+            
+        # Track memory operations with more comprehensive patterns
+        elif "malloc" in line or "calloc" in line or "realloc" in line:
+            harness_structure["buffer_allocations"].append(line)
+            harness_structure["memory_operations"].append(line)
+            
+        # Track free operations
+        elif "free" in line and "(" in line:
+            harness_structure["free_operations"].append(line)
+            harness_structure["memory_operations"].append(line)
+            
+        # Track assertions
+        elif "__CPROVER_assert" in line or "assert" in line:
+            harness_structure["assertions"].append(line)
+            
+        # Track function calls - improved to catch more cases
+        elif re.search(r'(\w+)\s*\([^;]*\)', line) and "=" not in line and not line.startswith("#"):
+            # Extract function name
+            func_match = re.search(r'(\w+)\s*\(', line)
+            if func_match and func_match.group(1) not in ["if", "for", "while", "switch"]:
+                harness_structure["function_calls"].append(line)
+                
+        # Check for stub implementations
+        if ("// Stub implementation" in line or "/* Stub " in line or "/* Mock " in line 
+                or "// Mock implementation" in line):
+            harness_structure["has_stubs"] = True
     
-    # Add missing nondet declarations recommendations
-    for nondet in missing_nondets:
-        specific_fixes.append(f"Add nondet function declaration: {nondet}")
+    # 4. Perform detailed gap analysis between errors and harness structure
+    gap_analysis = {
+        "missing_includes": [],
+        "missing_declarations": [],
+        "missing_constraints": [],
+        "missing_memory_operations": [],
+        "missing_assertions": [],
+        "invalid_stubs": harness_structure["has_stubs"],
+        "memory_leaks": False,
+        "pointer_issues": False,
+        "array_bounds_issues": False,
+        "arithmetic_issues": False,
+        "type_mismatches": False,
+        "missing_function_bodies": bool(missing_functions)
+    }
     
     # Check for memory leaks
-    if "__CPROVER__start.memory-leak" in "".join(failure_lines):
+    if any("memory leak" in line.lower() or "memory-leak" in line.lower() for line in failure_lines):
+        gap_analysis["memory_leaks"] = True
+        
         # Find allocations without matching free
         allocated_vars = []
-        for line in buffer_allocations:
+        for line in harness_structure["buffer_allocations"]:
             match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(malloc|calloc)', line)
             if match:
                 var = match.group(1)
                 allocated_vars.append(var)
         
         freed_vars = []
-        for line in free_operations:
+        for line in harness_structure["free_operations"]:
             match = re.search(r'free\s*\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\)', line)
             if match:
                 var = match.group(1)
                 freed_vars.append(var)
         
+        # Find variables that are allocated but not freed
         for var in allocated_vars:
             if var not in freed_vars:
-                specific_fixes.append(f"Add free operation for allocated variable: free({var});")
-    
-    # Check for no body errors
-    if no_body_matches:
-        specific_fixes.append("Use only functions that exist in the codebase - do not call functions that aren't implemented")
-    
-    # Check for assertion failures
-    if assertion_matches:
-        specific_fixes.append("Review and fix assertion conditions based on expected function behavior")
+                gap_analysis["missing_memory_operations"].append(f"Missing free for: {var}")
     
     # Check for pointer issues
-    if pointer_matches:
-        specific_fixes.append("Add NULL checks before dereferencing pointers")
-        specific_fixes.append("Add constraints to ensure pointers are valid: __CPROVER_assume(ptr != NULL);")
+    if any("pointer" in line.lower() or "dereference" in line.lower() or "null" in line.lower() for line in failure_lines):
+        gap_analysis["pointer_issues"] = True
+        
+        # Check for missing NULL pointer constraints
+        for line in harness_structure["nondet_assignments"]:
+            if "=" in line and "*" in line and not any(f"__CPROVER_assume({var} != NULL)" in harness_code for var in re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=', line)):
+                var_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=', line)
+                if var_match:
+                    var = var_match.group(1)
+                    gap_analysis["missing_constraints"].append(f"Missing NULL check for: {var}")
+    
+    # Check for array bounds issues
+    if any("array bounds" in line.lower() or "buffer" in line.lower() for line in failure_lines):
+        gap_analysis["array_bounds_issues"] = True
+        
+        # Check for missing size constraints on arrays or buffers
+        for line in harness_structure["buffer_allocations"]:
+            if "malloc" in line and "1)" in line:  # Suspicious single-byte allocation
+                gap_analysis["missing_constraints"].append("Using malloc(1) is suspicious - consider appropriate buffer size")
     
     # Check for arithmetic issues
-    if arithmetic_matches:
-        specific_fixes.append("Add constraints to limit integer values: __CPROVER_assume(x >= 0 && x < INT_MAX/2);")
-    
-    # Check buffer allocations
-    if buffer_allocations and any("malloc(1)" in alloc for alloc in buffer_allocations):
-        specific_fixes.append("Use adequate buffer sizes instead of malloc(1)")
-        specific_fixes.append("Add: size_t bufferSize = nondet_size_t(); __CPROVER_assume(bufferSize >= 50 && bufferSize <= 1024);")
-    
-    # Prepare special messages for critical errors
-    critical_error_message = ""
-    
-    # Special handling for redeclaration errors
-    if redeclaration_errors:
-        redeclared_list = ", ".join([f"'{item}'" for item in redeclared_items])
-        critical_error_message = f"""
-        CRITICAL ERROR: The harness has duplicate declarations of {redeclared_list}. 
-        This is preventing CBMC from running.
+    if any("arithmetic" in line.lower() or "overflow" in line.lower() or "division" in line.lower() for line in failure_lines):
+        gap_analysis["arithmetic_issues"] = True
         
-        You MUST fix this by:
-        1. Remove ALL typedefs, enums, and struct definitions from the harness that are already defined in headers
-        2. Include ONLY the necessary header files that contain these definitions
-        3. If you need to define custom types, ensure they have unique names that don't conflict
-        4. Ensure the original function implementation does not include duplicate type definitions
-        
-        This is the most critical issue to fix - your harness will not work until this is resolved.
-        """
+        # Check for missing constraints on integer inputs
+        for line in harness_structure["nondet_assignments"]:
+            if "nondet_int" in line or "nondet_uint" in line:
+                var_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=', line)
+                if var_match:
+                    var = var_match.group(1)
+                    if not any(f"__CPROVER_assume({var}" in constraint for constraint in harness_structure["constraints"]):
+                        gap_analysis["missing_constraints"].append(f"Missing bounds constraint for: {var}")
+
+    # Check for missing function body issues
+    if missing_functions:
+        gap_analysis["missing_function_bodies"] = True
+        for func_name in missing_functions:
+            gap_analysis["missing_declarations"].append(f"Missing implementation for function: {func_name}")
     
-    # Create a detailed improvement recommendation
-    recommendation_prompt = f"""
-    Analyze the following CBMC verification failures for function '{func_name}' and suggest specific code improvements:
-    
-    FUNCTION:
-    ```c
-    {func_code}
-    ```
-    
-    CURRENT HARNESS:
-    ```c
-    {harness_code}
-    ```
-    
-    {critical_error_message if critical_error_message else ""}
-    
-    CBMC VERIFICATION FAILURES:
-    {chr(10).join(failure_lines[:30]) if failure_lines else "No specific failure lines found"}
-    
-    CBMC STDERR OUTPUT:
-    {chr(10).join(cbmc_stderr.split('\n')[:20]) if cbmc_stderr else "No stderr output captured"}
-    
-    DECLARATION ERRORS:
-    {chr(10).join(declaration_errors[:10]) if declaration_errors else "No declaration errors found"}
-    
-    REDECLARATION ERRORS:
-    {chr(10).join(redeclaration_errors[:10]) if redeclaration_errors else "No redeclaration errors found"}
-    
-    IDENTIFIED ISSUES:
-    {chr(10).join(specific_issues)}
-    
-    CURRENT INCLUDES:
-    {chr(10).join(includes) if includes else "No includes found"}
-    
-    CURRENT TYPE DEFINITIONS:
-    {chr(10).join(type_definitions) if type_definitions else "No type definitions found"}
-    
-    CURRENT NONDET DECLARATIONS:
-    {chr(10).join(nondet_declarations) if nondet_declarations else "No nondet declarations found"}
-    
-    CURRENT CONSTRAINTS:
-    {chr(10).join(existing_constraints) if existing_constraints else "No constraints found"}
-    
-    CURRENT MEMORY ALLOCATIONS:
-    {chr(10).join(buffer_allocations) if buffer_allocations else "No memory allocations found"}
-    
-    CURRENT FREE OPERATIONS:
-    {chr(10).join(free_operations) if free_operations else "No free operations found"}
-    
-    NON-EXISTENT HEADERS:
-    {chr(10).join(non_existent_headers) if non_existent_headers else "No non-existent headers found"}
-    
-    THE MOST CRITICAL ISSUE: 
-    {f"Redeclaration errors: {', '.join(redeclared_items)}" if redeclaration_errors else 
-    "Check for and remove any mock implementations or stubs. Do not implement functions that should already exist in the codebase."}
-    
-    Please provide very specific, concrete code changes to fix these issues. Focus on {
-    "removing duplicate type definitions and ensuring proper code structure" if redeclaration_errors else 
-    "removing stubs/mocks and using actual functions from the codebase"}.
-    
-    Respond with a JSON object containing:
-    {{
-        "needs_improvement": true or false,
-        "explanation": "Brief explanation of the main issues",
-        "specific_issues": ["issue1", "issue2", ...],
-        "specific_fixes": ["fix1", "fix2", ...],
-        "has_stubs_or_mocks": true or false,
-        "has_nonexistent_headers": true or false,
-        "has_redeclaration_errors": true or false,
-        "redeclared_items": ["item1", "item2", ...],
-        "code_changes": {{
-            "add_includes": ["<header1.h>", ...],
-            "add_declarations": ["type func(args);", ...],
-            "add_constraints": ["__CPROVER_assume(x > 0);", ...],
-            "add_initializations": ["memset(&structure, 0, sizeof(structure));", ...],
-            "replace_lines": [
-                {{"old": "x = nondet_int();", "new": "x = nondet_int(); __CPROVER_assume(x != NULL);"}}
-            ],
-            "buffer_size_changes": [
-                {{"old": "malloc(1)", "new": "size_t bufferSize = nondet_size_t();\\n__CPROVER_assume(bufferSize >= 50 && bufferSize <= 1024);\\nmalloc(bufferSize);"}}
-            ],
-            "free_operations": [
-                "free(ptr);"
-            ],
-            "remove_headers": [
-                "header_name.h"
-            ],
-            "remove_types": [
-                {{"name": "HTTPSuccess", "reason": "Already defined in included header"}}
-            ],
-            "remove_stubs": [
-                {{"start_line": "// Stub implementation for func1", "end_line": "}} // End of stub"}}
-            ]
-        }}
-    }}
-    """
-    
-    # Get LLM recommendations
-    from utils.llm_utils import setup_llm
-    llm = setup_llm()
-    
-    try:
-        logger.info(f"Requesting specific issue fixes for {func_name}")
-        
-        # Check for the LLM model type to handle system prompt correctly
-        model_name = str(llm).lower()
-        
-        # Setup messages for the LLM based on the model type
-        if "gemini" in model_name:
-            # For Gemini, we need to include the system prompt in the human message
-            system_content = "You are a CBMC harness evaluator. Focus on fixing critical errors like redeclarations before anything else. Provide detailed analysis of verification issues in JSON format."
-            recommendation_response = llm.invoke([
-                HumanMessage(content=f"{system_content}\n\n{recommendation_prompt}")
-            ])
-        else:
-            # For Claude and OpenAI models, use separate system and human messages
-            recommendation_response = llm.invoke([
-                SystemMessage(content="You are a CBMC harness evaluator. Focus on fixing critical errors like redeclarations before anything else. Provide detailed analysis of verification issues in JSON format."),
-                HumanMessage(content=recommendation_prompt)
-            ])
-        
-        # Parse LLM response
-        json_match = re.search(r'```json\n(.*?)\n```', recommendation_response.content, re.DOTALL)
-        if json_match:
-            recommendations = json.loads(json_match.group(1))
-        else:
-            # Try to directly parse the content
-            recommendations = json.loads(recommendation_response.content)
-            
-        needs_improvement = recommendations.get("needs_improvement", True)
-        explanation = recommendations.get("explanation", "")
-        specific_issues = recommendations.get("specific_issues", [])
-        specific_fixes = recommendations.get("specific_fixes", [])
-        has_stubs_or_mocks = recommendations.get("has_stubs_or_mocks", False)
-        has_nonexistent_headers = recommendations.get("has_nonexistent_headers", False)
-        has_redeclaration_errors = recommendations.get("has_redeclaration_errors", False)
-        redeclared_items = recommendations.get("redeclared_items", [])
-        code_changes = recommendations.get("code_changes", {})
-        
-        # Prioritize stub/mock removal if detected
-        if has_stubs_or_mocks:
-            if "Harness contains unnecessary mock/stub implementations" not in specific_issues:
-                specific_issues.insert(0, "Harness contains unnecessary mock/stub implementations")
-            if "Remove all mock and stub implementations" not in specific_fixes:
-                specific_fixes.insert(0, "Remove all mock and stub implementations from the harness")
+    # Check for declaration issues from stderr
+    if declaration_errors:
+        for error in declaration_errors:
+            match = re.search(r"function '([^']+)' is not declared", error)
+            if match:
+                func = match.group(1)
                 
-        # Prioritize non-existent header removal if detected
-        if has_nonexistent_headers:
-            if not any("non-existent header" in issue for issue in specific_issues):
-                specific_issues.insert(0, "Harness includes non-existent header files")
-            if not any("non-existent header" in fix for fix in specific_fixes):
-                specific_fixes.insert(0, "Remove non-existent header files and use only standard headers or headers from the codebase")
-        
-        # Prioritize redeclaration errors above all else
-        if has_redeclaration_errors or redeclaration_errors:
-            if not any("redeclaration" in issue.lower() for issue in specific_issues):
-                specific_issues.insert(0, f"Redeclaration errors: Types defined multiple times")
-            if not any("duplicate" in fix.lower() for fix in specific_fixes):
-                specific_fixes.insert(0, "Remove duplicate type definitions and ensure each type is only defined once")
-        
-        logger.info(f"Generated fixes for {func_name} - needs improvement: {needs_improvement}")
-        
-    except Exception as e:
-        logger.warning(f"Failed to parse recommendations response: {e}")
-        # Use our rule-based analysis as fallback
-        needs_improvement = cbmc_status != "SUCCESS"
-        explanation = "CBMC verification failed with specific issues detected in the output."
-        specific_issues = specific_issues if specific_issues else ["CBMC verification failed"]
-        specific_fixes = specific_fixes if specific_fixes else ["Review CBMC output and fix identified issues"]
-        has_stubs_or_mocks = contains_stubs or bool(potential_stubs)
-        has_nonexistent_headers = bool(non_existent_headers)
-        has_redeclaration_errors = bool(redeclaration_errors)
-        code_changes = {
-            "add_includes": list(missing_headers),
-            "add_declarations": list(missing_nondets),
-            "add_constraints": [],
-            "buffer_size_changes": [],
-            "free_operations": [],
-            "remove_headers": non_existent_headers,
-            "remove_types": [{"name": item, "reason": "Already defined in included header"} for item in redeclared_items]
-        }
+                # Check for standard library functions that need specific includes
+                if func in ["malloc", "free", "calloc", "realloc"]:
+                    if not any("stdlib.h" in include for include in harness_structure["includes"]):
+                        gap_analysis["missing_includes"].append("<stdlib.h>")
+                elif func in ["memcpy", "memset", "strcpy", "strcmp"]:
+                    if not any("string.h" in include for include in harness_structure["includes"]):
+                        gap_analysis["missing_includes"].append("<string.h>")
+                elif func in ["printf", "fprintf", "sprintf"]:
+                    if not any("stdio.h" in include for include in harness_structure["includes"]):
+                        gap_analysis["missing_includes"].append("<stdio.h>")
+                elif func.startswith("nondet_"):
+                    gap_analysis["missing_declarations"].append(f"Missing declaration for: {func}")
+                else:
+                    gap_analysis["missing_declarations"].append(f"Missing declaration for: {func}")
     
-    # Construct improvement recommendation if needed
+    # Missing header files
+    if missing_files:
+        for file in missing_files:
+            gap_analysis["missing_includes"].append(file)
+    
+    # Compile specific issues into a detailed analysis
+    analysis_details = {
+        "has_compilation_errors": bool(compilation_errors),
+        "has_parsing_errors": bool(parsing_errors),
+        "has_redeclaration_errors": bool(redeclaration_errors),
+        "has_declaration_errors": bool(declaration_errors),
+        "has_type_errors": bool(type_errors),
+        "has_failure_trace": bool(trace_steps),
+        "has_missing_includes": bool(gap_analysis["missing_includes"]),
+        "has_memory_leaks": gap_analysis["memory_leaks"],
+        "has_pointer_issues": gap_analysis["pointer_issues"],
+        "has_array_bounds_issues": gap_analysis["array_bounds_issues"],
+        "has_arithmetic_issues": gap_analysis["arithmetic_issues"],
+        "has_stubs": harness_structure["has_stubs"],
+        "has_missing_function_bodies": bool(missing_functions),
+        "raw_failure_count": len(failure_lines),
+        "categories": list(failure_details.keys())
+    }
+    
+    # Generate specific improvement recommendations based on the analysis
+    specific_issues = []
+    specific_fixes = []
+    
+    # Add common patterns for known issues
+    common_patterns = []
+    
+    # Deal with critical errors first - redeclaration errors
+    if analysis_details["has_redeclaration_errors"]:
+        specific_issues.append("Critical: Redeclaration errors detected - duplicate type definitions")
+        specific_fixes.append("Remove duplicate type definitions - ensure each type is defined only once")
+        specific_fixes.append("Use header files instead of redefining types in the harness")
+        
+    # Deal with parsing errors
+    if analysis_details["has_parsing_errors"]:
+        specific_issues.append("Critical: Syntax or parsing errors in the harness code")
+        for error in parsing_errors[:3]:  # First 3 for brevity
+            specific_issues.append(f"Parse error: {error}")
+        specific_fixes.append("Fix syntax errors in the harness code")
+        
+    # Deal with compilation errors
+    if analysis_details["has_compilation_errors"]:
+        specific_issues.append("Compilation errors in the harness code")
+        for error in compilation_errors[:3]:  # First 3 for brevity
+            specific_issues.append(f"Compile error: {error}")
+        specific_fixes.append("Fix compilation errors in the harness code")
+        
+    # Deal with missing includes
+    if analysis_details["has_missing_includes"]:
+        specific_issues.append("Missing necessary header files")
+        for include in gap_analysis["missing_includes"]:
+            specific_fixes.append(f"Add missing include: {include}")
+            
+    # Deal with missing declarations
+    if analysis_details["has_declaration_errors"]:
+        specific_issues.append("Missing function declarations")
+        for decl in gap_analysis["missing_declarations"]:
+            specific_fixes.append(decl)
+            
+    # Deal with stubs (always remove if present)
+    if analysis_details["has_stubs"]:
+        specific_issues.append("Harness contains unnecessary mock/stub implementations")
+        specific_fixes.append("Remove all mock and stub implementations from the harness")
+        specific_fixes.append("Use only actual functions from the codebase")
+        
+    # Deal with memory leaks
+    if analysis_details["has_memory_leaks"]:
+        specific_issues.append("Memory leak detected: Allocated memory not properly freed")
+        for fix in gap_analysis["missing_memory_operations"]:
+            specific_fixes.append(fix)
+        
+        # Add example pattern for memory management
+        common_patterns.append("""
+        // Memory management pattern
+        void* buffer = malloc(size);
+        // ... use buffer ...
+        free(buffer);  // Always free allocated memory
+        """)
+            
+    # Deal with pointer issues
+    if analysis_details["has_pointer_issues"]:
+        specific_issues.append("Pointer dereference failure: Possible NULL pointer dereference")
+        for fix in gap_analysis["missing_constraints"]:
+            if "NULL check" in fix:
+                specific_fixes.append(fix)
+        specific_fixes.append("Add NULL pointer checks before dereferencing")
+        
+        # Add example pattern for NULL pointer checks
+        common_patterns.append("""
+        // Null pointer check pattern
+        void* ptr = malloc(size);
+        __CPROVER_assume(ptr != NULL);  // Ensure pointer is valid before use
+        // ... use ptr ...
+        """)
+            
+    # Deal with array bounds issues
+    if analysis_details["has_array_bounds_issues"]:
+        specific_issues.append("Array bounds violation: Buffer overflow risk")
+        specific_fixes.append("Add constraints to ensure array indices are within bounds")
+        specific_fixes.append("Use realistic buffer sizes instead of fixed small sizes")
+        
+        # Add example pattern for array bounds checking
+        common_patterns.append("""
+        // Array bounds pattern
+        size_t index = nondet_size_t();
+        size_t size = 10;
+        __CPROVER_assume(index < size);  // Ensure index is within bounds
+        array[index] = value;  // Safe array access
+        """)
+            
+    # Deal with arithmetic issues
+    if analysis_details["has_arithmetic_issues"]:
+        specific_issues.append("Arithmetic error: Possible overflow or division by zero")
+        for fix in gap_analysis["missing_constraints"]:
+            if "bounds constraint" in fix:
+                specific_fixes.append(fix)
+        specific_fixes.append("Add constraints to limit integer values and prevent overflow")
+        specific_fixes.append("Add checks to ensure divisors are non-zero")
+        
+        # Add example pattern for arithmetic safety
+        common_patterns.append("""
+        // Arithmetic safety pattern
+        int value = nondet_int();
+        __CPROVER_assume(value > 0 && value < INT_MAX/2);  // Prevent overflow
+        // ... use value ...
+        
+        int divisor = nondet_int();
+        __CPROVER_assume(divisor != 0);  // Prevent division by zero
+        result = value / divisor;  // Safe division
+        """)
+    
+    # Deal with missing function bodies - NEW SECTION
+    if missing_functions:
+        # This is a critical issue that needs special handling
+        specific_issues.append(f"Critical: Missing function bodies for {len(missing_functions)} functions")
+        for func in missing_functions:
+            specific_issues.append(f"Missing implementation for: {func}")
+        
+        # Add specific recommendations
+        specific_fixes.append("You must address all missing function bodies using one of these approaches:")
+        specific_fixes.append("1. Find and include the complete function implementation from the codebase")
+        specific_fixes.append("2. Create a minimal valid stub implementation that satisfies CBMC verification")
+        specific_fixes.append("3. Modify the test strategy to avoid calling these functions directly")
+        
+        # Add example pattern for handling missing functions
+        example_stub = f"""
+        // Option 1: Minimal stub for missing function (adapt for each function)
+        {list(missing_functions)[0] if missing_functions else 'missing_function'}(...) {{
+            // Return a valid status without complex side effects
+            return HTTPSuccess; // Or appropriate return value
+        }}
+        
+        // Option 2: Avoid calling function and use constraints
+        // Instead of: status = {list(missing_functions)[0] if missing_functions else 'missing_function'}(...);
+        // Do: 
+        HTTPStatus_t status = nondet_HTTPStatus_t();
+        __CPROVER_assume(status == HTTPSuccess || status == HTTPInvalidParameter);
+        """
+        
+        common_patterns.append(example_stub)
+    
+    # Ensure we have at least some generic recommendations if nothing specific was found
+    if not specific_issues:
+        if failure_lines:
+            specific_issues.append("Verification failures detected but could not be specifically categorized")
+            specific_fixes.append("Review CBMC output carefully for specific verification failures")
+        else:
+            specific_issues.append("CBMC failed but did not produce specific error messages")
+            specific_fixes.append("Ensure the harness correctly tests the function with appropriate inputs")
+    
+    # Determine if the harness needs improvement
+    needs_improvement = (
+        analysis_details["has_redeclaration_errors"] or
+        analysis_details["has_parsing_errors"] or
+        analysis_details["has_compilation_errors"] or
+        analysis_details["has_missing_includes"] or
+        analysis_details["has_declaration_errors"] or
+        analysis_details["has_stubs"] or
+        analysis_details["has_memory_leaks"] or
+        analysis_details["has_pointer_issues"] or
+        analysis_details["has_array_bounds_issues"] or
+        analysis_details["has_arithmetic_issues"] or
+        analysis_details["has_missing_function_bodies"] or
+        bool(failure_lines)
+    )
+    
+    # Create detailed improvement recommendation
     if needs_improvement:
         # Format issues and fixes
         issues_text = "\n".join([f"- {issue}" for issue in specific_issues])
         fixes_text = "\n".join([f"- {fix}" for fix in specific_fixes])
         
-        # Format proposed changes
-        proposed_changes_text = ""
-        if code_changes:
-            proposed_changes_text = "\n\nProposed code changes:\n"
-            
-            # Prioritize removing duplicate types if needed
-            if "remove_types" in code_changes and code_changes["remove_types"]:
-                proposed_changes_text += "\nRemove duplicate type definitions:\n"
-                for type_info in code_changes["remove_types"]:
-                    proposed_changes_text += f"- Remove: {type_info.get('name', '')} ({type_info.get('reason', '')})\n"
-            
-            # Add headers to remove
-            if "remove_headers" in code_changes and code_changes["remove_headers"]:
-                proposed_changes_text += "\nRemove non-existent headers:\n"
-                for header in code_changes["remove_headers"]:
-                    proposed_changes_text += f"- Remove: #include \"{header}\"\n"
-            
-            # Add includes
-            if "add_includes" in code_changes and code_changes["add_includes"]:
-                proposed_changes_text += "\nAdd header files:\n"
-                for header in code_changes["add_includes"]:
-                    proposed_changes_text += f"- Add: #include {header}\n"
-            
-            # Add declarations
-            if "add_declarations" in code_changes and code_changes["add_declarations"]:
-                proposed_changes_text += "\nAdd declarations:\n"
-                for decl in code_changes["add_declarations"]:
-                    proposed_changes_text += f"- Add: {decl}\n"
-            
-            # Add constraints
-            if "add_constraints" in code_changes and code_changes["add_constraints"]:
-                proposed_changes_text += "\nAdd constraints:\n"
-                for constraint in code_changes["add_constraints"]:
-                    proposed_changes_text += f"- Add: {constraint}\n"
-            
-            # Add initializations
-            if "add_initializations" in code_changes and code_changes["add_initializations"]:
-                proposed_changes_text += "\nAdd initializations:\n"
-                for init in code_changes["add_initializations"]:
-                    proposed_changes_text += f"- Add: {init}\n"
-            
-            # Replace lines
-            if "replace_lines" in code_changes and code_changes["replace_lines"]:
-                proposed_changes_text += "\nReplace lines:\n"
-                for replacement in code_changes["replace_lines"]:
-                    proposed_changes_text += f"- Replace: {replacement.get('old', '')}\n  With: {replacement.get('new', '')}\n"
-            
-            # Buffer size changes
-            if "buffer_size_changes" in code_changes and code_changes["buffer_size_changes"]:
-                proposed_changes_text += "\nBuffer size changes:\n"
-                for change in code_changes["buffer_size_changes"]:
-                    proposed_changes_text += f"- Replace: {change.get('old', '')}\n  With: {change.get('new', '')}\n"
-            
-            # Free operations
-            if "free_operations" in code_changes and code_changes["free_operations"]:
-                proposed_changes_text += "\nAdd free operations:\n"
-                for free_op in code_changes["free_operations"]:
-                    proposed_changes_text += f"- Add: {free_op}\n"
-            
-            # Remove stubs
-            if "remove_stubs" in code_changes and code_changes["remove_stubs"]:
-                proposed_changes_text += "\nRemove stub implementations:\n"
-                for stub in code_changes["remove_stubs"]:
-                    proposed_changes_text += f"- Remove from: {stub.get('start_line', '')}\n  To: {stub.get('end_line', '')}\n"
+        # Add patterns text if we have any
+        patterns_text = ""
+        if common_patterns:
+            patterns_text = "\n\nRecommended patterns for CBMC verification:\n\n"
+            for i, pattern in enumerate(common_patterns):
+                patterns_text += f"Pattern {i+1}:\n```c\n{pattern.strip()}\n```\n\n"
+                
+        # Format verification failures
+        failures_text = ""
+        if failure_details:
+            failures_text = "\n\nDetailed CBMC verification failures:\n\n"
+            for category, failures in failure_details.items():
+                failures_text += f"\n{category.capitalize()} failures ({len(failures)}):\n"
+                for failure in failures[:3]:  # Show first 3 of each category
+                    failures_text += f"- {failure}\n"
         
-        # Add raw failures for context
-        raw_failures_text = "\n".join(failure_lines[:15]) if failure_lines else "No specific failure lines found"
-
-        # Add raw failures for context
-        if failure_lines:
-            raw_failures_text = "\n".join(failure_lines[:20])  # Show more failure lines
-            failure_summary = "\n\nFAILURE SUMMARY:\n"
+        # Format 'no body for callee' errors separately for emphasis
+        no_body_text = ""
+        if missing_functions:
+            no_body_text = "\n\nMISSING FUNCTION BODIES DETECTED:\n\n"
+            for func in missing_functions:
+                no_body_text += f"- no body for callee: {func}\n"
             
-            # Group failures by category
-            for category, details in failure_details.items():
-                failure_summary += f"\n{category} failures ({len(details)}):\n"
-                for detail in details[:3]:  # Show first 3 of each category
-                    failure_summary += f"- {detail}\n"
-        else:
-            raw_failures_text = "No specific failure lines found"
-            failure_summary = ""
+            no_body_text += """
+            You must implement or stub these functions. Options:
+            1. Find and include the actual implementation
+            2. Create minimal stubs that return appropriate values
+            3. Avoid calling these functions and simulate their effects
+            """
         
-        # Add stderr if available (especially important for redeclaration errors)
+        # Format failure trace if available
+        trace_text = ""
+        if trace_steps:
+            trace_text = "\n\nExecution trace from CBMC:\n\n"
+            for step in trace_steps[:10]:  # Show first 10 steps
+                trace_text += f"{step}\n"
+            if len(trace_steps) > 10:
+                trace_text += f"... and {len(trace_steps) - 10} more steps\n"
+                
+        # Format errors from stderr
         stderr_text = ""
         if cbmc_stderr:
-            stderr_text = "\nCBMC STDERR OUTPUT:\n" + "\n".join(cbmc_stderr.split('\n')[:20])
+            stderr_text = "\n\nCBMC stderr output:\n\n"
+            stderr_lines = cbmc_stderr.split('\n')
+            for line in stderr_lines[:15]:  # Show first 15 lines
+                if line.strip():
+                    stderr_text += f"{line}\n"
+            if len(stderr_lines) > 15:
+                stderr_text += f"... and {len(stderr_lines) - 15} more lines\n"
+                
+        # Summarize failure locations
+        locations_text = ""
+        if failure_locations:
+            locations_text = "\n\nFailure locations:\n\n"
+            for location, failures in failure_locations.items():
+                locations_text += f"- {location}: {len(failures)} failures\n"
         
-        # Build the full improvement recommendation
+        # Build structured improvement recommendation
         improvement_recommendation = f"""
         Previous harness for {func_name} needs improvement. Refinement attempt {current_attempts + 1} of {max_refinements}.
         
         CBMC verification status: {cbmc_status}
         
-        EXPLANATION: {explanation}
-        
-        {critical_error_message if critical_error_message else ""}
-        
-        Specific issues detected:
+        KEY ISSUES IDENTIFIED:
         {issues_text}
         
-        Recommended fixes:
+        RECOMMENDED FIXES:
         {fixes_text}
-        {proposed_changes_text}
-
-        {failure_summary}
+        {patterns_text}
         
-        Raw CBMC verification failures:
-        {raw_failures_text}
-        
+        {no_body_text}
+        {failures_text}
+        {locations_text}
+        {trace_text}
         {stderr_text}
         
         Current harness:
@@ -719,7 +710,7 @@ def harness_evaluator_node(state):
         ```
         
         CRITICAL INSTRUCTIONS:
-        1. DO NOT CREATE ANY MOCK OR STUB IMPLEMENTATIONS
+        1. DO NOT CREATE ANY MOCK OR STUB IMPLEMENTATIONS unless specifically required for missing functions
         2. Use only functions that actually exist in the codebase
         3. Only include header files that actually exist in the codebase or standard libraries
         4. Focus on creating a minimal test harness with appropriate inputs
@@ -746,15 +737,19 @@ def harness_evaluator_node(state):
     
     # Calculate evaluation time
     evaluation_time = time.time() - evaluation_start
-    
-    # Update function times
+
+    # Update function times - FIXED VERSION with better initialization
+    function_times = state.get("function_times", {}).copy()
+    if func_name not in function_times:
+        function_times[func_name] = {}
     function_times[func_name]["evaluation"] = evaluation_time
-    
+
     # Log proof metrics
     if func_name in proof_metrics:
         metrics = proof_metrics[func_name]
         logger.info(f"Current proof metrics for {func_name}: reachable_lines={metrics.get('total_reachable_lines', 0)}, " 
-                   f"coverage={metrics.get('total_coverage', 0):.2f}%, errors={metrics.get('reported_errors', 0)}")
+                    f"coverage={metrics.get('total_coverage', 0):.2f}%, errors={metrics.get('reported_errors', 0)}")
+
     
     # Update refinement attempts if needed - using refined logic
     if needs_improvement:

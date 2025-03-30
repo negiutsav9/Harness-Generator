@@ -266,6 +266,193 @@ def cbmc_node(state):
         stderr = property_process.stderr
         returncode = property_process.returncode
         
+        # Save raw output immediately, even for preprocessing errors
+        raw_output_file = os.path.join(func_verification_dir, f"v{version_num}_raw_output.txt")
+        with open(raw_output_file, "w") as f:
+            f.write("=== STDOUT ===\n")
+            f.write(stdout)
+            f.write("\n\n=== STDERR ===\n")
+            f.write(stderr)
+        
+        # Enhanced error detection for preprocessing and parsing errors
+        if "PARSING ERROR" in stderr or "preprocessing failed" in stderr.lower() or "error generated" in stderr.lower():
+            logger.warning(f"Preprocessing or parsing error detected for {func_name}")
+            
+            # Extract specific error messages with improved regex pattern
+            error_messages = []
+            error_locations = []
+            
+            for line in stderr.split('\n'):
+                # Look for typical error message patterns
+                if 'error:' in line or 'warning:' in line or 'note:' in line:
+                    error_messages.append(line.strip())
+                    
+                    # Extract specific location information
+                    loc_match = re.search(r'([^:]+):(\d+):', line)
+                    if loc_match:
+                        file_name = loc_match.group(1)
+                        line_num = loc_match.group(2)
+                        error_locations.append(f"{file_name}:{line_num}")
+            
+            # Look for macro-related errors specifically
+            macro_errors = []
+            for line in stderr.split('\n'):
+                if 'macro' in line.lower() and ('error' in line.lower() or 'defined' in line.lower()):
+                    macro_errors.append(line.strip())
+                    # Try to extract the macro name
+                    macro_match = re.search(r"macro '([^']+)'", line)
+                    if macro_match:
+                        macro_name = macro_match.group(1)
+                        macro_errors.append(f"Problematic macro: {macro_name}")
+            
+            # Create a more detailed error description
+            if macro_errors:
+                error_description = "Macro definition error: " + "; ".join(macro_errors[:2])
+            elif error_messages:
+                error_description = "; ".join(error_messages[:3])
+            else:
+                error_description = "GCC preprocessing failed - check for syntax errors"
+            
+            # Update the results dictionary with detailed error information
+            cbmc_results = state.get("cbmc_results", {}).copy()
+            cbmc_results[func_name] = {
+                "function": func_name,
+                "status": "FAILED",
+                "message": f"PREPROCESSING ERROR: {error_description}",
+                "suggestions": "Fix syntax errors and ensure all macros are properly defined",
+                "stdout": stdout,
+                "stderr": stderr,
+                "returncode": returncode,
+                "version": version_num,
+                "has_syntax_error": True,
+                "has_parsing_issue": True,
+                "verification_failure_types": ["preprocessing_error"],
+                "error_locations": error_locations,
+                "macro_errors": macro_errors,
+                "error_messages": error_messages
+            }
+            
+            # Save detailed verification results with error information
+            verification_file = os.path.join(func_verification_dir, f"v{version_num}_results.txt")
+            with open(verification_file, "w") as f:
+                f.write(f"Function: {func_name}\n")
+                f.write(f"Version: {version_num}\n")
+                f.write(f"Status: FAILED\n")
+                f.write(f"Message: PREPROCESSING ERROR\n")
+                f.write(f"Error Description: {error_description}\n\n")
+                
+                if error_locations:
+                    f.write("Error Locations:\n")
+                    for loc in error_locations:
+                        f.write(f"- {loc}\n")
+                    f.write("\n")
+                
+                if macro_errors:
+                    f.write("Macro Errors:\n")
+                    for err in macro_errors:
+                        f.write(f"- {err}\n")
+                    f.write("\n")
+                
+                f.write("Error Messages:\n")
+                for err in error_messages:
+                    f.write(f"- {err}\n")
+                f.write("\n")
+                
+                f.write(f"STDOUT:\n{stdout}\n\n")
+                f.write(f"STDERR:\n{stderr}\n")
+            
+            # Generate detailed error report
+            report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
+            with open(report_file, "w") as f:
+                f.write(f"# CBMC Verification Report - {func_name} (Version {version_num})\n\n")
+                f.write(f"## Summary\n\n")
+                f.write(f"**Status:** FAILED (Preprocessing Error)\n\n")
+                f.write(f"**Message:** {error_description}\n\n")
+                f.write(f"**Suggestions:** Fix syntax errors and ensure all macros are properly defined\n\n")
+                
+                f.write(f"## Error Details\n\n")
+                
+                if error_locations:
+                    f.write("### Error Locations\n\n")
+                    for loc in error_locations:
+                        f.write(f"- {loc}\n")
+                    f.write("\n")
+                
+                if macro_errors:
+                    f.write("### Macro Errors\n\n")
+                    for err in macro_errors:
+                        f.write(f"- {err}\n")
+                    f.write("\n")
+                
+                f.write("### All Error Messages\n\n")
+                for err in error_messages:
+                    f.write(f"- {err}\n")
+                f.write("\n")
+                
+                # Add code fix suggestions for common errors
+                f.write("## Suggested Fixes\n\n")
+                
+                # Specific suggestions for LogError macro issue
+                if any("LogError" in err for err in error_messages):
+                    f.write("### LogError Macro Fix\n\n")
+                    f.write("The error suggests a mismatch between the LogError macro definition and its usage. Try one of these fixes:\n\n")
+                    f.write("1. **Option 1:** Modify your function declaration to match the macro:\n")
+                    f.write("```c\n// Change from\nvoid LogError(const char * format, ...);\n\n// To\nvoid LogError(const char * message);\n```\n\n")
+                    f.write("2. **Option 2:** Create a wrapper function with a different name:\n")
+                    f.write("```c\n// Add this instead\nvoid LogErrorExtended(const char * format, ...);\n```\n\n")
+                
+                # Generic suggestions for macro errors
+                elif macro_errors:
+                    f.write("### Macro Fix Suggestions\n\n")
+                    f.write("1. Check if there are conflicting macro definitions in the included headers\n")
+                    f.write("2. Ensure macros are defined consistently across included files\n")
+                    f.write("3. Try undefining and redefining problematic macros if necessary\n\n")
+                
+                f.write("## Next Steps\n\n")
+                f.write("1. Review the errors above and modify the harness accordingly\n")
+                f.write("2. Fix any macro definition issues or syntax errors\n")
+                f.write("3. Try another verification iteration\n\n")
+                
+                f.write("## Command and Environment\n\n")
+                f.write(f"```\n{' '.join(property_cmd)}\n```\n\n")
+                
+                f.write("## Raw Error Output\n\n")
+                f.write("```\n")
+                f.write(stderr)
+                f.write("\n```\n")
+            
+            # Add empty metrics for this run
+            proof_metrics[func_name] = {
+                "total_reachable_lines": 0,
+                "total_coverage": 0.0,
+                "func_reachable_lines": 0,
+                "func_coverage": 0.0,
+                "reported_errors": len(error_messages),
+                "error_lines": {},
+                "preprocessing_error": True,
+                "error_messages": error_messages,
+                "error_locations": error_locations,
+                "macro_errors": macro_errors
+            }
+            
+            # Skip coverage run and return early with detailed error info
+            function_times = state.get("function_times", {}).copy()
+            if func_name not in function_times:
+                function_times[func_name] = {}
+            function_times[func_name]["verification"] = time.time() - verification_start
+            
+            return {
+                "messages": [AIMessage(content=f"CBMC preprocessing error for function {func_name}: {error_description}")],
+                "cbmc_results": cbmc_results,
+                "function_times": function_times,
+                "cbmc_error_messages": cbmc_error_messages,
+                "harness_syntax_errors": harness_syntax_errors,
+                "parsing_issues": parsing_issues,
+                "verification_failures": verification_failures,
+                "proof_metrics": proof_metrics,
+                "next": "evaluator"
+            }
+        
         # Then run the coverage checking separately
         logger.info(f"Running coverage checking for {func_name}")
         coverage_process = subprocess.run(
@@ -488,6 +675,7 @@ def cbmc_node(state):
             "message": message,
             "suggestions": suggestions,
             "stdout": stdout,
+            "stderr": stderr,  # Make sure stderr is included
             "returncode": returncode,
             "version": version_num,
             "has_syntax_error": func_name in harness_syntax_errors,
@@ -512,11 +700,16 @@ def cbmc_node(state):
             f.write(f"Reported errors: {total_unique_errors}\n")
             f.write("\nDetailed Output:\n")
             f.write(stdout)
+            f.write("\n\n=== STDERR OUTPUT ===\n")  # Add stderr to the results file
+            f.write(stderr)
         
-        # Also save raw output for debugging
+        # Also save raw output for debugging - with both stdout and stderr
         raw_output_file = os.path.join(func_verification_dir, f"v{version_num}_raw_output.txt")
         with open(raw_output_file, "w") as f:
+            f.write("=== STDOUT ===\n")
             f.write(stdout)
+            f.write("\n\n=== STDERR ===\n")
+            f.write(stderr)
         
         # Generate a verification report for this version
         report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
@@ -580,7 +773,8 @@ def cbmc_node(state):
                 f.write(f"The verification was successful. No issues were detected with the current harness implementation.\n\n")
         
     except subprocess.TimeoutExpired as e:
-        # Handle timeout
+        # Handle timeout - make sure process exists before trying to kill it
+        # The 'e' parameter will contain the process
         if hasattr(e, 'process'):
             e.process.kill()
             e.process.wait()

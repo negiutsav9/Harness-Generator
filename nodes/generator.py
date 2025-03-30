@@ -39,11 +39,14 @@ def generator_node(state):
     
     # Get previous harness if refining
     previous_harness = ""
+    cbmc_result = {}
     if is_refinement and func_name in state.get("harnesses", {}):
         previous_harness = state.get("harnesses", {})[func_name]
         # Add to history if not already there
         if previous_harness not in harness_history[func_name]:
             harness_history[func_name].append(previous_harness)
+        # Get the CBMC results for analysis
+        cbmc_result = state.get("cbmc_results", {}).get(func_name, {})
     
     # Get function code
     function_result = code_collection.get(ids=[func_name], include=["documents", "metadatas"])
@@ -101,6 +104,96 @@ def generator_node(state):
                             break
                             
     logger.info(f"Found {len(dependency_implementations)} function dependencies with implementations")
+
+    # ENHANCED HANDLING FOR "NO BODY FOR CALLEE" ERRORS
+    if is_refinement:
+        # Check if previous CBMC result had "no body for callee" errors
+        missing_bodies = []
+        if cbmc_result and cbmc_result.get("stdout", ""):
+            # Extract all missing function bodies using regex
+            cbmc_stdout = cbmc_result.get("stdout", "")
+            no_body_matches = re.findall(r'no body for callee (\w+)', cbmc_stdout)
+            missing_bodies = list(set(no_body_matches))  # Remove duplicates
+        
+        if missing_bodies:
+            logger.info(f"Detected {len(missing_bodies)} missing function bodies: {', '.join(missing_bodies)}")
+            # Find bodies for these missing functions
+            missing_function_bodies = {}
+            
+            # Search for each missing function across all source files
+            for missing_func in missing_bodies:
+                logger.info(f"Searching for implementation of missing function: {missing_func}")
+                
+                # First, try direct match by function name
+                try:
+                    query_results = code_collection.query(
+                        query_texts=[f"function {missing_func}"],
+                        n_results=5
+                    )
+                    
+                    # Check each result for exact function match
+                    if query_results["ids"] and len(query_results["ids"][0]) > 0:
+                        for i, result_id in enumerate(query_results["ids"][0]):
+                            # Check if this is the function we're looking for
+                            if missing_func in result_id and not result_id.startswith("declaration:"):
+                                func_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
+                                if func_result["ids"]:
+                                    # Found the implementation
+                                    logger.info(f"Found implementation for {missing_func}: {result_id}")
+                                    missing_function_bodies[missing_func] = {
+                                        "id": result_id,
+                                        "code": func_result["documents"][0],
+                                        "is_implementation": True,
+                                    }
+                                    break
+                except Exception as e:
+                    logger.error(f"Error searching for {missing_func}: {str(e)}")
+            
+            # Now enhance the harness with these implementations or alternative approaches
+            if missing_function_bodies:
+                # Create function implementation section to include in prompt
+                implementations_section = "\n\nIMPORTANT: Add these function implementations to your harness:\n\n"
+                for func_name, info in missing_function_bodies.items():
+                    implementations_section += f"Implementation for {func_name}:\n```c\n{info['code']}\n```\n\n"
+                    
+                # Append this to the improvement recommendation
+                improvement_recommendation += implementations_section
+            else:
+                # If we couldn't find implementations, provide stub approach
+                stub_section = """
+                \nIMPORTANT: The following functions have no available implementations:
+                """
+                for func in missing_bodies:
+                    stub_section += f"\n- {func}"
+                    
+                stub_section += """
+                \nSince implementations are not available, you need to either:
+                1. Create minimal stub implementations that satisfy CBMC verification
+                2. Modify the harness to avoid calling these functions directly
+                3. Use __CPROVER_assume() to constrain return values instead of calling functions
+
+                Example approach for missing functions:
+                ```c
+                // Option 1: Minimal stub that satisfies CBMC verification
+                HTTPStatus_t addHeader(HTTPRequestHeaders_t* pRequestHeaders, 
+                                      const char* pName, size_t nameLen,
+                                      const char* pValue, size_t valueLen) {
+                    // Return a valid status without side effects
+                    return HTTPSuccess;
+                }
+
+                // Option 2: Modify your test strategy to avoid the function call
+                // Instead of: status = addHeader(...);
+                // Do: 
+                HTTPStatus_t status = nondet_HTTPStatus_t();
+                __CPROVER_assume(status == HTTPSuccess || status == HTTPInvalidParameter);
+                ```
+
+                Choose the approach that best fits each missing function.
+                """
+                
+                # Append this to the improvement recommendation
+                improvement_recommendation += stub_section
     
     # Get pattern information
     patterns_result = query_pattern_db(func_code)
