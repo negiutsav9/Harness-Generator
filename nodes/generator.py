@@ -71,7 +71,7 @@ def generator_node(state):
     except json.JSONDecodeError:
         function_calls = []
     
-    # NEW: Find and add implementations for function dependencies
+    # Find and add implementations for function dependencies
     dependency_implementations = {}
     for called_func in function_calls:
         # Skip standard library functions and control flow statements
@@ -149,15 +149,17 @@ def generator_node(state):
                 except Exception as e:
                     logger.error(f"Error searching for {missing_func}: {str(e)}")
             
-            # Now enhance the harness with these implementations or alternative approaches
+            # FIXED: Never attempt to generate a harness for missing functions
+            # Just include the implementation directly in the current harness
             if missing_function_bodies:
                 # Create function implementation section to include in prompt
                 implementations_section = "\n\nIMPORTANT: Add these function implementations to your harness:\n\n"
-                for func_name, info in missing_function_bodies.items():
-                    implementations_section += f"Implementation for {func_name}:\n```c\n{info['code']}\n```\n\n"
+                for missing_func_name, info in missing_function_bodies.items():
+                    implementations_section += f"Function: {missing_func_name}\n```c\n{info['code']}\n```\n\n"
                     
                 # Append this to the improvement recommendation
                 improvement_recommendation += implementations_section
+                logger.info(f"Added {len(missing_function_bodies)} missing function implementations to improvement recommendation")
             else:
                 # If we couldn't find implementations, provide stub approach
                 stub_section = """
@@ -194,6 +196,7 @@ def generator_node(state):
                 
                 # Append this to the improvement recommendation
                 improvement_recommendation += stub_section
+                logger.info(f"Added stub approach suggestions for {len(missing_bodies)} missing functions")
     
     # Get pattern information
     patterns_result = query_pattern_db(func_code)
@@ -602,16 +605,26 @@ def generator_node(state):
             "next": "cbmc"  # Proceed to CBMC verification
         }
         
+   # In the catch block of generator_node where errors are handled
     except Exception as e:
-        # Handle API errors
+        # Enhanced error handling with more details
         error_msg = str(e)
-        logger.error(f"Error generating harness for {func_name}: {error_msg}")
+        error_type = type(e).__name__
+        logger.error(f"Error ({error_type}) generating harness for {func_name}: {error_msg}")
+        logger.error(f"Full traceback:", exc_info=True)
         print(f"\nERROR: API call failed when processing function {func_name}")
+        print(f"Error type: {error_type}")
         print(f"Error message: {error_msg}")
+        
+        # NEW: Mark this function as failed to prevent repeated attempts
+        failed_functions = state.get("failed_functions", [])
+        if func_name not in failed_functions:
+            failed_functions.append(func_name)
         
         # Return to junction to try next function
         return {
             "messages": [AIMessage(content=f"Error generating harness for {func_name}: {error_msg}. Skipping to next function.")],
+            "failed_functions": failed_functions,  # Add the new failed_functions state
             "next": "junction"
         }
 

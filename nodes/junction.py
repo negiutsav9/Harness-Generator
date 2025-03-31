@@ -13,6 +13,9 @@ def junction_node(state):
     vulnerable_functions = state.get("vulnerable_functions", [])
     processed_functions = state.get("processed_functions", [])
     
+    # NEW: Add tracking for failed functions
+    failed_functions = state.get("failed_functions", [])
+    
     # Safety counter
     loop_counter = state.get("loop_counter", 0) + 1
     
@@ -43,12 +46,12 @@ def junction_node(state):
     # Get current function
     current_function = state.get("current_function", "")
     
-    # If current function is in processed_functions, clear it
-    if current_function and current_function in processed_functions:
+    # If current function is in processed_functions or failed_functions, clear it
+    if current_function and (current_function in processed_functions or current_function in failed_functions):
         current_function = ""
     
     # If valid current function, continue with it
-    if current_function and current_function in vulnerable_functions and current_function not in processed_functions:
+    if current_function and current_function in vulnerable_functions and current_function not in processed_functions and current_function not in failed_functions:
         logger.info(f"Continuing with function: {current_function}")
         return {
             "messages": [AIMessage(content=f"Continuing processing of function: {current_function}")],
@@ -57,9 +60,9 @@ def junction_node(state):
             "next": "generator"
         }
     
-    # Find next unprocessed function
+    # Find next unprocessed and non-failed function
     for func in vulnerable_functions:
-        if func not in processed_functions:
+        if func not in processed_functions and func not in failed_functions:
             logger.info(f"Selected next function: {func} ({completed_functions + 1}/{total_functions})")
             return {
                 "messages": [AIMessage(content=f"Processing function {completed_functions + 1} of {total_functions}: {func}")],
@@ -67,6 +70,15 @@ def junction_node(state):
                 "loop_counter": loop_counter,
                 "next": "generator"
             }
+    
+    # If we get here, all remaining functions have failed
+    if failed_functions:
+        logger.warning(f"Skipping {len(failed_functions)} failed functions. Moving to output.")
+        return {
+            "messages": [AIMessage(content=f"Skipped {len(failed_functions)} functions due to errors. Moving to final output.")],
+            "loop_counter": 0,
+            "next": "output"
+        }
     
     # Fallback - should not reach here
     logger.warning("Junction fallback - all functions appear processed")
