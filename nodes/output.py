@@ -31,8 +31,11 @@ def output_node(state):
     function_times = state.get("function_times", {})
     total_refinements = sum(state.get("refinement_attempts", {}).values())
     
-    # Get the proof metrics
+    # Get the proof metrics with detailed logging
     proof_metrics = state.get("proof_metrics", {})
+    logger.info(f"Retrieved proof metrics: {len(proof_metrics)} entries")
+    for func_name, metrics in proof_metrics.items():
+        logger.info(f"Metrics for {func_name}: {metrics}")
     
     # Calculate aggregate proof metrics
     aggregate_metrics = {
@@ -47,66 +50,96 @@ def output_node(state):
     
     # Compute the aggregated proof metrics with improved error handling
     for func_name, metrics in proof_metrics.items():
-        if "timeout" not in metrics and "system_error" not in metrics:  # Skip timeouts and errors
-            # Add better error handling for metrics extraction
-            total_reachable = metrics.get("total_reachable_lines", 0)
-            if not isinstance(total_reachable, int):
-                try:
-                    total_reachable = int(total_reachable)
-                except (ValueError, TypeError):
-                    total_reachable = 0
-                    
-            aggregate_metrics["total_reachable_lines"] += total_reachable
+        if not metrics:
+            logger.warning(f"Empty metrics for {func_name}")
+            continue
             
-            # Calculate covered lines from total_reachable_lines and total_coverage
-            total_coverage_pct = metrics.get("total_coverage", 0)
-            if isinstance(total_coverage_pct, str):
-                try:
-                    total_coverage_pct = float(total_coverage_pct.strip('%'))
-                except (ValueError, TypeError):
-                    total_coverage_pct = 0
-            
-            covered_lines = int(total_reachable * total_coverage_pct / 100) if total_reachable > 0 else 0
-            aggregate_metrics["total_covered_lines"] += covered_lines
-            
-            # Handle function-specific metrics
-            func_reachable = metrics.get("func_reachable_lines", 0)
-            if not isinstance(func_reachable, int):
-                try:
-                    func_reachable = int(func_reachable)
-                except (ValueError, TypeError):
-                    func_reachable = 0
-                    
-            aggregate_metrics["func_reachable_lines"] += func_reachable
-            
-            # Calculate function covered lines
-            func_coverage_pct = metrics.get("func_coverage", 0)
-            if isinstance(func_coverage_pct, str):
-                try:
-                    func_coverage_pct = float(func_coverage_pct.strip('%'))
-                except (ValueError, TypeError):
-                    func_coverage_pct = 0
-                    
-            func_covered_lines = int(func_reachable * func_coverage_pct / 100) if func_reachable > 0 else 0
-            aggregate_metrics["func_covered_lines"] += func_covered_lines
-            
-            # Add error counts
-            reported_errors = metrics.get("reported_errors", 0)
-            if not isinstance(reported_errors, int):
-                try:
-                    reported_errors = int(reported_errors)
-                except (ValueError, TypeError):
-                    reported_errors = 0
-                    
-            aggregate_metrics["total_reported_errors"] += reported_errors
-            
-            # Count functions with full coverage (100%)
-            if func_coverage_pct == 100.0:
-                aggregate_metrics["functions_with_full_coverage"] += 1
+        if "timeout" in metrics or "system_error" in metrics or "preprocessing_error" in metrics:
+            logger.info(f"Skipping metrics for {func_name} due to timeout/error")
+            continue  # Skip timeouts and errors
+        
+        # Add better error handling for metrics extraction
+        total_reachable = metrics.get("total_reachable_lines", 0)
+        if not isinstance(total_reachable, int):
+            try:
+                total_reachable = int(total_reachable)
+            except (ValueError, TypeError):
+                logger.warning(f"Failed to convert total_reachable_lines to int for {func_name}: {total_reachable}")
+                total_reachable = 0
                 
-            # Count functions without errors
-            if reported_errors == 0:
-                aggregate_metrics["functions_without_errors"] += 1
+        aggregate_metrics["total_reachable_lines"] += total_reachable
+        
+        # Calculate covered lines from total_reachable_lines and total_coverage
+        total_coverage_pct = metrics.get("total_coverage", 0)
+        if isinstance(total_coverage_pct, str):
+            try:
+                total_coverage_pct = float(total_coverage_pct.strip('%'))
+            except (ValueError, TypeError):
+                logger.warning(f"Failed to convert string total_coverage to float for {func_name}: {total_coverage_pct}")
+                total_coverage_pct = 0
+        elif isinstance(total_coverage_pct, (int, float)):
+            # Already a number, make sure it's a float
+            total_coverage_pct = float(total_coverage_pct)
+        else:
+            logger.warning(f"Unknown type for total_coverage for {func_name}: {type(total_coverage_pct)}")
+            total_coverage_pct = 0
+        
+        # Log raw coverage values for debugging
+        logger.info(f"Raw coverage values for {func_name}: reachable={total_reachable}, coverage={total_coverage_pct}%")
+        
+        covered_lines = int(total_reachable * total_coverage_pct / 100) if total_reachable > 0 else 0
+        aggregate_metrics["total_covered_lines"] += covered_lines
+        
+        # Handle function-specific metrics
+        func_reachable = metrics.get("func_reachable_lines", 0)
+        if not isinstance(func_reachable, int):
+            try:
+                func_reachable = int(func_reachable)
+            except (ValueError, TypeError):
+                logger.warning(f"Failed to convert func_reachable_lines to int for {func_name}: {func_reachable}")
+                func_reachable = 0
+                
+        aggregate_metrics["func_reachable_lines"] += func_reachable
+        
+        # Calculate function covered lines
+        func_coverage_pct = metrics.get("func_coverage", 0)
+        if isinstance(func_coverage_pct, str):
+            try:
+                func_coverage_pct = float(func_coverage_pct.strip('%'))
+            except (ValueError, TypeError):
+                logger.warning(f"Failed to convert string func_coverage to float for {func_name}: {func_coverage_pct}")
+                func_coverage_pct = 0
+        elif isinstance(func_coverage_pct, (int, float)):
+            # Already a number, make sure it's a float
+            func_coverage_pct = float(func_coverage_pct)
+        else:
+            logger.warning(f"Unknown type for func_coverage for {func_name}: {type(func_coverage_pct)}")
+            func_coverage_pct = 0
+            
+        func_covered_lines = int(func_reachable * func_coverage_pct / 100) if func_reachable > 0 else 0
+        aggregate_metrics["func_covered_lines"] += func_covered_lines
+        
+        # Add error counts
+        reported_errors = metrics.get("reported_errors", 0)
+        if not isinstance(reported_errors, int):
+            try:
+                reported_errors = int(reported_errors)
+            except (ValueError, TypeError):
+                logger.warning(f"Failed to convert reported_errors to int for {func_name}: {reported_errors}")
+                reported_errors = 0
+                
+        aggregate_metrics["total_reported_errors"] += reported_errors
+        
+        # Count functions with full coverage (100%)
+        if func_coverage_pct >= 99.5:  # Allow for small rounding errors
+            aggregate_metrics["functions_with_full_coverage"] += 1
+                
+        # Count functions without errors
+        if reported_errors == 0:
+            aggregate_metrics["functions_without_errors"] += 1
+    
+    # Log aggregated metrics
+    logger.info(f"Aggregated metrics: {aggregate_metrics}")
     
     # Calculate overall coverage percentages with safeguards against division by zero
     overall_total_coverage = 0
@@ -235,18 +268,28 @@ def output_node(state):
                 metrics = proof_metrics[func_name]
                 header.append(f"\n#### Unit Proof Metrics")
                 
-                if "timeout" in metrics or "system_error" in metrics:
-                    status = "timeout" if "timeout" in metrics else "system error"
+                if "timeout" in metrics or "system_error" in metrics or "preprocessing_error" in metrics:
+                    status = "timeout" if "timeout" in metrics else "system error" if "system_error" in metrics else "preprocessing error"
                     header.append(f"- Total reachable lines: N/A ({status})")
                     header.append(f"- Total coverage: N/A ({status})")
                     header.append(f"- Function reachable lines: N/A ({status})")
                     header.append(f"- Function coverage: N/A ({status})")
                     header.append(f"- Reported errors: N/A ({status})")
                 else:
-                    header.append(f"- Total reachable lines: {metrics.get('total_reachable_lines', 'N/A')}")
-                    header.append(f"- Total coverage: {metrics.get('total_coverage', 0):.2f}%")
-                    header.append(f"- Function reachable lines: {metrics.get('func_reachable_lines', 'N/A')}")
-                    header.append(f"- Function coverage: {metrics.get('func_coverage', 0):.2f}%")
+                    # Get raw metric values for debugging
+                    raw_total_reachable = metrics.get('total_reachable_lines', 'N/A')
+                    raw_total_coverage = metrics.get('total_coverage', 0)
+                    raw_func_reachable = metrics.get('func_reachable_lines', 'N/A')
+                    raw_func_coverage = metrics.get('func_coverage', 0)
+                    
+                    # Format coverage percentages properly
+                    total_coverage_fmt = f"{float(raw_total_coverage):.2f}%" if isinstance(raw_total_coverage, (int, float)) else "N/A"
+                    func_coverage_fmt = f"{float(raw_func_coverage):.2f}%" if isinstance(raw_func_coverage, (int, float)) else "N/A"
+                    
+                    header.append(f"- Total reachable lines: {raw_total_reachable}")
+                    header.append(f"- Total coverage: {total_coverage_fmt}")
+                    header.append(f"- Function reachable lines: {raw_func_reachable}")
+                    header.append(f"- Function coverage: {func_coverage_fmt}")
                     header.append(f"- Reported errors: {metrics.get('reported_errors', 0)}")
                 
                 # Add error details if any
@@ -376,10 +419,28 @@ def output_node(state):
                 # Get version count
                 version_count = len(state.get("harness_history", {}).get(func_name, [])) or refinements + 1
                 
-                # Get function metrics
+                # Get function metrics with improved error handling
                 metrics = proof_metrics.get(func_name, {})
+                
+                # Handle function coverage value - ensure it's a properly formatted float
                 func_coverage = metrics.get("func_coverage", 0)
+                if isinstance(func_coverage, str):
+                    try:
+                        func_coverage = float(func_coverage.strip('%'))
+                    except (ValueError, TypeError):
+                        func_coverage = 0
+                elif isinstance(func_coverage, (int, float)):
+                    func_coverage = float(func_coverage)
+                else:
+                    func_coverage = 0
+                    
+                # Similarly, handle reported errors values
                 reported_errors = metrics.get("reported_errors", 0)
+                if not isinstance(reported_errors, int):
+                    try:
+                        reported_errors = int(reported_errors)
+                    except (ValueError, TypeError):
+                        reported_errors = 0
                 
                 # Determine coverage color
                 coverage_style = ""
@@ -399,9 +460,10 @@ def output_node(state):
                 else:
                     error_style = "style='color:red;font-weight:bold'"
                 
-                # Get coverage and error display values
-                coverage_display = f"{func_coverage:.2f}%" if "timeout" not in metrics and "system_error" not in metrics else "N/A"
-                errors_display = str(reported_errors) if "timeout" not in metrics and "system_error" not in metrics else "N/A"
+                # Get coverage and error display values with error handling
+                special_status = "timeout" in metrics or "system_error" in metrics or "preprocessing_error" in metrics
+                coverage_display = f"{func_coverage:.2f}%" if not special_status else "N/A"
+                errors_display = str(reported_errors) if not special_status else "N/A"
                 
                 f.write(f"<tr><td>{display_name}</td><td>{file_name}</td><td {status_style}>{result['status']}</td>")
                 f.write(f"<td {coverage_style}>{coverage_display}</td>")
@@ -466,11 +528,19 @@ def output_node(state):
                 if ":" in func_name:
                     _, display_name = func_name.split(":", 1)
                 
-                # Coverage evolution - only available if we have it
+                # Coverage evolution - handle special cases
                 coverage_evolution = "N/A"
                 metrics = proof_metrics.get(func_name, {})
-                if "timeout" not in metrics and "system_error" not in metrics and metrics.get("func_coverage") is not None:
-                    coverage_evolution = f"{metrics.get('func_coverage', 0):.2f}%"
+                if metrics and "timeout" not in metrics and "system_error" not in metrics and "preprocessing_error" not in metrics:
+                    func_coverage = metrics.get("func_coverage", None)
+                    if func_coverage is not None:
+                        if isinstance(func_coverage, (int, float)):
+                            coverage_evolution = f"{float(func_coverage):.2f}%"
+                        elif isinstance(func_coverage, str):
+                            try:
+                                coverage_evolution = f"{float(func_coverage.strip('%')):.2f}%"
+                            except (ValueError, TypeError):
+                                coverage_evolution = "N/A (format error)"
                 
                 f.write(f"<tr><td>{display_name}</td><td>{versions}</td>")
                 f.write(f"<td {status_style}>{status}</td><td>{line_evolution}</td><td>{coverage_evolution}</td></tr>")

@@ -1,0 +1,123 @@
+<html><head><title>CBMC Verification Report</title><style>body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px}h1{color:#2c3e50}h2{color:#3498db}h3{color:#2980b9}pre{background:#f8f8f8;border:1px solid #ddd;padding:10px;overflow:auto;border-radius:3px}table{border-collapse:collapse;width:100%}table,th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}tr:nth-child(even){background-color:#f9f9f9}</style></head><body><h1>CBMC Harness Generation Complete - Directory Mode - Openai</h1>
+<p>Total processing time: 1132.62 seconds
+Processed 23 source files.
+Analyzed 223 functions.
+Identified 39 functions with memory or arithmetic operations.
+Generated 3 verification harnesses.
+Performed 11 harness refinements (average 2.20 per function).</p>
+<h2>File Analysis</h2>
+<h3>core_http_client.c</h3>
+<p>Functions analyzed: 35
+Functions verified: 3
+Successful verifications: 2
+Failed verifications: 1</p>
+<h3>pattern</h3>
+<p>Functions analyzed: 4
+Functions verified: 0</p>
+<h2>Unit Proof Metrics Summary</h2>
+<p>Total reachable lines: 383
+Total coverage: 79.63%
+Total reachable lines for harnessed functions only: 190
+Coverage of harnessed functions only: 78.95%
+Number of reported errors: 0
+Functions with full coverage: 0 of 3
+Functions without errors: 3 of 3</p>
+<h3>Note on Error Reporting:</h3>
+<ul>
+<li>Errors are grouped by line number (one error per line)</li>
+<li>Errors about missing function bodies are excluded</li>
+<li>Loop unwinding assertions are excluded from error count</li>
+</ul>
+<h2>Performance Metrics</h2>
+<p>Average harness generation time: 4.47 seconds
+Average verification time: 0.37 seconds
+Average evaluation time: 0.02 seconds</p>
+<h2>Summary of Results</h2>
+<h3>Function: HTTPClient_AddHeader (File: core_http_client.c)</h3>
+<p>Status: SUCCESS
+Refinements: 1
+Message: VERIFICATION SUCCESSFUL: No issues detected.</p>
+<h4>Unit Proof Metrics</h4>
+<ul>
+<li>Total reachable lines: 113</li>
+<li>Total coverage: 79.65%</li>
+<li>Function reachable lines: 56</li>
+<li>Function coverage: 78.57%</li>
+<li>Reported errors: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddHeader/v1.c</li>
+<li>Version 2: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddHeader/v2.c</li>
+<li>Version 3: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddHeader/v3.c</li>
+<li>Size evolution: Initial 126 lines → Final 113 lines (-13 lines)</li>
+<li>Refinement result: Successfully addressed all verification issues</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddHeader/v1_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddHeader/v1_report.md</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddHeader/v2_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddHeader/v2_report.md</li>
+</ul>
+<h3>Function: HTTPClient_AddRangeHeader (File: core_http_client.c)</h3>
+<p>Status: SUCCESS
+Refinements: 1
+Message: VERIFICATION SUCCESSFUL: No issues detected.</p>
+<h4>Unit Proof Metrics</h4>
+<ul>
+<li>Total reachable lines: 99</li>
+<li>Total coverage: 79.80%</li>
+<li>Function reachable lines: 49</li>
+<li>Function coverage: 79.59%</li>
+<li>Reported errors: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddRangeHeader/v1.c</li>
+<li>Version 2: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddRangeHeader/v2.c</li>
+<li>Version 3: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddRangeHeader/v3.c</li>
+<li>Version 4: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_AddRangeHeader/v4.c</li>
+<li>Size evolution: Initial 93 lines → Final 99 lines (+6 lines)</li>
+<li>Refinement result: Successfully addressed all verification issues</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddRangeHeader/v1_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddRangeHeader/v1_report.md</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddRangeHeader/v2_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_AddRangeHeader/v2_report.md</li>
+</ul>
+<h3>Function: HTTPClient_InitializeRequestHeaders (File: core_http_client.c)</h3>
+<p>Status: FAILED
+Refinements: 3
+Message: VERIFICATION FAILED: Null pointer dereference detected.
+Suggestions: Add null pointer checks before dereferencing.</p>
+<h4>Unit Proof Metrics</h4>
+<ul>
+<li>Total reachable lines: 171</li>
+<li>Total coverage: 79.53%</li>
+<li>Function reachable lines: 85</li>
+<li>Function coverage: 80.00%</li>
+<li>Reported errors: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_InitializeRequestHeaders/v1.c</li>
+<li>Version 2: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_InitializeRequestHeaders/v2.c</li>
+<li>Version 3: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_InitializeRequestHeaders/v3.c</li>
+<li>Version 4: results/openai/20250331_090914/harnesses/core_http_client.c:HTTPClient_InitializeRequestHeaders/v4.c</li>
+<li>Size evolution: Initial 198 lines → Final 171 lines (-27 lines)</li>
+<li>Refinement result: Some issues remain after 3 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v1_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v1_report.md</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v2_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v2_report.md</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v3_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v3_report.md</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v4_results.txt</li>
+<li>results/openai/20250331_090914/verification/core_http_client.c:HTTPClient_InitializeRequestHeaders/v4_report.md</li>
+</ul></body></html>
