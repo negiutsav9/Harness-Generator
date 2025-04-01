@@ -41,6 +41,8 @@ harnesses
 verification
 coreHTTP
 coreHTTP/*
+coreJSON
+coreJSON/*
 demo
 notes.txt
 
