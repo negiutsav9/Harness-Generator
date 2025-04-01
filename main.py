@@ -8,10 +8,12 @@ import argparse
 import logging
 import sys
 from langchain_core.messages import HumanMessage
+import polars as pl
 
 from core.workflow import create_workflow
 from utils.file_utils import process_directory, calculate_recursion_limit, setup_verification_directories
 from utils.llm_utils import setup_llm
+from utils.metrics_utils import initialize_metrics_tracker
 
 # Improved logging setup:
 logging.basicConfig(level=logging.INFO, 
@@ -41,6 +43,8 @@ def main():
                         help='Timeout in seconds for the entire workflow (default: 3600)')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Enable verbose logging')
+    parser.add_argument('-e', '--export', type=str, default='metrics.xlsx',
+                        help='Export metrics to specified Excel file (default: metrics.xlsx)')
     args = parser.parse_args()
     
     # Set logging level based on verbose flag
@@ -49,8 +53,7 @@ def main():
         logger.debug("Verbose logging enabled")
     
     try:
-        # Initialize the global LLM based on user choice - this sets up the global LLM
-        # that will be used by all nodes through the import in those nodes
+        # Initialize the global LLM based on user choice
         logger.info(f"Initializing LLM: {args.llm}")
         setup_llm(model_choice=args.llm)
         
@@ -59,6 +62,10 @@ def main():
         
         # Set up verification directories with LLM model name
         directories = setup_verification_directories(llm_used=args.llm)
+        
+        # Initialize metrics tracker with reports directory
+        metrics_output_dir = directories["reports"]
+        initialize_metrics_tracker(metrics_output_dir)
         
         # Add directories to state for access by nodes
         result_directories = {
@@ -102,9 +109,8 @@ def main():
                         "harnesses": {},
                         "cbmc_results": {},
                         "processed_functions": [],
-                        "proof_metrics": {},  # Initialize the proof metrics field
-                        "result_directories": result_directories,  # Add result directories
-                        "llm_used": args.llm  # Add LLM info
+                        "result_directories": result_directories,
+                        "llm_used": args.llm
                     },
                     {"recursion_limit": recursion_limit, "timeout": args.timeout}
                 )
@@ -152,9 +158,8 @@ def main():
                             "harnesses": {},
                             "cbmc_results": {},
                             "processed_functions": [],
-                            "proof_metrics": {},  # Initialize the proof metrics field
-                            "result_directories": result_directories,  # Add result directories
-                            "llm_used": args.llm  # Add LLM info
+                            "result_directories": result_directories,
+                            "llm_used": args.llm
                         },
                         {"recursion_limit": recursion_limit, "timeout": args.timeout}
                     )
@@ -175,6 +180,18 @@ def main():
             logger.error("No input provided")
             print("Please provide either a directory (-d) or a file (-f) to analyze")
             return 1
+        
+        # Get metrics tracker and export data
+        from utils.metrics_utils import get_metrics_tracker
+        
+        metrics_tracker = get_metrics_tracker()
+        metrics_tracker.generate_summary()
+        
+        # Export metrics to CSV and Excel
+        metrics_tracker.export_to_csv()
+        if args.export:
+            metrics_tracker.export_to_excel(args.export)
+            print(f"Metrics exported to {os.path.join(metrics_tracker.output_dir, args.export)}")
         
         # Display the conversation
         print("=== Workflow Execution Results ===")
