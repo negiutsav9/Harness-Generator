@@ -39,6 +39,7 @@ origin/
 origin/*.py
 harnesses
 verification
+rag_data
 coreHTTP
 coreHTTP/*
 coreJSON

@@ -10,11 +10,6 @@ import sys
 from langchain_core.messages import HumanMessage
 import polars as pl
 
-from core.workflow import create_workflow
-from utils.file_utils import process_directory, calculate_recursion_limit, setup_verification_directories
-from utils.llm_utils import setup_llm
-from utils.metrics_utils import initialize_metrics_tracker
-
 # Improved logging setup:
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -24,6 +19,49 @@ logger = logging.getLogger("main")
 # Reduce verbosity of other loggers
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("chromadb").setLevel(logging.WARNING)
+
+# Import local modules
+from utils.file_utils import process_directory, calculate_recursion_limit, setup_verification_directories
+from utils.llm_utils import setup_llm
+from utils.metrics_utils import initialize_metrics_tracker
+
+def initialize_rag_system(result_base_dir):
+    """
+    Initialize the RAG system after all modules are loaded.
+    This avoids circular imports by initializing the RAG system
+    only after all core modules are already loaded.
+    """
+    logger.info("Initializing unified RAG system")
+    
+    # Create the directory for RAG storage
+    rag_dir = os.path.join(result_base_dir, "rag_data")
+    os.makedirs(rag_dir, exist_ok=True)
+    
+    try:
+        # Import the unified RAG database module
+        from utils.rag import get_unified_db
+        import core.embedding_db as embedding_db
+        
+        # Initialize the unified database
+        db = get_unified_db(rag_dir)
+        logger.info(f"Initialized RAG database at {rag_dir}")
+        
+        # Update embedding_db to use the unified database
+        embedding_db.code_collection = db.code_collection
+        embedding_db.pattern_collection = db.pattern_collection
+        
+        # Update the query function to use the unified database
+        def updated_query_pattern_db(query: str):
+            return db.query_pattern_db(query)
+        
+        embedding_db.query_pattern_db = updated_query_pattern_db
+        logger.info("Successfully connected embedding_db to unified RAG database")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error initializing RAG system: {str(e)}")
+        logger.warning("Continuing with default embedding_db implementation")
+        return False
 
 def main():
     """
@@ -45,6 +83,8 @@ def main():
                         help='Enable verbose logging')
     parser.add_argument('-e', '--export', type=str, default='metrics.xlsx',
                         help='Export metrics to specified Excel file (default: metrics.xlsx)')
+    parser.add_argument('--no-rag', action='store_true',
+                        help='Disable the RAG system and use standard embedding database')
     args = parser.parse_args()
     
     # Set logging level based on verbose flag
@@ -57,15 +97,17 @@ def main():
         logger.info(f"Initializing LLM: {args.llm}")
         setup_llm(model_choice=args.llm)
         
-        # Set up workflow
-        app = create_workflow()
-        
         # Set up verification directories with LLM model name
         directories = setup_verification_directories(llm_used=args.llm)
         
         # Initialize metrics tracker with reports directory
         metrics_output_dir = directories["reports"]
         initialize_metrics_tracker(metrics_output_dir)
+        
+        # Initialize the RAG system if not disabled
+        rag_enabled = False
+        if not args.no_rag:
+            rag_enabled = initialize_rag_system(directories["result_base"])
         
         # Add directories to state for access by nodes
         result_directories = {
@@ -74,6 +116,13 @@ def main():
             "reports_dir": directories["reports"],
             "result_base_dir": directories["result_base"]
         }
+        
+        # Only import workflow after initializing the RAG system
+        # This prevents circular imports
+        from core.workflow import create_workflow
+        
+        # Set up workflow
+        app = create_workflow()
         
         if args.directory:
             # Directory mode
@@ -110,7 +159,8 @@ def main():
                         "cbmc_results": {},
                         "processed_functions": [],
                         "result_directories": result_directories,
-                        "llm_used": args.llm
+                        "llm_used": args.llm,
+                        "rag_enabled": rag_enabled
                     },
                     {"recursion_limit": recursion_limit, "timeout": args.timeout}
                 )
@@ -159,7 +209,8 @@ def main():
                             "cbmc_results": {},
                             "processed_functions": [],
                             "result_directories": result_directories,
-                            "llm_used": args.llm
+                            "llm_used": args.llm,
+                            "rag_enabled": rag_enabled
                         },
                         {"recursion_limit": recursion_limit, "timeout": args.timeout}
                     )

@@ -1,15 +1,16 @@
 """
-Output node for CBMC harness generator workflow.
+Output node for CBMC harness generator workflow with unified RAG database integration.
 """
 import os
 import time
 from langchain_core.messages import AIMessage
 import logging
+from utils.rag import get_unified_db
 
 logger = logging.getLogger("output")
 
 def output_node(state):
-    """Provides final summary of all processed functions with performance metrics and generates an index report."""
+    """Provides final summary and generates reports with RAG database statistics."""
     total_time = time.time() - state.get("start_time", time.time())
 
     logger.info("Generating final report and output summaries")
@@ -20,6 +21,9 @@ def output_node(state):
     harnesses_dir = result_directories.get("harnesses_dir", "harnesses")
     verification_dir = result_directories.get("verification_dir", "verification")
     result_base_dir = result_directories.get("result_base_dir", "results")
+    
+    # Get the unified RAG database
+    rag_db = get_unified_db(os.path.join(result_base_dir, "rag_data"))
     
     # Get LLM model info
     llm_used = state.get("llm_used", "claude")
@@ -159,6 +163,24 @@ def output_node(state):
     else:
         avg_generation_time = avg_verification_time = avg_evaluation_time = avg_refinements = 0
     
+    # Get RAG database statistics
+    try:
+        rag_stats = {
+            "code_functions": rag_db.code_collection.count(),
+            "patterns": rag_db.pattern_collection.count(),
+            "errors": rag_db.error_collection.count(),
+            "solutions": rag_db.solution_collection.count()
+        }
+        logger.info(f"RAG database statistics: {rag_stats}")
+    except Exception as e:
+        logger.error(f"Error getting RAG statistics: {str(e)}")
+        rag_stats = {
+            "code_functions": 0,
+            "patterns": 0,
+            "errors": 0,
+            "solutions": 0
+        }
+    
     # Create a header based on mode
     if is_directory_mode:
         source_files = state.get("source_files", {})
@@ -212,6 +234,18 @@ def output_node(state):
             f"Generated {len(state.get('harnesses', {}))} verification harnesses.",
             f"Performed {total_refinements} harness refinements (average {avg_refinements:.2f} per function).",
         ]
+    
+    # Add RAG database statistics section
+    header.extend([
+        "",
+        "## RAG Knowledge Base Statistics",
+        f"Code functions stored: {rag_stats['code_functions']}",
+        f"Pattern templates: {rag_stats['patterns']}",
+        f"Error patterns stored: {rag_stats['errors']}",
+        f"Successful solutions: {rag_stats['solutions']}",
+        "",
+        "The RAG (Retrieval-Augmented Generation) knowledge base stores code functions, patterns, errors, and solutions to improve harness generation over time. Each run contributes to this knowledge base, helping future runs generate better harnesses with fewer iterations.",
+    ])
     
     # Add unit proof metrics summary
     header.extend([
@@ -372,6 +406,17 @@ def output_node(state):
         f.write("<p>This index provides links to all verification reports generated.</p>")
         f.write(f"<p><strong>LLM Model Used:</strong> {llm_used.capitalize()}</p>")
         
+        # Add section for RAG database statistics
+        f.write("<h2>RAG Knowledge Base</h2>")
+        f.write("<table>")
+        f.write("<tr><th>Collection</th><th>Count</th></tr>")
+        f.write(f"<tr><td>Code Functions</td><td>{rag_stats['code_functions']}</td></tr>")
+        f.write(f"<tr><td>Pattern Templates</td><td>{rag_stats['patterns']}</td></tr>")
+        f.write(f"<tr><td>Error Patterns</td><td>{rag_stats['errors']}</td></tr>")
+        f.write(f"<tr><td>Successful Solutions</td><td>{rag_stats['solutions']}</td></tr>")
+        f.write("</table>")
+        f.write("<p>The RAG knowledge base grows with each run, improving harness generation by leveraging past experience.</p>")
+        
         # Link to final report
         f.write("<h2>Final Summary Report</h2>")
         f.write(f"<p><a href='final_report.html'>View Complete Summary Report</a></p>")
@@ -503,15 +548,6 @@ def output_node(state):
                 versions = len(history)
                 status = state.get("cbmc_results", {}).get(func_name, {}).get("status", "UNKNOWN")
                 
-                # Calculate line count evolution
-                if len(history) > 1:
-                    first_lines = len(history[0].split('\n'))
-                    last_lines = len(history[-1].split('\n'))
-                    line_diff = last_lines - first_lines
-                    line_evolution = f"{first_lines} → {last_lines} ({'+' if line_diff > 0 else ''}{line_diff})"
-                else:
-                    line_evolution = "N/A"
-                
                 # Determine status color
                 status_style = ""
                 if status == "SUCCESS":
@@ -522,6 +558,15 @@ def output_node(state):
                     status_style = "style='color:orange;font-weight:bold'"
                 else:
                     status_style = "style='color:gray;font-weight:bold'"
+                
+                # Calculate line count evolution
+                if len(history) > 1:
+                    first_lines = len(history[0].split('\n'))
+                    last_lines = len(history[-1].split('\n'))
+                    line_diff = last_lines - first_lines
+                    line_evolution = f"{first_lines} → {last_lines} ({'+' if line_diff > 0 else ''}{line_diff})"
+                else:
+                    line_evolution = "N/A"
                 
                 # Extract display name
                 display_name = func_name

@@ -1,14 +1,14 @@
 """
-Analyzer node for CBMC harness generator workflow.
+Analyzer node for CBMC harness generator workflow with unified RAG database integration.
 """
 import time
 import os
 import re
 from langchain_core.messages import AIMessage
-from core.embedding_db import code_collection
+from utils.rag import get_unified_db
 
 def analyzer_node(state):
-    """Analyzes code from CodeDB to identify functions with memory operations or arithmetic."""
+    """Analyzes code to identify functions with memory operations or arithmetic using unified RAG database."""
     # Start timing for analysis phase
     analysis_start = time.time()
     
@@ -16,10 +16,32 @@ def analyzer_node(state):
     source_dir = state.get("source_directory", "")
     print(f"DEBUG: Source directory: {source_dir}")
     
-    # Try to get all functions from the code database
+    # Get result directories for RAG storage
+    result_directories = state.get("result_directories", {})
+    
+    # Initialize unified RAG database
+    rag_db = get_unified_db(os.path.join(result_directories.get("result_base_dir", "results"), "rag_data"))
+    
+    # Try to get all functions from the unified database first
+    # For backward compatibility, fall back to code_collection if needed
     try:
+        from core.embedding_db import code_collection
         all_functions = code_collection.get()
         print(f"DEBUG: Retrieved {len(all_functions['ids'])} items from code_collection")
+        
+        # Store all functions in the unified database for future use
+        for i, func_id in enumerate(all_functions["ids"]):
+            # Skip patterns and declarations for now
+            if func_id.startswith("pattern:") or func_id.startswith("declaration:"):
+                continue
+                
+            # Add to unified database
+            rag_db.add_code_function(
+                func_id,
+                all_functions["documents"][i],
+                all_functions["metadatas"][i]
+            )
+            
     except Exception as e:
         print(f"ERROR: Failed to retrieve functions from database: {e}")
         all_functions = {"ids": [], "documents": [], "metadatas": []}

@@ -1,5 +1,5 @@
 """
-Generator node for CBMC harness generator workflow.
+Generator node for CBMC harness generator workflow with unified RAG enhancement.
 """
 import time
 import os
@@ -8,14 +8,14 @@ import json
 import logging
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from core.embedding_db import code_collection
-from utils.cbmc_parser import generate_improvement_recommendation
 from utils.metrics_utils import get_metrics_tracker
+from utils.rag import get_unified_db
 
 # Set up logging
 logger = logging.getLogger("generator")
 
 def generator_node(state):
-    """Generates or refines CBMC-compatible harness for the current function."""
+    """Generates or refines CBMC-compatible harness for the current function using unified RAG."""
     # Get the global LLM instance
     from utils.llm_utils import setup_llm
     llm = setup_llm()
@@ -29,6 +29,9 @@ def generator_node(state):
     # Get result directories from state
     result_directories = state.get("result_directories", {})
     harnesses_dir = result_directories.get("harnesses_dir", "harnesses")
+    
+    # Get the unified RAG database
+    rag_db = get_unified_db(os.path.join(result_directories.get("result_base_dir", "results"), "rag_data"))
     
     # Check if this is a refinement
     improvement_recommendation = state.get("improvement_recommendation", "")
@@ -50,57 +53,70 @@ def generator_node(state):
         # Get the CBMC results for analysis
         cbmc_result = state.get("cbmc_results", {}).get(func_name, {})
     
-    # Get function code using multiple look-up strategies
-    func_code = ""
-    func_metadata = {}
+    # Try to get function from unified database first
+    function_data = rag_db.get_code_function(func_name)
     
-    # Strategy 1: Direct ID lookup (most reliable)
-    function_result = code_collection.get(ids=[func_name], include=["documents", "metadatas"])
-    
-    if function_result["ids"]:
-        func_code = function_result["documents"][0]
-        func_metadata = function_result["metadatas"][0]
-        logger.info(f"Found function {func_name} via direct ID lookup")
+    if function_data:
+        func_code = function_data["code"]
+        func_metadata = function_data["metadata"]
+        logger.info(f"Found function {func_name} in unified RAG database")
     else:
-        # Strategy 2: Try parsing the function name 
-        if ":" in func_name:
-            # Try with file basename and function name
-            file_basename, orig_func_name = func_name.split(":", 1)
-            # Try searching for original function name 
-            query_results = code_collection.query(
-                query_texts=[f"function {orig_func_name}"],
-                n_results=5
-            )
-            
-            if query_results["ids"][0]:
-                for i, result_id in enumerate(query_results["ids"][0]):
-                    # Look for exact matches first
-                    if orig_func_name in result_id and not result_id.startswith("pattern:"):
-                        match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                        if match_result["ids"]:
-                            func_code = match_result["documents"][0]
-                            func_metadata = match_result["metadatas"][0]
-                            logger.info(f"Found function {func_name} via name search: {result_id}")
-                            break
+        # Fall back to direct lookup from code_collection
+        function_result = code_collection.get(ids=[func_name], include=["documents", "metadatas"])
         
-        # Strategy 3: Last resort - fuzzy search
-        if not func_code:
-            # Try a more general search
-            search_term = func_name.split(":")[-1] if ":" in func_name else func_name
-            logger.info(f"Trying fuzzy search for {search_term}")
+        if function_result["ids"]:
+            func_code = function_result["documents"][0]
+            func_metadata = function_result["metadatas"][0]
+            logger.info(f"Found function {func_name} via direct ID lookup")
             
-            query_results = code_collection.query(
-                query_texts=[search_term],
-                n_results=3
-            )
+            # Store in unified database for future use
+            rag_db.add_code_function(func_name, func_code, func_metadata)
+        else:
+            # Strategy 2: Try parsing the function name 
+            if ":" in func_name:
+                # Try with file basename and function name
+                file_basename, orig_func_name = func_name.split(":", 1)
+                # Try searching for original function name 
+                query_results = code_collection.query(
+                    query_texts=[f"function {orig_func_name}"],
+                    n_results=5
+                )
+                
+                if query_results["ids"][0]:
+                    for i, result_id in enumerate(query_results["ids"][0]):
+                        # Look for exact matches first
+                        if orig_func_name in result_id and not result_id.startswith("pattern:"):
+                            match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
+                            if match_result["ids"]:
+                                func_code = match_result["documents"][0]
+                                func_metadata = match_result["metadatas"][0]
+                                logger.info(f"Found function {func_name} via name search: {result_id}")
+                                
+                                # Store in unified database for future use
+                                rag_db.add_code_function(func_name, func_code, func_metadata)
+                                break
             
-            if query_results["ids"][0]:
-                result_id = query_results["ids"][0][0]  # Take the closest match
-                match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                if match_result["ids"]:
-                    func_code = match_result["documents"][0]
-                    func_metadata = match_result["metadatas"][0]
-                    logger.info(f"Found potential match for {func_name} via fuzzy search: {result_id}")
+            # Strategy 3: Last resort - fuzzy search
+            if not func_code:
+                # Try a more general search
+                search_term = func_name.split(":")[-1] if ":" in func_name else func_name
+                logger.info(f"Trying fuzzy search for {search_term}")
+                
+                query_results = code_collection.query(
+                    query_texts=[search_term],
+                    n_results=3
+                )
+                
+                if query_results["ids"][0]:
+                    result_id = query_results["ids"][0][0]  # Take the closest match
+                    match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
+                    if match_result["ids"]:
+                        func_code = match_result["documents"][0]
+                        func_metadata = match_result["metadatas"][0]
+                        logger.info(f"Found potential match for {func_name} via fuzzy search: {result_id}")
+                        
+                        # Store in unified database for future use
+                        rag_db.add_code_function(func_name, func_code, func_metadata)
     
     if not func_code:
         logger.error(f"Function {func_name} not found in database")
@@ -134,6 +150,16 @@ def generator_node(state):
                           "memset", "memcpy", "printf", "fprintf", "sprintf"]:
             continue
         
+        # Try to find the dependency in the unified database first
+        function_data = rag_db.get_code_function(called_func)
+        if function_data:
+            dependency_implementations[called_func] = {
+                "code": function_data["code"],
+                "metadata": function_data["metadata"]
+            }
+            logger.info(f"Found dependency {called_func} in unified RAG database")
+            continue
+        
         # Strategy 1: Direct lookup by name in same file
         if ":" in func_name:
             file_basename, _ = func_name.split(":", 1)
@@ -146,6 +172,10 @@ def generator_node(state):
                     "code": dep_result["documents"][0],
                     "metadata": dep_result["metadatas"][0]
                 }
+                
+                # Store in unified database for future use
+                rag_db.add_code_function(direct_id, dep_result["documents"][0], dep_result["metadatas"][0])
+                
                 logger.info(f"Found dependency {called_func} in same file")
                 continue
         
@@ -173,6 +203,10 @@ def generator_node(state):
                             "code": match_result["documents"][0],
                             "metadata": metadata
                         }
+                        
+                        # Store in unified database for future use
+                        rag_db.add_code_function(result_id, match_result["documents"][0], metadata)
+                        
                         logger.info(f"Found dependency {called_func} via pattern search: {result_id}")
                         break
         
@@ -240,8 +274,34 @@ def generator_node(state):
                                         "metadata": metadata,
                                         "is_missing_function": True
                                     }
+                                    
+                                    # Store in unified database for future use
+                                    rag_db.add_code_function(result_id, match_result["documents"][0], metadata)
                                     break
-
+    
+    # RAG Enhancement: Get recommendations from unified database for similar errors/solutions
+    rag_recommendations = None
+    
+    if is_refinement and cbmc_result:
+        logger.info(f"Querying unified RAG database for function {func_name}")
+        
+        # Get recommendations from unified database
+        rag_recommendations = rag_db.get_recommendations(
+            func_name, 
+            func_code, 
+            cbmc_result,
+            previous_harness
+        )
+        
+        # Log RAG findings
+        if rag_recommendations:
+            if rag_recommendations["has_similar_errors"]:
+                logger.info(f"Found {len(rag_recommendations['similar_errors'])} similar errors in RAG database")
+            if rag_recommendations["has_solutions"]:
+                logger.info(f"Found {len(rag_recommendations['solutions'])} potential solutions in RAG database")
+            if rag_recommendations["has_matching_patterns"]:
+                logger.info(f"Found {len(rag_recommendations['matching_patterns'])} matching patterns in RAG database")
+    
     # Build generator prompt with improved focus on dependencies and verification
     if not is_refinement:
         # For initial generation, create a focused prompt
@@ -298,7 +358,7 @@ def generator_node(state):
         Provide only the minimal, focused harness code (including the function implementation) without explanation.
         """
     else:
-        # For refinement, use the improvement recommendation
+        # For refinement, use the improvement recommendation and RAG enhancements
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
         You need to REFINE an existing harness based on SPECIFIC CBMC verification failures.
@@ -319,6 +379,40 @@ def generator_node(state):
             for dep_name, dep_info in dependency_implementations.items():
                 generator_prompt += f"Function: {dep_name}\n"
                 generator_prompt += f"```c\n{dep_info['code']}\n```\n\n"
+                
+        # Add RAG recommendations if available
+        if rag_recommendations and (rag_recommendations["has_similar_errors"] or 
+                                   rag_recommendations["has_solutions"] or 
+                                   rag_recommendations["has_matching_patterns"]):
+            generator_prompt += "\nHISTORICAL KNOWLEDGE FROM SIMILAR FUNCTIONS:\n"
+            
+            # Add complete solution if one was found
+            if rag_recommendations["has_solutions"]:
+                best_solution = rag_recommendations["solutions"][0]
+                generator_prompt += f"\nA similar function was successfully verified with this approach:\n```c\n"
+                
+                # Extract only the relevant parts (not the entire harness)
+                harness_code = best_solution["harness_code"]
+                
+                # Try to extract just the main() function which contains the test strategy
+                main_match = re.search(r'(void|int)\s+main\s*\([^{]*\{([^}]+)\}', harness_code, re.DOTALL)
+                if main_match:
+                    generator_prompt += f"// Main function from similar successful harness\n{main_match.group(0)}\n"
+                else:
+                    # Just include a portion to avoid too much code
+                    lines = harness_code.split('\n')
+                    relevant_lines = lines[max(0, len(lines)//2-15):min(len(lines), len(lines)//2+15)]
+                    generator_prompt += f"// Relevant portion from similar successful harness\n" + '\n'.join(relevant_lines) + "\n"
+                
+                generator_prompt += "```\n"
+            
+            # Add matching patterns if found
+            if rag_recommendations["has_matching_patterns"]:
+                generator_prompt += "\nMatching vulnerability patterns:\n"
+                
+                for name, pattern_info in rag_recommendations["matching_patterns"].items():
+                    generator_prompt += f"\n- {pattern_info['description']} (Severity: {pattern_info['severity']})"
+                    generator_prompt += f"\n  Strategy: {pattern_info['verification_strategy']}\n"
         
         # Add critical instructions for refinement
         generator_prompt += """
@@ -332,6 +426,7 @@ def generator_node(state):
         7. If a function is missing, implement it using the provided code or create a minimal stub
         8. DO NOT create elaborate mock implementations - use only what is necessary
         9. Keep the harness minimal and focused on the specific verification issues
+        10. Apply any relevant patterns from the historical knowledge section
         
         Provide only the improved harness code without explanation.
         """
@@ -456,6 +551,17 @@ def generator_node(state):
         
         logger.info(f"Successfully {'refined' if is_refinement else 'generated'} harness for {func_name} in {generation_time:.2f}s")
         
+        # Create message with RAG information if used
+        message_content = f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s"
+        if is_refinement and rag_recommendations:
+            # Add info about RAG contributions
+            if rag_recommendations["has_similar_errors"]:
+                message_content += f"\nLeveraged {len(rag_recommendations['similar_errors'])} similar past errors from unified database"
+            if rag_recommendations["has_solutions"]:
+                message_content += f"\nApplied patterns from {len(rag_recommendations['solutions'])} successful solutions"
+            if rag_recommendations["has_matching_patterns"]:
+                message_content += f"\nIdentified {len(rag_recommendations['matching_patterns'])} relevant vulnerability patterns"
+        
         # Get metrics tracker and update
         metrics_tracker = get_metrics_tracker()
         metrics = {
@@ -468,7 +574,7 @@ def generator_node(state):
         metrics_tracker.add_function_metrics(func_name, version_num, metrics, generation_time_ms)
         
         return {
-            "messages": [AIMessage(content=f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s")],
+            "messages": [AIMessage(content=message_content)],
             "harnesses": harnesses,
             "harness_history": harness_history,
             "improvement_recommendation": "",
@@ -477,8 +583,7 @@ def generator_node(state):
         }
         
     except Exception as e:
-        # Enhanced error handling with more details
-        # Enhanced error handling with more details
+        # Error handling
         error_msg = str(e)
         error_type = type(e).__name__
         logger.error(f"Error ({error_type}) generating harness for {func_name}: {error_msg}")
