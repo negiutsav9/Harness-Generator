@@ -13,6 +13,9 @@ from utils.metrics_utils import get_metrics_tracker
 
 logger = logging.getLogger("cbmc")
 
+# Define CBMC_MAX_OBJECT_SIZE
+cbmc_max_object_size = 1024 * 1024  # 1MB is a typical reasonable size
+
 def cbmc_node(state):
     """Executes CBMC verification on the current function's harness using sources from verification/sources directory."""
     verification_start = time.time()
@@ -64,10 +67,7 @@ def cbmc_node(state):
     refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
     version_num = refinement_num + 1
     
-    # Define CBMC_MAX_OBJECT_SIZE
-    cbmc_max_object_size = 1024 * 1024  # 1MB is a typical reasonable size
-    
-    # Create a header file with the CBMC_MAX_OBJECT_SIZE definition
+    # Create CBMC definitions header
     cbmc_defs_header = os.path.join(verification_include_dir, "cbmc_defs.h")
     with open(cbmc_defs_header, "w") as f:
         f.write("""/*
@@ -97,7 +97,16 @@ def cbmc_node(state):
     if state.get("is_directory_mode", False):
         # Get original source directory from state
         original_source_dir = state.get("source_directory", "")
-        directory_path = os.path.dirname(original_source_dir) if original_source_dir else ""
+        
+        # Get directory path, removing "/source" if present
+        directory_path = original_source_dir.replace("/source", "") if "/source" in original_source_dir else original_source_dir
+        
+        # Predefined paths for CBMC test files
+        test_cbmc_paths = [
+            os.path.join(directory_path, "test", "cbmc", "include"),
+            os.path.join(directory_path, "test", "cbmc", "sources"),
+            os.path.join(directory_path, "test", "cbmc", "stubs")
+        ]
         
         # Find the specific source file for this function from embeddings
         embeddings = state.get("embeddings", {})
@@ -111,21 +120,40 @@ def cbmc_node(state):
                 shutil.copy2(file_path, dest_file)
                 print(f"Copied main source file: {file_path} → {dest_file}")
         
-        # Copy necessary headers to include directory
+        # Copy necessary headers to include directory, prioritizing source and CBMC directories
+        header_paths = []
         if original_source_dir and os.path.exists(original_source_dir):
-            for root, dirs, files in os.walk(original_source_dir):
+            header_paths.append(original_source_dir)
+        
+        # Add all CBMC test include paths that exist
+        for path in test_cbmc_paths:
+            if os.path.exists(path):
+                header_paths.append(path)
+                print(f"Found CBMC test directory: {path}")
+        
+        # Copy headers from all found paths
+        for src_dir in header_paths:
+            for root, dirs, files in os.walk(src_dir):
                 for file in files:
-                    # Copy headers to include directory
-                    if file.endswith(('.h', '.hpp')):
+                    # Copy headers and important source files to include directory
+                    if file.endswith(('.h', '.hpp', '.c', '.cbmc')):
                         src_file = os.path.join(root, file)
                         dest_file = os.path.join(verification_include_dir, file)
-                        shutil.copy2(src_file, dest_file)
-                        print(f"Copied header: {file}")
-    else:
-        # Original single-file mode - write source to a flat file
-        source_file = os.path.join(verification_project_src_dir, "source.c")
-        with open(source_file, "w") as f:
-            f.write(state.get("source_code", ""))
+                        
+                        # Avoid overwriting
+                        if not os.path.exists(dest_file):
+                            shutil.copy2(src_file, dest_file)
+                            print(f"Copied test/verification file: {file}")
+        
+        # Additional CBMC-specific copies for known utility files
+        cbmc_utility_files = ['assert.h', 'nondet.h', 'proof_api.h']
+        for util_file in cbmc_utility_files:
+            for path in test_cbmc_paths:
+                potential_file = os.path.join(path, util_file)
+                if os.path.exists(potential_file):
+                    dest_file = os.path.join(verification_include_dir, util_file)
+                    shutil.copy2(potential_file, dest_file)
+                    print(f"Copied CBMC utility file: {util_file}")
     
     # Write harness to file
     harness_filename = original_func_name if ":" not in func_name else original_func_name
@@ -158,14 +186,35 @@ def cbmc_node(state):
         "--div-by-zero-check",
     ])
     
-    # Add necessary include paths
-    cbmc_cmd.extend([
-        "-I", verification_include_dir,
-        "-I", verification_harness_dir,
-        "-I", verification_stubs_dir,
-        "-I", verification_cbmc_utils_dir,
-        "-I", verification_project_src_dir
-    ])
+    # Add necessary include paths with additional check for CBMC test files
+    include_paths = [
+        verification_include_dir,
+        verification_harness_dir,
+        verification_stubs_dir,
+        verification_cbmc_utils_dir,
+        verification_project_src_dir
+    ]
+    
+    # Optional: If in directory mode, add CBMC-related test directories
+    if state.get("is_directory_mode", False):
+        original_source_dir = state.get("source_directory", "")
+        
+        # Get directory path, removing "/source" if present
+        directory_path = original_source_dir.replace("/source", "") if "/source" in original_source_dir else original_source_dir
+        
+        cbmc_test_paths = [
+            os.path.join(directory_path, "test", "cbmc", "include"),
+            os.path.join(directory_path, "test", "cbmc", "sources"),
+            os.path.join(directory_path, "test", "cbmc", "stubs")
+        ]
+        
+        # Add existing CBMC test paths to include paths
+        include_paths.extend([path for path in cbmc_test_paths if os.path.exists(path)])
+    
+    # Add include paths to CBMC command, ensuring they exist
+    for path in include_paths:
+        if os.path.exists(path):
+            cbmc_cmd.extend(["-I", path])
     
     # Save the command for debugging
     cmd_file = os.path.join(func_verification_dir, f"v{version_num}_command.txt")

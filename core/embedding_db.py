@@ -8,44 +8,6 @@ from chromadb.utils import embedding_functions
 from typing import Dict, List, Any
 import logging
 
-# Set up logging
-logger = logging.getLogger("embedding_db")
-
-# Set up ChromaDB - Initialize directly first
-# Later this can be updated to use unified RAG database
-chroma_client = chromadb.Client()
-sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-
-# Initialize collections
-try:
-    code_collection = chroma_client.get_collection(
-        name="code_embeddings",
-        embedding_function=sentence_transformer_ef
-    )
-    logger.info("Retrieved existing code collection")
-except:
-    code_collection = chroma_client.create_collection(
-        name="code_embeddings",
-        embedding_function=sentence_transformer_ef,
-        metadata={"hnsw:space": "cosine"}
-    )
-    logger.info("Created new code collection")
-
-try:
-    pattern_collection = chroma_client.get_collection(
-        name="pattern_embeddings",
-        embedding_function=sentence_transformer_ef
-    )
-    logger.info("Retrieved existing pattern collection")
-except:
-    pattern_collection = chroma_client.create_collection(
-        name="pattern_embeddings",
-        embedding_function=sentence_transformer_ef,
-        metadata={"hnsw:space": "cosine"}
-    )
-    _initialize_pattern_collection()
-    logger.info("Created new pattern collection with initial patterns")
-
 def _initialize_pattern_collection():
     """Initialize pattern collection with common memory and arithmetic patterns."""
     pattern_collection.add(
@@ -104,6 +66,46 @@ def _initialize_pattern_collection():
             {"name": "cbmc_div_by_zero_check", "category": "cbmc_verification", "description": "Checks for division by zero errors"}
         ]
     )
+
+# Set up logging
+logger = logging.getLogger("embedding_db")
+
+# Set up ChromaDB - Initialize directly first
+# Later this can be updated to use unified RAG database
+chroma_client = chromadb.Client()
+sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+
+# Initialize collections
+try:
+    code_collection = chroma_client.get_collection(
+        name="code_embeddings",
+        embedding_function=sentence_transformer_ef
+    )
+    logger.info("Retrieved existing code collection")
+except:
+    code_collection = chroma_client.create_collection(
+        name="code_embeddings",
+        embedding_function=sentence_transformer_ef,
+        metadata={"hnsw:space": "cosine"}
+    )
+    logger.info("Created new code collection")
+
+try:
+    pattern_collection = chroma_client.get_collection(
+        name="pattern_embeddings",
+        embedding_function=sentence_transformer_ef
+    )
+    logger.info("Retrieved existing pattern collection")
+except:
+    pattern_collection = chroma_client.create_collection(
+        name="pattern_embeddings",
+        embedding_function=sentence_transformer_ef,
+        metadata={"hnsw:space": "cosine"}
+    )
+    _initialize_pattern_collection()
+    logger.info("Created new pattern collection with initial patterns")
+
+
 
 def initialize_collections():
     """

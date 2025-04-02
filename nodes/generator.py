@@ -1,3 +1,4 @@
+
 """
 Generator node for CBMC harness generator workflow with unified RAG enhancement.
 """
@@ -72,78 +73,31 @@ def generator_node(state):
             # Store in unified database for future use
             rag_db.add_code_function(func_name, func_code, func_metadata)
         else:
-            # Strategy 2: Try parsing the function name 
-            if ":" in func_name:
-                # Try with file basename and function name
-                file_basename, orig_func_name = func_name.split(":", 1)
-                # Try searching for original function name 
-                query_results = code_collection.query(
-                    query_texts=[f"function {orig_func_name}"],
-                    n_results=5
-                )
-                
-                if query_results["ids"][0]:
-                    for i, result_id in enumerate(query_results["ids"][0]):
-                        # Look for exact matches first
-                        if orig_func_name in result_id and not result_id.startswith("pattern:"):
-                            match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                            if match_result["ids"]:
-                                func_code = match_result["documents"][0]
-                                func_metadata = match_result["metadatas"][0]
-                                logger.info(f"Found function {func_name} via name search: {result_id}")
-                                
-                                # Store in unified database for future use
-                                rag_db.add_code_function(func_name, func_code, func_metadata)
-                                break
-            
-            # Strategy 3: Last resort - fuzzy search
-            if not func_code:
-                # Try a more general search
-                search_term = func_name.split(":")[-1] if ":" in func_name else func_name
-                logger.info(f"Trying fuzzy search for {search_term}")
-                
-                query_results = code_collection.query(
-                    query_texts=[search_term],
-                    n_results=3
-                )
-                
-                if query_results["ids"][0]:
-                    result_id = query_results["ids"][0][0]  # Take the closest match
-                    match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                    if match_result["ids"]:
-                        func_code = match_result["documents"][0]
-                        func_metadata = match_result["metadatas"][0]
-                        logger.info(f"Found potential match for {func_name} via fuzzy search: {result_id}")
-                        
-                        # Store in unified database for future use
-                        rag_db.add_code_function(func_name, func_code, func_metadata)
+            logger.error(f"Function {func_name} not found in database")
+            return {
+                "messages": [AIMessage(content=f"Error: Function {func_name} not found in database.")],
+                "next": "junction"
+            }
     
-    if not func_code:
-        logger.error(f"Function {func_name} not found in database")
-        return {
-            "messages": [AIMessage(content=f"Error: Function {func_name} not found in database.")],
-            "next": "junction"
-        }
-    
-    # Extract function dependencies
-    function_calls = []
-    
-    # First try from metadata
-    calls_json = func_metadata.get("function_calls", "[]")
-    try:
-        if isinstance(calls_json, str):
-            function_calls = json.loads(calls_json)
-        else:
-            function_calls = calls_json
-    except json.JSONDecodeError:
-        # Fallback: Extract from code directly
-        function_calls = re.findall(r'\b(\w+)\s*\(', func_code)
-        # Remove duplicates while preserving order
-        function_calls = list(dict.fromkeys(function_calls))
+    # Extract original function name
+    if ":" in func_name:
+        _, original_func_name = func_name.split(":", 1)
+    else:
+        original_func_name = func_name
     
     # Find implementations for dependencies
     dependency_implementations = {}
     
+    # Extract function calls or dependencies
+    function_calls = func_metadata.get("function_calls", [])
+    if isinstance(function_calls, str):
+        try:
+            function_calls = json.loads(function_calls)
+        except json.JSONDecodeError:
+            # Fallback to splitting if JSON parsing fails
+            function_calls = [call.strip() for call in function_calls.split(',')]
+    
+    # Find implementations for dependencies
     for called_func in function_calls:
         # Skip standard library and control flow functions
         if called_func in ["if", "for", "while", "switch", "return", "malloc", "free",
@@ -160,124 +114,14 @@ def generator_node(state):
             logger.info(f"Found dependency {called_func} in unified RAG database")
             continue
         
-        # Strategy 1: Direct lookup by name in same file
-        if ":" in func_name:
-            file_basename, _ = func_name.split(":", 1)
-            direct_id = f"{file_basename}:{called_func}"
-            
-            dep_result = code_collection.get(ids=[direct_id], include=["documents", "metadatas"])
-            if dep_result["ids"]:
-                # Found direct match in same file
-                dependency_implementations[called_func] = {
-                    "code": dep_result["documents"][0],
-                    "metadata": dep_result["metadatas"][0]
-                }
-                
-                # Store in unified database for future use
-                rag_db.add_code_function(direct_id, dep_result["documents"][0], dep_result["metadatas"][0])
-                
-                logger.info(f"Found dependency {called_func} in same file")
-                continue
-        
-        # Strategy 2: Search for function pattern
-        search_pattern = f"\\b{called_func}\\s*\\([^)]*\\)\\s*\\{{"
-        logger.info(f"Searching for dependency: {search_pattern}")
-        
-        query_results = code_collection.query(
-            query_texts=[search_pattern],
-            n_results=5
-        )
-        
-        if query_results["ids"][0]:
-            for result_id in query_results["ids"][0]:
-                # Skip pattern matches
-                if result_id.startswith("pattern:"):
-                    continue
-                    
-                match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                if match_result["ids"]:
-                    # Ensure this is a full implementation (not a declaration)
-                    metadata = match_result["metadatas"][0]
-                    if not metadata.get("is_declaration_only", True):
-                        dependency_implementations[called_func] = {
-                            "code": match_result["documents"][0],
-                            "metadata": metadata
-                        }
-                        
-                        # Store in unified database for future use
-                        rag_db.add_code_function(result_id, match_result["documents"][0], metadata)
-                        
-                        logger.info(f"Found dependency {called_func} via pattern search: {result_id}")
-                        break
-        
-        # Strategy 3: Look for function declaration as fallback
-        if called_func not in dependency_implementations:
-            # No implementation found, look for declaration as fallback
-            decl_query_results = code_collection.query(
-                query_texts=[f"declaration {called_func}"],
-                n_results=3
-            )
-            
-            if decl_query_results["ids"][0]:
-                for result_id in decl_query_results["ids"][0]:
-                    if "declaration:" in result_id and called_func in result_id:
-                        decl_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                        if decl_result["ids"]:
-                            dependency_implementations[called_func] = {
-                                "code": decl_result["documents"][0],
-                                "metadata": decl_result["metadatas"][0],
-                                "is_declaration_only": True
-                            }
-                            logger.info(f"Found declaration for {called_func}: {result_id}")
-                            break
-    
-    logger.info(f"Found {len(dependency_implementations)} function dependencies with implementations")
-    
-    # Special handling for improved missing function detection
-    if is_refinement and cbmc_result:
-        missing_functions = cbmc_result.get("missing_functions", set())
-        if missing_functions:
-            logger.info(f"Detected {len(missing_functions)} missing functions: {', '.join(missing_functions)}")
-            
-            # Look for these functions in the code database
-            for missing_func in missing_functions:
-                if missing_func in dependency_implementations:
-                    logger.info(f"Already found implementation for {missing_func}")
-                    continue
-                    
-                # Try to find implementation for missing function
-                logger.info(f"Searching for implementation of missing function: {missing_func}")
-                
-                # Try direct match by function name
-                query_results = code_collection.query(
-                    query_texts=[f"function {missing_func}"],
-                    n_results=5
-                )
-                
-                # Check each result for an exact function match
-                if query_results["ids"][0]:
-                    for result_id in query_results["ids"][0]:
-                        # Skip patterns and declarations
-                        if result_id.startswith("pattern:") or result_id.startswith("declaration:"):
-                            continue
-                            
-                        # Check if this is the function we're looking for
-                        if missing_func in result_id:
-                            match_result = code_collection.get(ids=[result_id], include=["documents", "metadatas"])
-                            if match_result["ids"]:
-                                metadata = match_result["metadatas"][0]
-                                if not metadata.get("is_declaration_only", True):
-                                    # Found the implementation
-                                    logger.info(f"Found implementation for missing function {missing_func}: {result_id}")
-                                    dependency_implementations[missing_func] = {
-                                        "code": match_result["documents"][0],
-                                        "metadata": metadata,
-                                        "is_missing_function": True
-                                    }
-                                    
-                                    # Store in unified database for future use
-                                    rag_db.add_code_function(result_id, match_result["documents"][0], metadata)
-                                    break
+        # Fallback search in code collection
+        dep_result = code_collection.get(ids=[called_func], include=["documents", "metadatas"])
+        if dep_result["ids"]:
+            dependency_implementations[called_func] = {
+                "code": dep_result["documents"][0],
+                "metadata": dep_result["metadatas"][0]
+            }
+            logger.info(f"Found dependency {called_func} via direct lookup")
     
     # RAG Enhancement: Get recommendations from unified database for similar errors/solutions
     rag_recommendations = None
@@ -304,131 +148,142 @@ def generator_node(state):
     
     # Build generator prompt with improved focus on dependencies and verification
     if not is_refinement:
-        # For initial generation, create a focused prompt
+        # For initial generation, create a minimal harness focusing on function declaration and dependencies
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
-        Create a MINIMAL, FOCUSED harness for the following function:
+        Create a MINIMAL verification harness for testing the function:
 
+        Function Signature:
         ```c
-        {func_code}
+        {func_metadata.get('return_type', 'void')} {original_func_name}({func_metadata.get('params', 'void')});
         ```
 
-        IMPORTANT: You MUST include the function implementation itself in the harness file:
-        ```c
-        {func_code}
-        ```
+        CRITICAL INSTRUCTIONS:
+        1. DO NOT include the full function implementation
+        2. Declare the function you are testing
+        3. Declare ALL function dependencies WITHOUT implementation
+        4. Create a main() function that calls the target function
+        5. Use __CPROVER_assume() for input constraints
+        6. Use nondet functions for nondeterministic inputs
+        7. ONLY include header files from the standard library
+        8. Ensure all declarations are complete and syntactically correct
+        9. FOCUS on creating a verifiable function call scenario
+
+        Function Dependencies:
         """
         
-        # Add dependency section if we found implementations
+        # Add dependency declarations
         if dependency_implementations:
-            generator_prompt += "\nFUNCTION DEPENDENCIES NEEDED:\n"
-            generator_prompt += "The following functions are called by this function and need their implementations included:\n\n"
-            
+            generator_prompt += "\n// Function Dependencies to Declare\n"
             for dep_name, dep_info in dependency_implementations.items():
-                generator_prompt += f"Function: {dep_name}\n"
-                generator_prompt += f"```c\n{dep_info['code']}\n```\n\n"
+                # Extract function signature from metadata or existing implementations
+                return_type = dep_info.get('metadata', {}).get('return_type', 'void')
+                params = dep_info.get('metadata', {}).get('params', 'void')
+                generator_prompt += f"extern {return_type} {dep_name}({params});\n"
         
-        # Add function metadata
+        # Add main function template
         generator_prompt += f"""
-        Function metadata:
-        - Return type: {func_metadata.get("return_type", "void")}
-        - Parameters: {func_metadata.get("params", "")}
-        - Contains malloc: {"Yes" if "has_malloc" in func_metadata and func_metadata["has_malloc"] else "No"}
-        - Contains free: {"Yes" if "has_free" in func_metadata and func_metadata["has_free"] else "No"}
+        void main() {{
+            // Nondeterministic input preparation
+            // Assume constraints for inputs
+            
+            // Call the function under test
+            {func_metadata.get('return_type', 'void')} result = {original_func_name}({
+                ', '.join([f'nondet_{p.split()[-1]}()' if p.strip() != 'void' else '' 
+                           for p in func_metadata.get('params', 'void').split(',')])
+            });
+            
+            // Add verification assertions as needed
+            __CPROVER_assert(/* add specific verification condition */, "Verification condition");
+        }}
         """
         
         # Add clear instructions
         generator_prompt += """
-        CRITICAL INSTRUCTIONS:
-        1. INCLUDE THE COMPLETE FUNCTION IMPLEMENTATION from above in your harness file
-        2. Place the function implementation AFTER any necessary TYPE DEFINITIONS and DECLARATIONS but BEFORE the main() function
-        3. ENSURE all necessary TYPE DEFINITIONS (enums, structs, etc.) come before any function that uses them
-        4. DECLARE functions before calling them
-        5. DO NOT duplicate function implementations - include the function code exactly ONCE
-        6. INCLUDE ALL REQUIRED FUNCTION IMPLEMENTATIONS that were found and provided above
-        7. ONLY include header files from the standard library (stdio.h, stdlib.h, string.h, etc.)
-        8. DO NOT create mock implementations for any functions
-        9. FOCUS ONLY on verifying actual properties of the function under test
-        10. USE __CPROVER_assume() for input constraints
-        11. USE nondet functions for inputs that need to be nondeterministic: nondet_int(), nondet_size_t(), etc.
-        12. The function under test is '{func_name.split(":")[-1] if ":" in func_name else func_name}' - make sure to call this exact function
-        
-        Your harness must be minimal and focused - only create what's necessary to test the function.
-        
-        Provide only the minimal, focused harness code (including the function implementation) without explanation.
+        KEY VERIFICATION PRINCIPLES:
+        - Use __CPROVER_assume() to set realistic input constraints
+        - Add __CPROVER_assert() to check critical properties
+        - Minimize the harness complexity
+        - Focus on key function behaviors
         """
+    
     else:
-        # For refinement, use the improvement recommendation and RAG enhancements
+        # For refinement, focus on specific CBMC verification issues
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
-        You need to REFINE an existing harness based on SPECIFIC CBMC verification failures.
+        You need to REFINE a harness based on SPECIFIC CBMC verification failures.
         
         {improvement_recommendation}
         
-        IMPORTANT: You MUST include the function implementation in the harness:
-        ```c
-        {func_code}
-        ```
+        CRITICAL INSTRUCTIONS:
+        1. DO NOT include the full function implementation
+        2. Declare the function being tested
+        3. Declare function dependencies WITHOUT implementation
+        4. Modify the main() function to address specific CBMC failures
+        5. Use __CPROVER_assume() to constrain inputs
+        6. Use __CPROVER_assert() to validate key properties
+        7. Address each specific issue from the previous verification
+        8. Minimize the harness complexity
+        9. FOCUS on the verification requirements
         """
         
-        # Add dependency section if we found implementations
+        # Add dependency declarations
         if dependency_implementations:
-            generator_prompt += "\nFUNCTION DEPENDENCIES NEEDED:\n"
-            generator_prompt += "The following functions are called by this function and need their implementations included:\n\n"
-            
+            generator_prompt += "\n// Function Dependencies to Declare\n"
             for dep_name, dep_info in dependency_implementations.items():
-                generator_prompt += f"Function: {dep_name}\n"
-                generator_prompt += f"```c\n{dep_info['code']}\n```\n\n"
-                
-        # Add RAG recommendations if available
+                # Extract function signature from metadata or existing implementations
+                return_type = dep_info.get('metadata', {}).get('return_type', 'void')
+                params = dep_info.get('metadata', {}).get('params', 'void')
+                generator_prompt += f"extern {return_type} {dep_name}({params});\n"
+        
+        # Add main function with specific refinement guidance
+        generator_prompt += f"""
+        void main() {{
+            // Refined input preparation based on previous verification
+            // More constrained and targeted input generation
+            
+            // Call the function under test with carefully prepared inputs
+            {func_metadata.get('return_type', 'void')} result = {original_func_name}({
+                ', '.join([f'nondet_{p.split()[-1]}()' if p.strip() != 'void' else '' 
+                           for p in func_metadata.get('params', 'void').split(',')])
+            });
+            
+            // Add specific verification conditions addressing previous failures
+            __CPROVER_assert(/* refined verification condition */, "Refined verification condition");
+        }}
+        """
+        
+        # Add RAG-based recommendations if available
         if rag_recommendations and (rag_recommendations["has_similar_errors"] or 
                                    rag_recommendations["has_solutions"] or 
                                    rag_recommendations["has_matching_patterns"]):
-            generator_prompt += "\nHISTORICAL KNOWLEDGE FROM SIMILAR FUNCTIONS:\n"
+            generator_prompt += "\n\n// RECOMMENDATIONS FROM KNOWLEDGE BASE:\n"
             
-            # Add complete solution if one was found
+            if rag_recommendations["has_similar_errors"]:
+                generator_prompt += "// Similar Errors Insights:\n"
+                for error in rag_recommendations["similar_errors"][:2]:
+                    generator_prompt += f"// - {error.get('error_message', 'Unspecified error')}\n"
+            
             if rag_recommendations["has_solutions"]:
-                best_solution = rag_recommendations["solutions"][0]
-                generator_prompt += f"\nA similar function was successfully verified with this approach:\n```c\n"
-                
-                # Extract only the relevant parts (not the entire harness)
-                harness_code = best_solution["harness_code"]
-                
-                # Try to extract just the main() function which contains the test strategy
-                main_match = re.search(r'(void|int)\s+main\s*\([^{]*\{([^}]+)\}', harness_code, re.DOTALL)
-                if main_match:
-                    generator_prompt += f"// Main function from similar successful harness\n{main_match.group(0)}\n"
-                else:
-                    # Just include a portion to avoid too much code
-                    lines = harness_code.split('\n')
-                    relevant_lines = lines[max(0, len(lines)//2-15):min(len(lines), len(lines)//2+15)]
-                    generator_prompt += f"// Relevant portion from similar successful harness\n" + '\n'.join(relevant_lines) + "\n"
-                
-                generator_prompt += "```\n"
+                generator_prompt += "// Successful Solution Patterns:\n"
+                for solution in rag_recommendations["solutions"][:2]:
+                    generator_prompt += "// Verification strategy hints:\n"
+                    # Add specific hints about solution patterns
+                    if solution.get('patterns_found', 0) > 0:
+                        generator_prompt += "// Consider adding targeted assertions\n"
             
-            # Add matching patterns if found
             if rag_recommendations["has_matching_patterns"]:
-                generator_prompt += "\nMatching vulnerability patterns:\n"
-                
-                for name, pattern_info in rag_recommendations["matching_patterns"].items():
-                    generator_prompt += f"\n- {pattern_info['description']} (Severity: {pattern_info['severity']})"
-                    generator_prompt += f"\n  Strategy: {pattern_info['verification_strategy']}\n"
+                generator_prompt += "// Matching Vulnerability Patterns:\n"
+                for name, pattern in rag_recommendations["matching_patterns"].items():
+                    generator_prompt += f"// - {pattern.get('description', 'Unspecified pattern')}\n"
         
-        # Add critical instructions for refinement
         generator_prompt += """
-        CRITICAL INSTRUCTIONS:
-        1. KEEP THE COMPLETE FUNCTION IMPLEMENTATION in your harness file
-        2. ADDRESS EACH SPECIFIC ISSUE mentioned in the error feedback
-        3. Fix all identified errors and implement the suggested improvements
-        4. If a memory leak is detected, ensure all allocated memory is freed
-        5. If null pointer issues exist, add appropriate NULL checks
-        6. If array bounds violations occur, add bounds checking
-        7. If a function is missing, implement it using the provided code or create a minimal stub
-        8. DO NOT create elaborate mock implementations - use only what is necessary
-        9. Keep the harness minimal and focused on the specific verification issues
-        10. Apply any relevant patterns from the historical knowledge section
-        
-        Provide only the improved harness code without explanation.
+        VERIFICATION REFINEMENT PRINCIPLES:
+        - Precisely address the specific CBMC verification failures
+        - Use more restrictive input constraints
+        - Add targeted assertions
+        - Minimize harness complexity
+        - Focus on the specific verification requirements
         """
     
     # Generate the harness
@@ -450,12 +305,11 @@ def generator_node(state):
         5. AVOID creating any helper functions or utility code
         6. Create DIRECT tests of the function behavior with appropriate inputs
         7. FOCUS on real verification concerns, not artificial test scenarios
-        8. ALWAYS include the original function implementation in the harness file
+        8. ALWAYS include the necessary function declarations
         9. FOLLOW PROPER C CODE STRUCTURE:
            - Include directives first
            - Type definitions next
            - Function declarations next
-           - Function implementations next
            - Main function last
         """
         
@@ -496,25 +350,6 @@ def generator_node(state):
             # Make sure there's a main function
             if not has_main:
                 harness_code += "\n\nvoid main() {\n    // Auto-generated main function\n}"
-        
-        # Check for missing function dependencies in the harness
-        for dep_name, dep_info in dependency_implementations.items():
-            # Create a pattern to match the function signature
-            dep_signature_pattern = rf"\b{re.escape(dep_name)}\s*\([^)]*\)\s*\{{"
-            
-            # Check if this function is already in the harness
-            if not re.search(dep_signature_pattern, harness_code):
-                logger.warning(f"Dependency {dep_name} not included in harness, adding it manually")
-                
-                # Find a suitable place to add it - after the target function impl but before main
-                main_match = re.search(r"\b(?:void|int)\s+main\s*\([^)]*\)\s*\{", harness_code)
-                if main_match:
-                    main_pos = main_match.start()
-                    # Add dependency before main
-                    harness_code = harness_code[:main_pos] + "\n" + dep_info["code"] + "\n\n" + harness_code[main_pos:]
-                else:
-                    # No main function found, add at end
-                    harness_code += "\n\n" + dep_info["code"]
         
         # Save the new harness to history
         if harness_code not in harness_history[func_name]:

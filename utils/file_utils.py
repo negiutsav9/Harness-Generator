@@ -106,10 +106,6 @@ def setup_verification_directories(llm_used="claude"):
         "result_base": result_base,
         "harnesses": os.path.join(result_base, "harnesses"),
         "verification": os.path.join(result_base, "verification"),
-        "verification_src": os.path.join(result_base, "verification", "src"),
-        "verification_include": os.path.join(result_base, "verification", "include"),
-        "verification_stubs": os.path.join(result_base, "verification", "stubs"),
-        "verification_sources": os.path.join(result_base, "verification", "sources"),
         "reports": os.path.join(result_base, "reports")
     }
     
