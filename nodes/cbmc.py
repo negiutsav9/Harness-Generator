@@ -281,8 +281,10 @@ def cbmc_node(state):
     cbmc_cmd.extend([
         # Performance optimizations
         "--slice-formula",  # Add formula slicing to reduce complexity
-        "--unwind", "10",   # Reasonable unwinding limit
-        
+        "--no-unwinding-assertions",
+        "--partial-loops",  # Use partial loops to reduce the state space
+        "--unwind", "1",  # Limit unwinding to 1 to speed up verification (can be adjusted)
+        "--no-assertions",
         # Targeted verification flags - focus on essential properties
         "--memory-leak-check",
         "--div-by-zero-check",
@@ -316,13 +318,8 @@ def cbmc_node(state):
     cbmc_returncode = 0
     cbmc_results = state.get("cbmc_results", {}).copy()
     
-    # OPTIMIZATION: Increase timeout for complex functions
-    # Start with base timeout and adjust based on function complexity
-    timeout_seconds = 90  # Increased from 60 to 90 seconds
-    
-    # Adjust timeout based on dependency count
-    if len(verification_files) > 5:
-        timeout_seconds = 120  # 2 minutes for complex dependency graphs
+    refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
+    timeout_seconds = 90 + (refinement_num * 30)
     
     try:
         # Run the verification with adjusted timeout

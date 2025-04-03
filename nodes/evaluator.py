@@ -41,7 +41,7 @@ def harness_evaluator_node(state):
         state_refinement_attempts[func_name] = 0
     
     current_attempts = state_refinement_attempts.get(func_name, 0)
-    max_refinements = 3  # Maximum number of refinement attempts
+    max_refinements = 9  # Maximum number of refinement attempts
     
     # Get processed functions from state
     state_processed_functions = state.get("processed_functions", []).copy()
