@@ -21,20 +21,11 @@ Starting Bounded Model Checking
 Passing problem to propositional reduction
 converting SSA
 Running propositional reduction
-Writing temporary CNF
-Invoking SAT solver
-Solver returned code: 10
-result:SATISFIABLE
+SAT checker: instance is SATISFIABLE
 Running propositional reduction
-Writing temporary CNF
-Invoking SAT solver
-Solver returned code: 10
-result:SATISFIABLE
+SAT checker: instance is SATISFIABLE
 Running propositional reduction
-Writing temporary CNF
-Invoking SAT solver
-Solver returned code: 20
-result:UNSATISFIABLE
+SAT checker: instance is UNSATISFIABLE
 
 ** Results:
 function __CPROVER__start

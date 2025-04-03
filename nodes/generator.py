@@ -1,4 +1,3 @@
-
 """
 Generator node for CBMC harness generator workflow with unified RAG enhancement.
 """
@@ -14,6 +13,118 @@ from utils.rag import get_unified_db
 
 # Set up logging
 logger = logging.getLogger("generator")
+
+def extract_project_functions(rag_db):
+    """
+    Extract all function declarations from headers and source files in the RAG database.
+    
+    Args:
+        rag_db: The unified RAG database
+        
+    Returns:
+        Dictionary mapping header names to lists of function declarations
+    """
+    project_functions = {}
+    
+    try:
+        # Use the rag_db collections directly
+        code_coll = rag_db.code_collection
+        
+        # First gather all available headers
+        available_headers = []
+        
+        # Query all documents that are headers
+        try:
+            header_results = code_coll.get(
+                include=["documents", "metadatas"],
+                where={"type": "header"}
+            )
+            
+            # Process each header
+            if header_results["ids"]:
+                for i, header_id in enumerate(header_results["ids"]):
+                    if "header:" in header_id:
+                        header_name = header_id.replace("header:", "")
+                        available_headers.append(header_name)
+                        # Initialize the entry in project_functions
+                        project_functions[header_name] = []
+                        
+                        # Extract declarations from header content if available
+                        if "documents" in header_results and i < len(header_results["documents"]):
+                            header_content = header_results["documents"][i]
+                            
+                            # Extract function declarations
+                            func_decl_pattern = r'([\w\s\*]+)\s+(\w+)\s*\(([^)]*)\)\s*;'
+                            for match in re.finditer(func_decl_pattern, header_content, re.MULTILINE):
+                                return_type = match.group(1).strip()
+                                func_name = match.group(2).strip()
+                                params = match.group(3).strip()
+                                
+                                # Add to function declarations
+                                project_functions[header_name].append({
+                                    "name": func_name,
+                                    "return_type": return_type,
+                                    "params": params,
+                                    "declaration": match.group(0)
+                                })
+            
+            logger.info(f"Found {len(available_headers)} header files")
+        except Exception as e:
+            logger.error(f"Error processing headers: {str(e)}")
+        
+        # Now get all function declarations
+        try:
+            decl_results = code_coll.get(
+                include=["documents", "metadatas"],
+                where={"type": "function_declaration"}
+            )
+            
+            # Process each declaration
+            if decl_results["ids"]:
+                for i, decl_id in enumerate(decl_results["ids"]):
+                    if i < len(decl_results["metadatas"]):
+                        metadata = decl_results["metadatas"][i]
+                        
+                        # Get header name
+                        header_name = metadata.get("header", "unknown")
+                        
+                        # Skip if it's a pattern match
+                        if "pattern:" in decl_id or metadata.get("is_keyword", False):
+                            continue
+                        
+                        # Initialize header entry if not exists
+                        if header_name not in project_functions:
+                            project_functions[header_name] = []
+                        
+                        # Create function declaration entry
+                        func_name = metadata.get("name", "")
+                        return_type = metadata.get("return_type", "void")
+                        params = metadata.get("params", "")
+                        
+                        if func_name and i < len(decl_results["documents"]):
+                            declaration = decl_results["documents"][i]
+                            
+                            # Add to function declarations if not already there
+                            existing_names = [f["name"] for f in project_functions[header_name]]
+                            if func_name not in existing_names:
+                                project_functions[header_name].append({
+                                    "name": func_name,
+                                    "return_type": return_type,
+                                    "params": params,
+                                    "declaration": declaration
+                                })
+            
+            # Count total function declarations
+            total_decls = sum(len(funcs) for funcs in project_functions.values())
+            logger.info(f"Found {total_decls} function declarations across {len(project_functions)} headers")
+        except Exception as e:
+            logger.error(f"Error processing function declarations: {str(e)}")
+        
+        return project_functions
+    
+    except Exception as e:
+        logger.error(f"Error extracting project functions: {str(e)}")
+        return {}
 
 def generator_node(state):
     """Generates or refines CBMC-compatible harness for the current function using unified RAG."""
@@ -123,6 +234,13 @@ def generator_node(state):
             }
             logger.info(f"Found dependency {called_func} via direct lookup")
     
+    # Extract all project functions from headers
+    project_functions = extract_project_functions(rag_db)
+    
+    # Collect available header files from the project
+    available_headers = list(project_functions.keys())
+    logger.info(f"Found {len(available_headers)} available headers with {sum(len(funcs) for funcs in project_functions.values())} function declarations")
+    
     # RAG Enhancement: Get recommendations from unified database for similar errors/solutions
     rag_recommendations = None
     
@@ -146,7 +264,15 @@ def generator_node(state):
             if rag_recommendations["has_matching_patterns"]:
                 logger.info(f"Found {len(rag_recommendations['matching_patterns'])} matching patterns in RAG database")
     
-    # Build generator prompt with improved focus on dependencies and verification
+    # Create a detailed project function library description for the LLM
+    function_library = ""
+    for header_name, functions in project_functions.items():
+        if functions:  # Only include headers with functions
+            function_library += f"\n// Header: {header_name}\n"
+            for func in functions:
+                function_library += f"{func['declaration']}\n"
+    
+    # Build generator prompt with comprehensive project-specific context
     if not is_refinement:
         # For initial generation, create a minimal harness focusing on function declaration and dependencies
         generator_prompt = f"""
@@ -158,6 +284,11 @@ def generator_node(state):
         {func_metadata.get('return_type', 'void')} {original_func_name}({func_metadata.get('params', 'void')});
         ```
 
+        Function Code:
+        ```c
+        {func_code}
+        ```
+
         CRITICAL INSTRUCTIONS:
         1. DO NOT include the full function implementation
         2. Always use the EXACT parameter names from the original function
@@ -165,13 +296,25 @@ def generator_node(state):
         4. NEVER redefine the function being tested
         5. Create a main() function that calls the target function
         6. Use __CPROVER_assume() for input constraints
-        7. Use nondet functions for nondeterministic inputs
-        8. ONLY include necessary header files from the standard library
-        9. Ensure all declarations are complete and syntactically correct
-        10. FOCUS on creating a verifiable function call scenario
+        7. Use nondet_* functions (like nondet_int(), nondet_char()) for nondeterministic inputs
+        8. AVOID STANDARD LIBRARY HEADERS AND FUNCTIONS - only use project-specific headers and functions
+        9. ONLY use one or more of the available project headers from the list below
+        10. Ensure all declarations are complete and syntactically correct
+        11. FOCUS on creating a verifiable function call scenario using only project resources
 
-        Function Dependencies:
+        Available Project Headers (USE ONLY THESE, DO NOT USE STANDARD LIBRARY HEADERS):
         """
+        
+        # Add available headers
+        if available_headers:
+            for header in available_headers:
+                generator_prompt += f"#include \"{header}\"\n"
+        else:
+            generator_prompt += "// No project headers found, use CBMC built-in functions only\n"
+        
+        # Add the project function library
+        generator_prompt += "\n\n// PROJECT FUNCTION LIBRARY - USE THESE FUNCTIONS INSTEAD OF STANDARD LIBRARY\n"
+        generator_prompt += function_library
         
         # Add dependency declarations
         if dependency_implementations:
@@ -185,9 +328,14 @@ def generator_node(state):
         
         # Add main function template
         generator_prompt += f"""
+        // CREATE A MAIN FUNCTION THAT USES PROJECT FUNCTIONS AND CBMC BUILTINS
         void main() {{
-            // Nondeterministic input preparation
-            // Assume constraints for inputs
+            // Nondeterministic input preparation using nondet_* functions
+            // Example: int x = nondet_int();
+            // Use __CPROVER_assume() to constrain inputs
+            // Example: __CPROVER_assume(x > 0);
+            
+            // Use appropriate project functions to prepare inputs if needed
             
             // Call the function under test with explicit parameter names
             {func_metadata.get('return_type', 'void')} result = {original_func_name}({
@@ -196,13 +344,18 @@ def generator_node(state):
             });
             
             // Add verification assertions as needed
-            __CPROVER_assert(/* add specific verification condition */, "Verification condition");
+            // Example: __CPROVER_assert(result != NULL, "Result should not be NULL");
+            
+            // Use appropriate project functions to verify outputs if needed
         }}
         """
         
         # Add clear instructions
         generator_prompt += """
         KEY VERIFICATION PRINCIPLES:
+        - DO NOT use any standard library functions (printf, malloc, free, etc.) or headers (stdio.h, stdlib.h, etc.)
+        - Only use one or more of the project-specific headers provided above
+        - Only use project-specific functions and CBMC built-in nondet_* functions
         - Use __CPROVER_assume() to set realistic input constraints
         - Add __CPROVER_assert() to check critical properties
         - Minimize the harness complexity
@@ -217,7 +370,18 @@ def generator_node(state):
         You are a specialized harness generator for CBMC verification.
         You need to REFINE a harness based on SPECIFIC CBMC verification failures.
         
+        Previous Harness:
+        ```c
+        {previous_harness}
+        ```
+        
+        CBMC Verification Results:
         {improvement_recommendation}
+        
+        Function Code:
+        ```c
+        {func_code}
+        ```
         
         CRITICAL INSTRUCTIONS:
         1. DO NOT include the full function implementation
@@ -227,10 +391,25 @@ def generator_node(state):
         5. Modify the main() function to address specific CBMC failures
         6. Use __CPROVER_assume() to constrain inputs
         7. Use __CPROVER_assert() to validate key properties
-        8. Address each specific issue from the previous verification
-        9. Minimize the harness complexity
-        10. FOCUS on the verification requirements
+        8. AVOID ALL STANDARD LIBRARY HEADERS AND FUNCTIONS
+        9. ONLY use one or more of the available project headers from the list below
+        10. Only use project-specific functions from the provided library and CBMC built-ins
+        11. Make sure to use the EXACT header include names as provided
+        12. FOCUS on the verification requirements
+
+        Available Project Headers (USE ONLY THESE, DO NOT USE STANDARD LIBRARY HEADERS):
         """
+        
+        # Add available headers
+        if available_headers:
+            for header in available_headers:
+                generator_prompt += f"#include \"{header}\"\n"
+        else:
+            generator_prompt += "// No project headers found, use CBMC built-in functions only\n"
+        
+        # Add the project function library
+        generator_prompt += "\n\n// PROJECT FUNCTION LIBRARY - USE THESE FUNCTIONS INSTEAD OF STANDARD LIBRARY\n"
+        generator_prompt += function_library
         
         # Add dependency declarations
         if dependency_implementations:
@@ -241,21 +420,13 @@ def generator_node(state):
                 params = dep_info.get('metadata', {}).get('params', 'void')
                 generator_prompt += f"extern {return_type} {dep_name}({params});\n"
         
-        # Add main function with specific refinement guidance
-        generator_prompt += f"""
-        void main() {{
-            // Refined input preparation based on previous verification
-            // More constrained and targeted input generation
-            
-            // Call the function under test with carefully prepared inputs
-            {func_metadata.get('return_type', 'void')} result = {original_func_name}({
-                ', '.join([f'nondet_{p.split()[-1]}()' if p.strip() != 'void' else '' 
-                           for p in func_metadata.get('params', 'void').split(',')])
-            });
-            
-            // Add specific verification conditions addressing previous failures
-            __CPROVER_assert(/* refined verification condition */, "Refined verification condition");
-        }}
+        # Add refinement guidance
+        generator_prompt += """
+        // REFINE THE HARNESS TO ADDRESS THE CBMC VERIFICATION FAILURES
+        // Use nondet_* functions for inputs (nondet_int, nondet_char, etc.)
+        // Use __CPROVER_assume() for constraints
+        // Use __CPROVER_assert() for verification
+        // Use project functions for any other functionality
         """
         
         # Add RAG-based recommendations if available
@@ -284,11 +455,13 @@ def generator_node(state):
         
         generator_prompt += """
         VERIFICATION REFINEMENT PRINCIPLES:
+        - DO NOT use any standard library headers or functions
+        - Only use project-specific headers and functions listed above
+        - Use CBMC built-in nondet_* functions for inputs
         - Precisely address the specific CBMC verification failures
-        - Use more restrictive input constraints
-        - Add targeted assertions
+        - Use more restrictive input constraints with __CPROVER_assume()
+        - Add targeted assertions with __CPROVER_assert()
         - Minimize harness complexity
-        - Focus on the specific verification requirements
         - ALWAYS use extern for function declarations
         - NEVER redeclare the function with different parameter names
         """
@@ -300,26 +473,29 @@ def generator_node(state):
         # Check for the LLM model type to handle system prompt correctly
         model_name = str(llm).lower()
         
-        # Enhanced system prompt to strongly discourage mocks and stubs
+        # Enhanced system prompt to strongly enforce project-specific functions
         system_prompt = """
         You are a specialized harness generator for CBMC verification. Generate complete, correct, minimal code.
 
         IMPORTANT RULES:
         1. ALWAYS create a function named 'void main()' as the ONLY entry point
         2. DO NOT create functions named 'harness()', 'test_harness()', or any other entry point
-        3. NEVER create mock implementations or stubs unless absolutely necessary
-        4. ONLY include standard library headers
-        5. AVOID creating any helper functions or utility code
-        6. Create DIRECT tests of the function behavior with appropriate inputs
-        7. FOCUS on real verification concerns, not artificial test scenarios
+        3. NEVER use standard library headers (stdio.h, stdlib.h, string.h, etc.)
+        4. NEVER use standard library functions (printf, malloc, free, etc.)
+        5. ONLY use project-specific functions that were provided AND CBMC built-in functions
+        6. ONLY include project-specific headers that were explicitly provided
+        7. CREATE A HARNESS USING ONLY PROJECT RESOURCES AND CBMC BUILT-INS
         8. ALWAYS use "extern" for function declarations to avoid redefinition conflicts
         9. ALWAYS use the EXACT parameter names from the original function
         10. NEVER redefine the function being tested
         11. FOLLOW PROPER C CODE STRUCTURE:
-           - Include directives first
-           - Type definitions next
+           - Project-specific include directives first (if any)
+           - Type definitions next (if needed)
            - Function declarations next
            - Main function last
+        12. ALWAYS use nondet_* functions for inputs (nondet_int(), nondet_char(), etc.)
+        13. Constrain inputs with __CPROVER_assume() when needed
+        14. ONLY INCLUDE HEADERS FROM THE PROVIDED LIST - DO NOT MAKE UP HEADER NAMES
         """
         
         # Setup messages for the LLM based on the model type
@@ -360,6 +536,14 @@ def generator_node(state):
             if not has_main:
                 harness_code += "\n\nvoid main() {\n    // Auto-generated main function\n}"
         
+        # Check for standard library includes and remove them
+        harness_code = re.sub(r'#include\s+<[^>]+>', '// REMOVED STANDARD LIBRARY INCLUDE', harness_code)
+        
+        # Ensure all project headers start with double quotes (not angle brackets)
+        for header in available_headers:
+            if f"#include <{header}>" in harness_code:
+                harness_code = harness_code.replace(f"#include <{header}>", f'#include "{header}"')
+        
         # Save the new harness to history
         if harness_code not in harness_history[func_name]:
             harness_history[func_name].append(harness_code)
@@ -396,7 +580,7 @@ def generator_node(state):
         logger.info(f"Successfully {'refined' if is_refinement else 'generated'} harness for {func_name} in {generation_time:.2f}s")
         
         # Create message with RAG information if used
-        message_content = f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s"
+        message_content = f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s using project-specific functions"
         if is_refinement and rag_recommendations:
             # Add info about RAG contributions
             if rag_recommendations["has_similar_errors"]:

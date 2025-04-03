@@ -6,12 +6,13 @@ import glob
 import shutil
 import logging
 import datetime
+import fnmatch
 
 logger = logging.getLogger("file_utils")
 
 def process_directory(directory_path: str) -> dict:
     """
-    Process all C source files in the source/source_code subdirectory of the given directory.
+    Process all C source files in the given directory and all its subdirectories.
     
     Args:
         directory_path: Path to the directory containing C source files
@@ -26,7 +27,7 @@ def process_directory(directory_path: str) -> dict:
         logger.error(f"Directory '{directory_path}' does not exist")
         return source_files
     
-    # Look for source/source_code subdirectory
+    # Look for source subdirectory
     source_subdir = os.path.join(directory_path, "source")
     if not os.path.isdir(source_subdir):
         logger.warning(f"'{source_subdir}' directory not found. Using top directory.")
@@ -34,29 +35,42 @@ def process_directory(directory_path: str) -> dict:
     
     logger.info(f"Looking for source files in: {source_subdir}")
     
-    # Find all C source files in the source subdirectory
+    # Find all C source files in the source directory and all subdirectories
     c_file_patterns = ['*.c', '*.h', '*.cpp', '*.hpp']
-    for pattern in c_file_patterns:
-        file_paths = glob.glob(os.path.join(source_subdir, "**", pattern), recursive=True)
-        for file_path in file_paths:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if not content:
-                        print(f"Warning: Empty file: {file_path}")
-                    source_files[file_path] = content
-                    print(f"Processed file: {file_path} ({len(content)} bytes)")
-            except UnicodeDecodeError:
-                # Try with a different encoding if UTF-8 fails
+    
+    # Process all subdirectories recursively
+    for root, dirs, files in os.walk(source_subdir):
+        for pattern in c_file_patterns:
+            for filename in fnmatch.filter(files, pattern):
+                file_path = os.path.join(root, filename)
                 try:
-                    with open(file_path, 'r', encoding='latin-1') as f:
+                    with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
+                        if not content:
+                            print(f"Warning: Empty file: {file_path}")
                         source_files[file_path] = content
-                        print(f"Processed file with latin-1 encoding: {file_path} ({len(content)} bytes)")
+                        print(f"Processed file: {file_path} ({len(content)} bytes)")
+                except UnicodeDecodeError:
+                    # Try with a different encoding if UTF-8 fails
+                    try:
+                        with open(file_path, 'r', encoding='latin-1') as f:
+                            content = f.read()
+                            source_files[file_path] = content
+                            print(f"Processed file with latin-1 encoding: {file_path} ({len(content)} bytes)")
+                    except Exception as e:
+                        print(f"Error reading file {file_path}: {str(e)}")
                 except Exception as e:
                     print(f"Error reading file {file_path}: {str(e)}")
-            except Exception as e:
-                print(f"Error reading file {file_path}: {str(e)}")
+    
+    # Add statistics about found files
+    print(f"Found {len(source_files)} source files in total")
+    extension_counts = {}
+    for file_path in source_files:
+        ext = os.path.splitext(file_path)[1]
+        extension_counts[ext] = extension_counts.get(ext, 0) + 1
+    
+    for ext, count in extension_counts.items():
+        print(f"  {ext}: {count} files")
     
     return source_files
 

@@ -138,12 +138,8 @@ def cbmc_node(state):
     # Create proper directory structure for verification
     verification_harness_dir = os.path.join(verification_base_dir, "harness_files")
     verification_include_dir = os.path.join(verification_base_dir, "includes")
-    verification_stubs_dir = os.path.join(verification_base_dir, "stubs")
-    verification_cbmc_utils_dir = os.path.join(verification_base_dir, "cbmc_utils")
     os.makedirs(verification_harness_dir, exist_ok=True)
     os.makedirs(verification_include_dir, exist_ok=True)
-    os.makedirs(verification_stubs_dir, exist_ok=True)
-    os.makedirs(verification_cbmc_utils_dir, exist_ok=True)
     
     # Create a separate directory for project source files
     verification_project_src_dir = os.path.join(verification_base_dir, "project_src")
@@ -257,49 +253,46 @@ def cbmc_node(state):
         "--object-bits", "8",
         "-DCBMC_MAX_OBJECT_SIZE=" + str(cbmc_max_object_size)
     ]
-    
+
+    # Add the harness file first
+    cbmc_cmd.append(harness_file)
+
+    # Add all C files from verification/includes directory
+    c_files_in_includes = glob.glob(os.path.join(verification_include_dir, "*.c"))
+    cbmc_cmd.extend(c_files_in_includes)
+
     # Get the unified RAG database
     from utils.rag import get_unified_db
     rag_db = get_unified_db(os.path.join(result_directories.get("result_base_dir", "results"), "rag_data"))
-    
-    # OPTIMIZATION: Get minimal set of verification files based on function dependencies
+
+    # OPTIMIZATION: Add any targeted dependency files based on function dependencies
     verification_files = get_minimal_verification_files(
         func_name, 
         rag_db, 
         verification_include_dir
     )
-    
-    # Add source files in the correct order
-    cbmc_cmd.append(harness_file)
-    
-    # If we found targeted dependency files, use them
-    if verification_files:
-        logger.info(f"Using {len(verification_files)} targeted dependency files for verification")
-        cbmc_cmd.extend(verification_files)
-    else:
-        # Fallback to original approach if no dependencies found
-        logger.warning("No targeted dependencies found, using all source files")
-        cbmc_cmd.extend(glob.glob(os.path.join(verification_project_src_dir, "*.c")))
-        cbmc_cmd.extend(glob.glob(os.path.join(verification_cbmc_utils_dir, "*.c")))
-        cbmc_cmd.extend(glob.glob(os.path.join(verification_stubs_dir, "*.c")))
-    
+
+    # Add these files if they're not already included
+    for file in verification_files:
+        if file not in c_files_in_includes:
+            cbmc_cmd.append(file)
+
     # Add verification flags
     cbmc_cmd.extend([
         # Performance optimizations
         "--slice-formula",  # Add formula slicing to reduce complexity
-        "--unwind", "10",  # Reasonable unwinding limit
+        "--unwind", "10",   # Reasonable unwinding limit
         
         # Targeted verification flags - focus on essential properties
         "--memory-leak-check",
         "--div-by-zero-check",
-        "--pointer-overflow-check",  # Disable more expensive checks
+        "--pointer-overflow-check",
     ])
-    
+
     # Add necessary include paths with additional check for CBMC test files
-    include_paths = [
-        verification_include_dir,
-    ]
-    
+    # Important to add all the -I options at the end
+    include_paths = [verification_include_dir]
+
     # Add include paths to CBMC command, ensuring they exist
     for path in include_paths:
         if os.path.exists(path):
