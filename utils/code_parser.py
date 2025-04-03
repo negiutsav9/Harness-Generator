@@ -24,9 +24,9 @@ def extract_header_information(content, file_path):
     include_pattern = r'#include\s+[<"]([^>"]+)[>"]'
     header_info["includes"] = re.findall(include_pattern, content)
     
-    # Extract macro definitions
-    macro_pattern = r'#define\s+(\w+)(?:\(([^)]*)\))?\s+(.+)'
-    macro_matches = re.finditer(macro_pattern, content, re.MULTILINE)
+    # Extract macro definitions - ENHANCED to capture more macro formats
+    macro_pattern = r'#define\s+(\w+)(?:\(([^)]*)\))?\s+(.+?)(?=(?:\n#)|$)'
+    macro_matches = re.finditer(macro_pattern, content, re.MULTILINE | re.DOTALL)
     for match in macro_matches:
         macro_name = match.group(1)
         macro_params = match.group(2)
@@ -34,7 +34,23 @@ def extract_header_information(content, file_path):
         header_info["macros"].append({
             "name": macro_name,
             "params": macro_params,
-            "value": macro_value
+            "value": macro_value,
+            "full_definition": match.group(0)
+        })
+    
+    # Also look for multi-line macros using backslash continuation
+    multiline_macro_pattern = r'#define\s+(\w+)(?:\(([^)]*)\))?\s+(.*?\\(?:\r?\n).*?)(?=(?:\n#)|$)'
+    multiline_macro_matches = re.finditer(multiline_macro_pattern, content, re.MULTILINE | re.DOTALL)
+    for match in multiline_macro_matches:
+        macro_name = match.group(1)
+        macro_params = match.group(2)
+        macro_value = match.group(3).replace('\\\n', ' ').strip()
+        header_info["macros"].append({
+            "name": macro_name,
+            "params": macro_params,
+            "value": macro_value,
+            "full_definition": match.group(0),
+            "is_multiline": True
         })
     
     # Extract type definitions (structs, enums, typedefs)
@@ -149,6 +165,7 @@ def embed_code(code: str, file_path: str = None) -> dict:
             
         # Add header information to the database
         try:
+            # Create a more detailed header document including macro count
             header_document = (
                 f"Header file: {header_id}\n"
                 f"Includes: {', '.join(header_info['includes'])}\n"
@@ -157,18 +174,23 @@ def embed_code(code: str, file_path: str = None) -> dict:
                 f"Macros: {len(header_info['macros'])}"
             )
             
-            # Add header to collection with serialized list fields
-            # Convert list to JSON string for compatibility with ChromaDB
+            # Add macro names to the header document if any exist
+            if header_info['macros']:
+                header_document += "\nMacro names: " + ", ".join([m["name"] for m in header_info['macros']])
+            
+            # Add header to collection with serialized list fields and macro information
             code_collection.add(
                 ids=[f"header:{header_id}"],
                 documents=[header_document],
                 metadatas=[{
                     "type": "header",
                     "file_path": file_path,
-                    "includes": json.dumps(header_info["includes"]),  # Convert list to JSON string
+                    "includes": json.dumps(header_info["includes"]),
                     "declaration_count": len(header_info["function_declarations"]),
                     "typedef_count": len(header_info["type_definitions"]),
-                    "macro_count": len(header_info["macros"])
+                    "macro_count": len(header_info["macros"]),
+                    "macros": json.dumps([m["name"] for m in header_info["macros"]]),
+                    "has_multiline_macros": any(m.get("is_multiline", False) for m in header_info["macros"])
                 }]
             )
             
@@ -193,11 +215,36 @@ def embed_code(code: str, file_path: str = None) -> dict:
                     }]
                 )
             
-            logger.info(f"Processed header file {header_id} with {len(header_info['function_declarations'])} declarations")
+            # Add macro definitions separately
+            for macro in header_info["macros"]:
+                # Create macro ID
+                macro_id = f"macro:{header_id}:{macro['name']}"
+                
+                # Generate a macro definition document
+                if macro.get("params"):
+                    macro_doc = f"#define {macro['name']}({macro['params']}) {macro['value']}"
+                else:
+                    macro_doc = f"#define {macro['name']} {macro['value']}"
+                
+                code_collection.add(
+                    ids=[macro_id],
+                    documents=[macro_doc],
+                    metadatas=[{
+                        "type": "macro",
+                        "name": macro["name"],
+                        "params": macro.get("params", ""),
+                        "value": macro["value"],
+                        "header": header_id,
+                        "file_path": file_path,
+                        "is_multiline": macro.get("is_multiline", False)
+                    }]
+                )
+            
+            logger.info(f"Processed header file {header_id} with {len(header_info['function_declarations'])} declarations and {len(header_info['macros'])} macros")
         except Exception as e:
             logger.error(f"Error adding header information to database: {str(e)}")
         
-        return {"functions": functions, "headers": header_chunks, "code_patterns": code_patterns, "message": "Processed header file declarations"}
+        return {"functions": functions, "headers": header_chunks, "code_patterns": code_patterns, "message": "Processed header file declarations and macros"}
     
     try:
         # Use a more comprehensive pattern for C/C++ functions

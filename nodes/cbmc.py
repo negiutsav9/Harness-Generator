@@ -25,7 +25,6 @@ def get_minimal_verification_files(func_name, rag_db, verification_include_dir):
         func_name: Name of the function being verified
         rag_db: The RAG database instance
         verification_include_dir: Directory with include files
-        verification_project_src_dir: Directory with project source files
         
     Returns:
         List of file paths to include in verification
@@ -319,7 +318,8 @@ def cbmc_node(state):
     cbmc_results = state.get("cbmc_results", {}).copy()
     
     refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
-    timeout_seconds = 90 + (refinement_num * 30)
+    # UPDATED: Set timeout based on refinement number with new formula
+    timeout_seconds = 90 + (refinement_num * 10)
     
     try:
         # Run the verification with adjusted timeout
@@ -403,7 +403,11 @@ def cbmc_node(state):
             "missing_functions": list(cbmc_result["missing_functions"]),
             "verification_failures": cbmc_result["verification_failures"],
             "error_locations": cbmc_result["error_locations"],
-            "dependency_files_used": len(verification_files)
+            "dependency_files_used": len(verification_files),
+            # Add function-specific metrics
+            "func_reachable_lines": cbmc_result["func_reachable_lines"],
+            "func_covered_lines": cbmc_result["func_covered_lines"],
+            "func_coverage_pct": cbmc_result["func_coverage_pct"]
         }
         
         # Save verification results to a structured file
@@ -423,6 +427,12 @@ def cbmc_node(state):
             f.write(f"Covered lines: {cbmc_result['covered_lines']}\n")
             f.write(f"Coverage: {cbmc_result['coverage_pct']:.2f}%\n")
             f.write(f"Errors: {cbmc_result['errors']}\n")
+            
+            # Add function-specific metrics
+            f.write("\n=== FUNCTION-SPECIFIC METRICS ===\n")
+            f.write(f"Function reachable lines: {cbmc_result['func_reachable_lines']}\n")
+            f.write(f"Function covered lines: {cbmc_result['func_covered_lines']}\n")
+            f.write(f"Function coverage: {cbmc_result['func_coverage_pct']:.2f}%\n")
             
             if cbmc_result["error_categories"]:
                 f.write("\n=== ERROR CATEGORIES ===\n")
@@ -465,6 +475,15 @@ def cbmc_node(state):
             f.write(f"| Covered lines | {cbmc_result['covered_lines']} |\n")
             f.write(f"| Coverage | {cbmc_result['coverage_pct']:.2f}% |\n")
             f.write(f"| Errors | {cbmc_result['errors']} |\n\n")
+            
+            # Add Enhanced Function-Specific Metrics section
+            f.write(f"## Enhanced Function-Specific Metrics\n\n")
+            f.write(f"| Metric | Value |\n")
+            f.write(f"|--------|-------|\n")
+            f.write(f"| Function reachable lines | {cbmc_result['func_reachable_lines']} |\n")
+            f.write(f"| Function covered lines | {cbmc_result['func_covered_lines']} |\n")
+            f.write(f"| Function coverage | {cbmc_result['func_coverage_pct']:.2f}% |\n")
+            f.write(f"| Reported errors | {cbmc_result['errors']} |\n\n")
             
             # Add error details if any
             if cbmc_result["error_categories"]:
@@ -532,6 +551,9 @@ def cbmc_node(state):
             "reachable_lines": 0,
             "covered_lines": 0,
             "coverage_pct": 0.0,
+            "func_reachable_lines": 0,
+            "func_covered_lines": 0,
+            "func_coverage_pct": 0.0,
             "errors": 0
         }
         

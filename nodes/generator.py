@@ -14,17 +14,20 @@ from utils.rag import get_unified_db
 # Set up logging
 logger = logging.getLogger("generator")
 
+# Add to generator.py - Enhanced header analysis and macro extraction
+
 def extract_project_functions(rag_db):
     """
-    Extract all function declarations from headers and source files in the RAG database.
+    Extract all function declarations and macros from headers and source files in the RAG database.
     
     Args:
         rag_db: The unified RAG database
         
     Returns:
-        Dictionary mapping header names to lists of function declarations
+        Dictionary mapping header names to lists of function declarations and macros
     """
     project_functions = {}
+    project_macros = {}
     
     try:
         # Use the rag_db collections directly
@@ -48,6 +51,7 @@ def extract_project_functions(rag_db):
                         available_headers.append(header_name)
                         # Initialize the entry in project_functions
                         project_functions[header_name] = []
+                        project_macros[header_name] = []
                         
                         # Extract declarations from header content if available
                         if "documents" in header_results and i < len(header_results["documents"]):
@@ -66,6 +70,21 @@ def extract_project_functions(rag_db):
                                     "return_type": return_type,
                                     "params": params,
                                     "declaration": match.group(0)
+                                })
+                            
+                            # Extract macro definitions
+                            macro_pattern = r'#define\s+(\w+)(?:\(([^)]*)\))?\s+(.+?)(?:\n|$)'
+                            for match in re.finditer(macro_pattern, header_content, re.MULTILINE):
+                                macro_name = match.group(1)
+                                macro_params = match.group(2)
+                                macro_value = match.group(3).strip()
+                                
+                                # Add to macro definitions
+                                project_macros[header_name].append({
+                                    "name": macro_name,
+                                    "params": macro_params,
+                                    "value": macro_value,
+                                    "definition": match.group(0).strip()
                                 })
             
             logger.info(f"Found {len(available_headers)} header files")
@@ -117,14 +136,28 @@ def extract_project_functions(rag_db):
             # Count total function declarations
             total_decls = sum(len(funcs) for funcs in project_functions.values())
             logger.info(f"Found {total_decls} function declarations across {len(project_functions)} headers")
+            
+            # Count total macros
+            total_macros = sum(len(macros) for macros in project_macros.values())
+            logger.info(f"Found {total_macros} macro definitions across {len(project_macros)} headers")
         except Exception as e:
             logger.error(f"Error processing function declarations: {str(e)}")
         
-        return project_functions
+        # Combine macros with functions in the result
+        combined_result = {}
+        for header in set(list(project_functions.keys()) + list(project_macros.keys())):
+            combined_result[header] = {
+                "functions": project_functions.get(header, []),
+                "macros": project_macros.get(header, [])
+            }
+        
+        return combined_result
     
     except Exception as e:
-        logger.error(f"Error extracting project functions: {str(e)}")
+        logger.error(f"Error extracting project functions and macros: {str(e)}")
         return {}
+
+# Add to generator.py - Improved memory leak handling
 
 def generator_node(state):
     """Generates or refines CBMC-compatible harness for the current function using unified RAG."""
@@ -234,12 +267,17 @@ def generator_node(state):
             }
             logger.info(f"Found dependency {called_func} via direct lookup")
     
-    # Extract all project functions from headers
-    project_functions = extract_project_functions(rag_db)
+    # Extract all project functions and macros from headers
+    project_data = extract_project_functions(rag_db)
     
     # Collect available header files from the project
-    available_headers = list(project_functions.keys())
-    logger.info(f"Found {len(available_headers)} available headers with {sum(len(funcs) for funcs in project_functions.values())} function declarations")
+    available_headers = list(project_data.keys())
+    logger.info(f"Found {len(available_headers)} available headers")
+    
+    # Count total functions and macros
+    total_functions = sum(len(data.get("functions", [])) for data in project_data.values())
+    total_macros = sum(len(data.get("macros", [])) for data in project_data.values())
+    logger.info(f"Found {total_functions} function declarations and {total_macros} macro definitions")
     
     # RAG Enhancement: Get recommendations from unified database for similar errors/solutions
     rag_recommendations = None
@@ -266,11 +304,26 @@ def generator_node(state):
     
     # Create a detailed project function library description for the LLM
     function_library = ""
-    for header_name, functions in project_functions.items():
-        if functions:  # Only include headers with functions
-            function_library += f"\n// Header: {header_name}\n"
+    macro_library = ""
+    
+    for header_name, data in project_data.items():
+        functions = data.get("functions", [])
+        macros = data.get("macros", [])
+        
+        # Add functions section
+        if functions:
+            function_library += f"\n// Header: {header_name} - Functions\n"
             for func in functions:
                 function_library += f"{func['declaration']}\n"
+        
+        # Add macros section
+        if macros:
+            macro_library += f"\n// Header: {header_name} - Macros\n"
+            for macro in macros:
+                if macro.get('params'):
+                    macro_library += f"#define {macro['name']}({macro['params']}) {macro['value']}\n"
+                else:
+                    macro_library += f"#define {macro['name']} {macro['value']}\n"
     
     # Build generator prompt with comprehensive project-specific context
     if not is_refinement:
@@ -301,6 +354,9 @@ def generator_node(state):
         9. ONLY use one or more of the available project headers from the list below
         10. Ensure all declarations are complete and syntactically correct
         11. FOCUS on creating a verifiable function call scenario using only project resources
+        12. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
+        13. DO NOT CREATE STUBS for existing function dependencies
+        14. Properly use project macros that are provided in the PROJECT MACRO LIBRARY section
 
         Available Project Headers (USE ONLY THESE, DO NOT USE STANDARD LIBRARY HEADERS):
         """
@@ -316,6 +372,10 @@ def generator_node(state):
         generator_prompt += "\n\n// PROJECT FUNCTION LIBRARY - USE THESE FUNCTIONS INSTEAD OF STANDARD LIBRARY\n"
         generator_prompt += function_library
         
+        # Add the project macro library
+        generator_prompt += "\n\n// PROJECT MACRO LIBRARY - USE THESE MACROS IN YOUR HARNESS\n"
+        generator_prompt += macro_library
+        
         # Add dependency declarations
         if dependency_implementations:
             generator_prompt += "\n// Function Dependencies to Declare\n"
@@ -326,7 +386,7 @@ def generator_node(state):
                 # Use extern and PRESERVE EXACT parameter names
                 generator_prompt += f"extern {return_type} {dep_name}({params});\n"
         
-        # Add main function template
+        # Add main function template with explicit memory management
         generator_prompt += f"""
         // CREATE A MAIN FUNCTION THAT USES PROJECT FUNCTIONS AND CBMC BUILTINS
         void main() {{
@@ -336,6 +396,14 @@ def generator_node(state):
             // Example: __CPROVER_assume(x > 0);
             
             // Use appropriate project functions to prepare inputs if needed
+            // Use project macros where appropriate
+            
+            // MEMORY MANAGEMENT: CRUCIAL FOR VERIFICATION
+            // For any dynamic memory allocation:
+            // void* ptr = malloc(size);
+            // __CPROVER_assume(ptr != NULL);
+            // ... use ptr ...
+            // free(ptr);  // ALWAYS FREE ALLOCATED MEMORY
             
             // Call the function under test with explicit parameter names
             {func_metadata.get('return_type', 'void')} result = {original_func_name}({
@@ -347,6 +415,8 @@ def generator_node(state):
             // Example: __CPROVER_assert(result != NULL, "Result should not be NULL");
             
             // Use appropriate project functions to verify outputs if needed
+            
+            // MAKE SURE TO FREE ALL ALLOCATED MEMORY BEFORE FUNCTION EXIT
         }}
         """
         
@@ -356,12 +426,15 @@ def generator_node(state):
         - DO NOT use any standard library functions (printf, malloc, free, etc.) or headers (stdio.h, stdlib.h, etc.)
         - Only use one or more of the project-specific headers provided above
         - Only use project-specific functions and CBMC built-in nondet_* functions
+        - Use project-specific macros when relevant to the verification task
         - Use __CPROVER_assume() to set realistic input constraints
         - Add __CPROVER_assert() to check critical properties
         - Minimize the harness complexity
         - Focus on key function behaviors
         - ALWAYS use extern for function declarations
         - NEVER redeclare the function with different parameter names
+        - ALWAYS FREE ALL ALLOCATED MEMORY before the function exits
+        - NEVER create stubs for existing function dependencies
         """
     
     else:
@@ -394,8 +467,12 @@ def generator_node(state):
         8. AVOID ALL STANDARD LIBRARY HEADERS AND FUNCTIONS
         9. ONLY use one or more of the available project headers from the list below
         10. Only use project-specific functions from the provided library and CBMC built-ins
-        11. Make sure to use the EXACT header include names as provided
-        12. FOCUS on the verification requirements
+        11. Use project-specific macros when relevant to the verification task
+        12. Make sure to use the EXACT header include names as provided
+        13. FOCUS on the verification requirements
+        14. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
+        15. Follow any specific memory leak resolution instructions in the verification results
+        16. DO NOT CREATE STUBS for existing function dependencies - only add stubs for truly missing functions
 
         Available Project Headers (USE ONLY THESE, DO NOT USE STANDARD LIBRARY HEADERS):
         """
@@ -411,6 +488,10 @@ def generator_node(state):
         generator_prompt += "\n\n// PROJECT FUNCTION LIBRARY - USE THESE FUNCTIONS INSTEAD OF STANDARD LIBRARY\n"
         generator_prompt += function_library
         
+        # Add the project macro library
+        generator_prompt += "\n\n// PROJECT MACRO LIBRARY - USE THESE MACROS IN YOUR HARNESS\n"
+        generator_prompt += macro_library
+        
         # Add dependency declarations
         if dependency_implementations:
             generator_prompt += "\n// Function Dependencies to Declare\n"
@@ -420,6 +501,22 @@ def generator_node(state):
                 params = dep_info.get('metadata', {}).get('params', 'void')
                 generator_prompt += f"extern {return_type} {dep_name}({params});\n"
         
+        # Add memory leak detection
+        malloc_calls = re.findall(r'(\w+)\s*=\s*(?:malloc|calloc)\([^;]+\)', previous_harness)
+        has_malloc = bool(malloc_calls)
+        missing_free = []
+        
+        for var in malloc_calls:
+            if f"free({var})" not in previous_harness:
+                missing_free.append(var)
+        
+        if missing_free:
+            generator_prompt += "\n// MEMORY LEAK DETECTION:\n"
+            generator_prompt += "// The following allocated variables are not being freed:\n"
+            for var in missing_free:
+                generator_prompt += f"// - {var} \n"
+            generator_prompt += "// These must be explicitly freed before the function exits.\n"
+        
         # Add refinement guidance
         generator_prompt += """
         // REFINE THE HARNESS TO ADDRESS THE CBMC VERIFICATION FAILURES
@@ -427,6 +524,13 @@ def generator_node(state):
         // Use __CPROVER_assume() for constraints
         // Use __CPROVER_assert() for verification
         // Use project functions for any other functionality
+        // Use project macros where appropriate
+        
+        // MEMORY MANAGEMENT PATTERN:
+        // void* ptr = malloc(size);
+        // __CPROVER_assume(ptr != NULL);
+        // ... use ptr ...
+        // free(ptr);  // ALWAYS FREE ALL ALLOCATED MEMORY
         """
         
         # Add RAG-based recommendations if available
@@ -458,12 +562,15 @@ def generator_node(state):
         - DO NOT use any standard library headers or functions
         - Only use project-specific headers and functions listed above
         - Use CBMC built-in nondet_* functions for inputs
+        - Use project-specific macros when they help with verification
         - Precisely address the specific CBMC verification failures
         - Use more restrictive input constraints with __CPROVER_assume()
         - Add targeted assertions with __CPROVER_assert()
         - Minimize harness complexity
         - ALWAYS use extern for function declarations
         - NEVER redeclare the function with different parameter names
+        - ALWAYS FREE ALL ALLOCATED MEMORY before the function exits
+        - DO NOT CREATE STUBS for existing function dependencies - only add stubs for truly missing functions
         """
     
     # Generate the harness
@@ -473,7 +580,7 @@ def generator_node(state):
         # Check for the LLM model type to handle system prompt correctly
         model_name = str(llm).lower()
         
-        # Enhanced system prompt to strongly enforce project-specific functions
+        # Enhanced system prompt to strongly enforce project-specific functions and memory management
         system_prompt = """
         You are a specialized harness generator for CBMC verification. Generate complete, correct, minimal code.
 
@@ -496,6 +603,9 @@ def generator_node(state):
         12. ALWAYS use nondet_* functions for inputs (nondet_int(), nondet_char(), etc.)
         13. Constrain inputs with __CPROVER_assume() when needed
         14. ONLY INCLUDE HEADERS FROM THE PROVIDED LIST - DO NOT MAKE UP HEADER NAMES
+        15. ALWAYS FREE ALL ALLOCATED MEMORY - Every malloc() must have a matching free()
+        16. DO NOT CREATE STUBS for existing function dependencies - only implement stubs for truly missing functions
+        17. USE PROJECT MACROS when appropriate for the verification task
         """
         
         # Setup messages for the LLM based on the model type
@@ -544,6 +654,29 @@ def generator_node(state):
             if f"#include <{header}>" in harness_code:
                 harness_code = harness_code.replace(f"#include <{header}>", f'#include "{header}"')
         
+        # ENHANCEMENT: Check for memory leaks by finding malloc calls without corresponding free
+        malloc_vars = re.findall(r'(\w+)\s*=\s*(?:malloc|calloc)\([^;]+\)', harness_code)
+        missing_free = []
+        
+        for var in malloc_vars:
+            if f"free({var})" not in harness_code:
+                missing_free.append(var)
+        
+        if missing_free:
+            logger.warning(f"Found {len(missing_free)} allocated variables without free in harness")
+            
+            # Add free operations before the end of main function
+            main_end_match = re.search(r'}(\s*)$', harness_code)
+            if main_end_match:
+                # Insert free operations before the closing brace of main
+                free_block = "\n    // Free allocated memory to prevent leaks\n"
+                for var in missing_free:
+                    free_block += f"    free({var});\n"
+                
+                # Replace the closing brace with our free block plus closing brace
+                harness_code = harness_code[:main_end_match.start()] + free_block + "}" + harness_code[main_end_match.end():]
+                logger.info(f"Added free operations for {len(missing_free)} variables to prevent memory leaks")
+        
         # Save the new harness to history
         if harness_code not in harness_history[func_name]:
             harness_history[func_name].append(harness_code)
@@ -577,10 +710,22 @@ def generator_node(state):
             function_times[func_name] = {}
         function_times[func_name]["generation"] = generation_time
         
-        logger.info(f"Successfully {'refined' if is_refinement else 'generated'} harness for {func_name} in {generation_time:.2f}s")
+        # Count macro usage in the harness
+        macro_usage = 0
+        for header_name, data in project_data.items():
+            macros = data.get("macros", [])
+            for macro in macros:
+                macro_name = macro.get("name", "")
+                if macro_name and macro_name in harness_code:
+                    macro_usage += 1
+        
+        logger.info(f"Successfully {'refined' if is_refinement else 'generated'} harness for {func_name} in {generation_time:.2f}s with {macro_usage} project macros")
         
         # Create message with RAG information if used
         message_content = f"{'Refined' if is_refinement else 'Generated'} minimal, focused harness for function {func_name} in {generation_time:.2f}s using project-specific functions"
+        if macro_usage > 0:
+            message_content += f" and {macro_usage} project macros"
+            
         if is_refinement and rag_recommendations:
             # Add info about RAG contributions
             if rag_recommendations["has_similar_errors"]:
