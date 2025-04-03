@@ -632,7 +632,7 @@ def cbmc_node(state):
             "verification_failures": ["timeout"],
             "error_locations": {},
             "dependency_files_used": len(verification_files)
-        }
+        }=
         
         # Save timeout information to files
         verification_file = os.path.join(func_verification_dir, f"v{version_num}_results.txt")

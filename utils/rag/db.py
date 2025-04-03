@@ -480,21 +480,12 @@ class UnifiedEmbeddingDB:
     # ERROR AND SOLUTION METHODS
     
     def store_error(self, 
-                   func_name: str, 
-                   harness_code: str, 
-                   cbmc_result: Dict[str, Any], 
-                   iteration: int) -> str:
+                    func_name: str, 
+                    harness_code: str, 
+                    cbmc_result: Dict[str, Any], 
+                    iteration: int) -> str:
         """
-        Store an error pattern in the error collection.
-        
-        Args:
-            func_name: Name of the function
-            harness_code: The harness code that produced the error
-            cbmc_result: The CBMC verification result
-            iteration: The iteration number
-            
-        Returns:
-            The ID of the stored error
+        Enhanced error storage with pattern evolution tracking.
         """
         # Generate a unique ID
         error_id = f"{func_name}_error_{iteration}_{int(time.time())}"
@@ -511,7 +502,6 @@ class UnifiedEmbeddingDB:
         error_lines = []
         
         # Find the harness lines corresponding to errors
-        # Find the harness lines corresponding to errors
         for file_name, line_nums in error_locations.items():
             harness_lines = harness_code.split('\n')
             for line_num in line_nums:
@@ -520,7 +510,6 @@ class UnifiedEmbeddingDB:
                     try:
                         line_num = int(line_num)
                     except ValueError:
-                        # Skip this line number if it can't be converted
                         continue
                 
                 # Only add lines that exist in the harness (adjust for 0-indexing)
@@ -531,60 +520,77 @@ class UnifiedEmbeddingDB:
         if error_lines:
             error_description += f"\nError patterns:\n" + "\n".join(error_lines)
         
-        # Store error in knowledge base
+        # Store error in knowledge base with enhanced tracking
         try:
+            # Add new metadata fields for pattern evolution
+            error_metadata = {
+                "func_name": func_name,
+                "iteration": iteration,
+                "error_categories": json.dumps(error_categories),
+                "error_message": error_message,
+                "has_memory_leak": "memory_leak" in error_categories,
+                "has_array_bounds": "array_bounds" in error_categories,
+                "has_null_pointer": "null_pointer" in error_categories,
+                "has_arithmetic_issue": any(cat in error_categories for cat in ["division_by_zero", "arithmetic_overflow"]),
+                "timestamp": time.time(),
+                
+                # NEW FIELDS FOR TRACKING
+                "refinement_attempts": [iteration],
+                "persistence_count": 1,
+                "is_resolved": False,
+                "is_challenging": False,
+                
+                # Error pattern details
+                "error_lines": json.dumps(error_lines),
+                "cbmc_error_details": json.dumps({
+                    "reachable_lines": cbmc_result.get("reachable_lines", 0),
+                    "covered_lines": cbmc_result.get("covered_lines", 0),
+                    "coverage_pct": cbmc_result.get("coverage_pct", 0.0)
+                })
+            }
+            
+            # Add the error to the collection
             self.error_collection.add(
                 ids=[error_id],
                 documents=[error_description],
-                metadatas=[{
-                    "func_name": func_name,
-                    "iteration": iteration,
-                    "error_categories": json.dumps(error_categories),
-                    "error_message": error_message,
-                    "has_memory_leak": "memory_leak" in error_categories,
-                    "has_array_bounds": "array_bounds" in error_categories,
-                    "has_null_pointer": "null_pointer" in error_categories,
-                    "has_arithmetic_issue": any(cat in error_categories for cat in ["division_by_zero", "arithmetic_overflow"]),
-                    "timestamp": time.time()
-                }]
+                metadatas=[error_metadata]
             )
+            
+            # Prune old entries if collection gets too large
+            if self.error_collection.count() > 1000:
+                # Remove oldest errors to keep the collection manageable
+                oldest_errors = self.error_collection.get(
+                    sort="timestamp", 
+                    limit=100
+                )
+                if oldest_errors["ids"]:
+                    self.error_collection.delete(ids=oldest_errors["ids"])
+            
             logger.info(f"Stored error pattern {error_id} for {func_name}")
             return error_id
         except Exception as e:
             logger.error(f"Error storing error pattern: {str(e)}")
             return ""
-    
+
     def store_solution(self, 
-                      error_id: str, 
-                      func_name: str, 
-                      harness_code: str, 
-                      cbmc_result: Dict[str, Any],
-                      iteration: int) -> str:
+                       error_id: str, 
+                       func_name: str, 
+                       harness_code: str, 
+                       cbmc_result: Dict[str, Any],
+                       iteration: int) -> str:
         """
-        Store a successful solution in the solution collection.
-        
-        Args:
-            error_id: ID of the corresponding error
-            func_name: Name of the function
-            harness_code: The successful harness code
-            cbmc_result: The successful CBMC verification result
-            iteration: The iteration number
-            
-        Returns:
-            The ID of the stored solution
+        Enhanced solution storage with effectiveness tracking.
         """
         # Generate a unique ID
         solution_id = f"{func_name}_solution_{iteration}_{int(time.time())}"
         
+        # Determine solution effectiveness
+        is_effective = cbmc_result.get("verification_status") == "SUCCESS"
+        
         # Create solution description for embedding
-        solution_description = f"Function: {func_name}\nSuccessful harness for iteration {iteration}"
+        solution_description = f"Function: {func_name}\nHarness for iteration {iteration}"
         
-        # Add coverage metrics
-        if "coverage_pct" in cbmc_result:
-            coverage = cbmc_result.get("coverage_pct", 0.0)
-            solution_description += f"\nCoverage: {coverage:.2f}%"
-        
-        # Extract successful patterns - look for memory management and testing patterns
+        # Extract successful patterns
         patterns = []
         
         # Find malloc/free patterns
@@ -605,51 +611,329 @@ class UnifiedEmbeddingDB:
         if cprover_pattern:
             patterns.append(cprover_pattern)
         
-        # Add patterns to description
-        if patterns:
-            solution_description += "\nSuccessful patterns:\n" + "\n".join(patterns)
-        
-        # Store solution in knowledge base
+        # Store solution in knowledge base with enhanced tracking
         try:
+            # Check for existing solutions for this error or function
+            existing_solutions = self.solution_collection.get(
+                where_document={"$or": [
+                    {"$contains": error_id},
+                    {"$contains": func_name}
+                ]},
+                include=["metadatas"]
+            )
+            
+            # Track total attempts and effectiveness
+            total_attempts = 1
+            effectiveness_iterations = [iteration] if is_effective else []
+            overall_effectiveness = is_effective
+            
+            # Update tracking if solution exists
+            if existing_solutions["ids"]:
+                for existing_metadata in existing_solutions["metadatas"]:
+                    total_attempts = existing_metadata.get("total_attempts", 1) + 1
+                    effectiveness_iterations = existing_metadata.get("effectiveness_iterations", [])
+                    overall_effectiveness = existing_metadata.get("is_effective", is_effective)
+                    
+                    # Add current iteration if effective
+                    if is_effective and iteration not in effectiveness_iterations:
+                        effectiveness_iterations.append(iteration)
+                        overall_effectiveness = True
+            
+            # Metadata for solution storage
+            solution_metadata = {
+                "func_name": func_name,
+                "iteration": iteration,
+                "related_error_id": error_id,
+                "is_effective": overall_effectiveness,
+                "total_attempts": total_attempts,
+                "effectiveness_iterations": effectiveness_iterations,
+                
+                # Detailed metadata
+                "coverage": cbmc_result.get("coverage_pct", 0.0),
+                "patterns_found": len(patterns),
+                "has_malloc_free": bool(malloc_free_pattern),
+                "has_null_check": bool(null_check_pattern),
+                "has_cprover_assume": bool(cprover_pattern),
+                "timestamp": time.time(),
+                
+                # Store complete harness for potential reuse
+                "harness_code": harness_code,
+                
+                # Additional function-specific metrics
+                "func_reachable_lines": cbmc_result.get("func_reachable_lines", 0),
+                "func_coverage_pct": cbmc_result.get("func_coverage_pct", 0.0)
+            }
+            
+            # Add solution to collection
             self.solution_collection.add(
                 ids=[solution_id],
                 documents=[solution_description],
-                metadatas=[{
-                    "func_name": func_name,
-                    "iteration": iteration,
-                    "related_error_id": error_id,
-                    "coverage": cbmc_result.get("coverage_pct", 0.0),
-                    "patterns_found": len(patterns),
-                    "has_malloc_free": bool(malloc_free_pattern),
-                    "has_null_check": bool(null_check_pattern),
-                    "has_cprover_assume": bool(cprover_pattern),
-                    "timestamp": time.time(),
-                    "harness_code": harness_code  # Store complete harness for reuse
-                }]
+                metadatas=[solution_metadata]
             )
+            
+            # Prune old solutions to keep collection manageable
+            if self.solution_collection.count() > 1000:
+                oldest_solutions = self.solution_collection.get(
+                    sort="timestamp", 
+                    limit=100
+                )
+                if oldest_solutions["ids"]:
+                    self.solution_collection.delete(ids=oldest_solutions["ids"])
+            
             logger.info(f"Stored solution {solution_id} for {func_name}")
             return solution_id
         except Exception as e:
             logger.error(f"Error storing solution: {str(e)}")
             return ""
-    
-    def _extract_pattern(self, code: str, pattern: str, label: str) -> str:
+
+    def get_recommendations(self, 
+                           func_name: str, 
+                           func_code: str, 
+                           cbmc_result: Dict[str, Any],
+                           previous_harness: str) -> Dict[str, Any]:
         """
-        Extract reusable code patterns from harness code.
+        Enhanced recommendation generation with solution effectiveness filtering.
+        """
+        # Extract error information
+        error_categories = cbmc_result.get("error_categories", [])
+        error_message = cbmc_result.get("message", "Unknown error")
         
-        Args:
-            code: The harness code
-            pattern: Regex pattern to extract
-            label: Label for the pattern
+        # Build error description
+        error_description = f"{error_message}"
+        if error_categories:
+            error_description += f" Categories: {', '.join(error_categories)}"
+        
+        # Query for similar errors
+        similar_errors = self.query_similar_errors(func_name, func_code, error_description)
+        
+        # Get solutions for similar errors
+        solutions = []
+        if similar_errors:
+            # Get the most similar error
+            most_similar = similar_errors[0]
             
-        Returns:
-            Extracted pattern with label or empty string if not found
+            # Enhanced solution filtering
+            all_solutions = self.query_solutions_for_error(most_similar["error_id"], func_name)
+            
+            # Filter for only effective solutions with high success rate
+            solutions = [
+                sol for sol in all_solutions 
+                if sol.get('is_effective', False) and 
+                   (sol.get('total_attempts', 0) <= 3 or  # Prefer newer solutions
+                    len(sol.get('effectiveness_iterations', [])) / sol.get('total_attempts', 1) > 0.5)  # High effectiveness ratio
+            ]
+        
+        # Query for patterns that match this function's issues
+        pattern_results = self.query_pattern_db(func_code)
+        matching_patterns = pattern_results.get("matching_patterns", {})
+        
+        # Build recommendation
+        recommendation = {
+            "has_similar_errors": bool(similar_errors),
+            "similar_errors": similar_errors,
+            "has_solutions": bool(solutions),
+            "solutions": solutions[:2],  # Limit to top 2 solutions
+            "has_matching_patterns": bool(matching_patterns),
+            "matching_patterns": matching_patterns,
+            "error_categories": error_categories,
+            "recommendations": []
+        }
+        
+        # Generate recommendations with enhanced effectiveness filtering
+        if solutions:
+            # Prioritize most effective solution
+            best_solution = solutions[0]
+            recommendation["recommendations"].append({
+                "type": "effective_solution",
+                "message": f"Found an effective solution with {len(best_solution.get('effectiveness_iterations', []))} successful runs",
+                "harness_code": best_solution.get("harness_code", ""),
+                "effectiveness_score": (len(best_solution.get('effectiveness_iterations', [])) / 
+                                        best_solution.get('total_attempts', 1)) * 100
+            })
+        elif matching_patterns:
+            # Fall back to pattern recommendations
+            for pattern_name, pattern_info in matching_patterns.items():
+                recommendation["recommendations"].append({
+                    "type": "pattern",
+                    "pattern_name": pattern_name,
+                    "message": f"Found a matching pattern: {pattern_info['description']}",
+                    "verification_strategy": pattern_info["verification_strategy"],
+                    "severity": pattern_info["severity"]
+                })
+        
+        # Add default recommendations based on error categories
+        default_recommendations = []
+        if "memory_leak" in error_categories:
+            default_recommendations.append({
+                "type": "memory",
+                "message": "Ensure comprehensive memory cleanup",
+                "suggestion": "Add explicit free() for all malloc() calls, verify memory paths"
+            })
+        
+        if "null_pointer" in error_categories:
+            default_recommendations.append({
+                "type": "pointer",
+                "message": "Implement robust null pointer handling",
+                "suggestion": "Add comprehensive null checks, use __CPROVER_assume() for constraining pointer usage"
+            })
+        
+        recommendation["recommendations"].extend(default_recommendations)
+        
+        return recommendation
+
+    def query_solutions_for_error(self, 
+                                  error_id: str, 
+                                  func_name: str, 
+                                  top_k: int = 3) -> List[Dict[str, Any]]:
         """
-        matches = re.findall(pattern, code, re.DOTALL)
-        if matches:
-            # Return the first match with label
-            return f"{label}:\n{matches[0].strip()}"
-        return ""
+        Enhanced solution query with effectiveness scoring.
+        """
+        def solution_score(solution):
+            """Calculate a score based on solution effectiveness."""
+            effectiveness_iterations = solution.get('effectiveness_iterations', [])
+            total_attempts = solution.get('total_attempts', 1)
+            
+            # Core effectiveness calculation
+            effectiveness_ratio = len(effectiveness_iterations) / total_attempts
+            
+            # Age penalty - solutions become less relevant over time
+            age_penalty = (time.time() - solution.get('timestamp', time.time())) / (24 * 3600)  # Daily decay
+            
+            # Combine effectiveness and recency
+            return effectiveness_ratio / (1 + age_penalty)
+        
+        # Query solutions
+        if not error_id:
+            solutions = self.solution_collection.get(
+                where={"func_name": func_name},
+                include=["documents", "metadatas"]
+            )
+        else:
+            # Try to find solutions for the specific error
+            solutions = self.solution_collection.get(
+                where_document={"$or": [
+                    {"$contains": error_id},
+                    {"$contains": func_name}
+                ]},
+                include=["documents", "metadatas"]
+            )
+        
+        # Process solutions
+        solution_list = []
+        for i, sol_id in enumerate(solutions.get("ids", [])):
+            solution_list.append({
+                "solution_id": sol_id,
+                "func_name": solutions["metadatas"][i].get("func_name", ""),
+                "iteration": solutions["metadatas"][i].get("iteration", 0),
+                "is_effective": solutions["metadatas"][i].get("is_effective", False),
+                "total_attempts": solutions["metadatas"][i].get("total_attempts", 1),
+                "coverage": solutions["metadatas"][i].get("coverage", 0.0),
+                "effectiveness_score": 0.0,  # Will be filled in sorting
+                "harness_code": solutions["metadatas"][i].get("harness_code", ""),
+                "effectiveness_iterations": solutions["metadatas"][i].get("effectiveness_iterations", [])
+            })
+        
+        # Sort solutions by effectiveness
+                # Attach effectiveness scores
+        for solution in solution_list:
+            solution['effectiveness_score'] = solution_score(solution)
+        
+        # Sort solutions by effectiveness score
+        sorted_solutions = sorted(
+            solution_list, 
+            key=lambda x: x['effectiveness_score'], 
+            reverse=True
+        )
+        
+        # Update solutions with their calculated score
+        for solution in sorted_solutions:
+            solution['effectiveness_pct'] = solution['effectiveness_score'] * 100
+        
+        # Return top k solutions
+        return sorted_solutions[:top_k]
+
+    def recognize_global_error_patterns(self) -> List[Dict[str, Any]]:
+        """
+        Analyze stored errors to identify systemic verification challenges.
+        
+        Returns:
+            List of global error pattern recommendations
+        """
+        try:
+            # Fetch all errors
+            errors = self.error_collection.get(
+                include=["documents", "metadatas"],
+                limit=1000  # Reasonable upper limit
+            )
+            
+            # Categorize error patterns
+            error_categories = {}
+            for i, metadata in enumerate(errors.get("metadatas", [])):
+                categories = json.loads(metadata.get("error_categories", "[]"))
+                for category in categories:
+                    if category not in error_categories:
+                        error_categories[category] = {
+                            "count": 0,
+                            "challenging_count": 0,
+                            "persistence_details": []
+                        }
+                    
+                    error_categories[category]["count"] += 1
+                    
+                    # Track challenging patterns
+                    if metadata.get("is_challenging", False):
+                        error_categories[category]["challenging_count"] += 1
+                        error_categories[category]["persistence_details"].append({
+                            "func_name": metadata.get("func_name", "Unknown"),
+                            "iterations": json.loads(metadata.get("refinement_attempts", "[]")),
+                            "error_message": metadata.get("error_message", "")
+                        })
+            
+            # Generate recommendations based on error analysis
+            global_recommendations = []
+            for category, details in error_categories.items():
+                # Calculate challenge ratio
+                challenge_ratio = details["challenging_count"] / details["count"] if details["count"] > 0 else 0
+                
+                recommendation = {
+                    "category": category,
+                    "total_occurrences": details["count"],
+                    "challenging_occurrences": details["challenging_count"],
+                    "challenge_ratio": challenge_ratio,
+                    "recommended_strategy": "Standard verification",
+                    "mitigation_suggestions": []
+                }
+                
+                # Provide targeted recommendations based on challenge ratio
+                if challenge_ratio > 0.5:
+                    recommendation["recommended_strategy"] = "Advanced verification required"
+                    
+                    if category == "memory_leak":
+                        recommendation["mitigation_suggestions"] = [
+                            "Implement comprehensive memory tracking",
+                            "Use static analysis tools for memory management",
+                            "Create more sophisticated memory cleanup harnesses"
+                        ]
+                    elif category == "null_pointer":
+                        recommendation["mitigation_suggestions"] = [
+                            "Enhance null pointer constraint generation",
+                            "Implement more rigorous null check patterns",
+                            "Use advanced CPROVER assume techniques"
+                        ]
+                    elif category == "array_bounds":
+                        recommendation["mitigation_suggestions"] = [
+                            "Develop more robust array access constraints",
+                            "Generate harnesses with explicit bounds checking",
+                            "Use symbolic execution techniques"
+                        ]
+                
+                global_recommendations.append(recommendation)
+            
+            return global_recommendations
+        
+        except Exception as e:
+            logger.error(f"Error in global error pattern recognition: {str(e)}")
+            return []
     
     def query_similar_errors(self, 
                            func_name: str, 
@@ -712,63 +996,7 @@ class UnifiedEmbeddingDB:
         except Exception as e:
             logger.error(f"Error querying similar errors: {str(e)}")
             return []
-    
-    def query_solutions_for_error(self, 
-                                error_id: str, 
-                                func_name: str, 
-                                top_k: int = 3) -> List[Dict[str, Any]]:
-        """
-        Query the solution collection for solutions matching a specific error.
-        
-        Args:
-            error_id: ID of the error to find solutions for
-            func_name: Name of the function
-            top_k: Number of results to return
-            
-        Returns:
-            List of solutions with metadata
-        """
-        if not error_id:
-            # Also try to search by function name
-            solutions = self.solution_collection.get(
-                where={"func_name": func_name},
-                limit=top_k
-            )
-        else:
-            # Try to find solutions related to the error ID
-            solutions = self.solution_collection.get(
-                where={"related_error_id": error_id},
-                limit=top_k
-            )
-            
-            # If no solutions found, try to find solutions for the function
-            if not solutions["ids"]:
-                solutions = self.solution_collection.get(
-                    where={"func_name": func_name},
-                    limit=top_k
-                )
-        
-        if not solutions["ids"]:
-            logger.info(f"No solutions found for error {error_id} or function {func_name}")
-            return []
-        
-        # Process and return results
-        solution_list = []
-        for i, solution_id in enumerate(solutions["ids"]):
-            metadata = solutions["metadatas"][i]
-            solution_list.append({
-                "solution_id": solution_id,
-                "func_name": metadata.get("func_name", ""),
-                "iteration": metadata.get("iteration", 0),
-                "coverage": metadata.get("coverage", 0.0),
-                "patterns_found": metadata.get("patterns_found", 0),
-                "harness_code": metadata.get("harness_code", ""),
-                "document": solutions["documents"][i] if "documents" in solutions else ""
-            })
-        
-        logger.info(f"Found {len(solution_list)} solutions for error {error_id}")
-        return solution_list
-    
+
     def _extract_function_signature(self, func_code: str) -> str:
         """
         Extract the function signature from the function code.
@@ -786,96 +1014,37 @@ class UnifiedEmbeddingDB:
             params = signature_match.group(3).strip()
             return f"{return_type} {func_name}({params})"
         return ""
-    
-    def get_recommendations(self, 
-                          func_name: str, 
-                          func_code: str, 
-                          cbmc_result: Dict[str, Any],
-                          previous_harness: str) -> Dict[str, Any]:
+   
+    def _extract_pattern(self, code: str, pattern: str, label: str) -> str:
         """
-        Get comprehensive recommendations for fixing a failing harness.
+        Extract reusable code patterns from harness code.
         
         Args:
-            func_name: Name of the function
-            func_code: The function code
-            cbmc_result: The CBMC verification result
-            previous_harness: The previous harness code that failed
+            code: The harness code
+            pattern: Regex pattern to extract
+            label: Label for the pattern
             
         Returns:
-            Dictionary with recommendations
+            Extracted pattern with label or empty string if not found
         """
-        # Extract error information
-        error_categories = cbmc_result.get("error_categories", [])
-        error_message = cbmc_result.get("message", "Unknown error")
+        # Ensure code is a string and pattern is valid
+        if not isinstance(code, str) or not pattern:
+            return ""
         
-        # Build error description
-        error_description = f"{error_message}"
-        if error_categories:
-            error_description += f" Categories: {', '.join(error_categories)}"
+        # Use re.DOTALL to match across multiple lines
+        matches = re.findall(pattern, code, re.DOTALL)
         
-        # Query for similar errors
-        similar_errors = self.query_similar_errors(func_name, func_code, error_description)
+        if matches:
+            # Return the first match with label
+            first_match = matches[0]
+            
+            # If match is a tuple (from multiple capture groups), take the first element
+            if isinstance(first_match, tuple):
+                first_match = first_match[0]
+            
+            return f"{label}:\n{first_match.strip()}"
         
-        # Get solutions for similar errors
-        solutions = []
-        if similar_errors:
-            # Get the most similar error
-            most_similar = similar_errors[0]
-            solutions = self.query_solutions_for_error(most_similar["error_id"], func_name)
-        
-        # Query for patterns that match this function's issues
-        pattern_results = self.query_pattern_db(func_code)
-        matching_patterns = pattern_results.get("matching_patterns", {})
-        
-        # Build recommendation
-        recommendation = {
-            "has_similar_errors": bool(similar_errors),
-            "similar_errors": similar_errors,
-            "has_solutions": bool(solutions),
-            "solutions": solutions,
-            "has_matching_patterns": bool(matching_patterns),
-            "matching_patterns": matching_patterns,
-            "error_categories": error_categories,
-            "recommendations": []
-        }
-        
-        # Add specific recommendations based on what we found
-        if solutions and solutions[0].get("harness_code"):
-            # Best case: we have a complete solution for a similar error
-            best_solution = solutions[0]
-            recommendation["recommendations"].append({
-                "type": "complete_solution",
-                "message": f"Found a complete solution for a similar error in function {best_solution['func_name']}",
-                "harness_code": best_solution["harness_code"]
-            })
-        elif matching_patterns:
-            # Second best: we have patterns that match the vulnerabilities in this function
-            for pattern_name, pattern_info in matching_patterns.items():
-                recommendation["recommendations"].append({
-                    "type": "pattern",
-                    "pattern_name": pattern_name,
-                    "message": f"Found a matching pattern: {pattern_info['description']}",
-                    "verification_strategy": pattern_info["verification_strategy"],
-                    "severity": pattern_info["severity"]
-                })
-        
-        # Add default recommendations based on error categories
-        if "memory_leak" in error_categories:
-            recommendation["recommendations"].append({
-                "type": "default",
-                "message": "Ensure proper memory cleanup after allocation",
-                "suggestion": "Add corresponding free() calls for each malloc() and implement proper error handling"
-            })
-        
-        if "null_pointer" in error_categories:
-            recommendation["recommendations"].append({
-                "type": "default",
-                "message": "Add null pointer checks before dereferencing",
-                "suggestion": "Add if (ptr != NULL) checks and CPROVER_assume(ptr != NULL) where appropriate"
-            })
-        
-        return recommendation
-    
+        return ""
 # Global instance for convenience
 _db_instance = None
 
