@@ -160,14 +160,15 @@ def generator_node(state):
 
         CRITICAL INSTRUCTIONS:
         1. DO NOT include the full function implementation
-        2. Declare the function you are testing
-        3. Declare ALL function dependencies WITHOUT implementation
-        4. Create a main() function that calls the target function
-        5. Use __CPROVER_assume() for input constraints
-        6. Use nondet functions for nondeterministic inputs
-        7. ONLY include header files from the standard library
-        8. Ensure all declarations are complete and syntactically correct
-        9. FOCUS on creating a verifiable function call scenario
+        2. Always use the EXACT parameter names from the original function
+        3. ALWAYS use "extern" keyword for function declarations to avoid redefinition conflicts
+        4. NEVER redefine the function being tested
+        5. Create a main() function that calls the target function
+        6. Use __CPROVER_assume() for input constraints
+        7. Use nondet functions for nondeterministic inputs
+        8. ONLY include necessary header files from the standard library
+        9. Ensure all declarations are complete and syntactically correct
+        10. FOCUS on creating a verifiable function call scenario
 
         Function Dependencies:
         """
@@ -179,6 +180,7 @@ def generator_node(state):
                 # Extract function signature from metadata or existing implementations
                 return_type = dep_info.get('metadata', {}).get('return_type', 'void')
                 params = dep_info.get('metadata', {}).get('params', 'void')
+                # Use extern and PRESERVE EXACT parameter names
                 generator_prompt += f"extern {return_type} {dep_name}({params});\n"
         
         # Add main function template
@@ -187,7 +189,7 @@ def generator_node(state):
             // Nondeterministic input preparation
             // Assume constraints for inputs
             
-            // Call the function under test
+            // Call the function under test with explicit parameter names
             {func_metadata.get('return_type', 'void')} result = {original_func_name}({
                 ', '.join([f'nondet_{p.split()[-1]}()' if p.strip() != 'void' else '' 
                            for p in func_metadata.get('params', 'void').split(',')])
@@ -205,6 +207,8 @@ def generator_node(state):
         - Add __CPROVER_assert() to check critical properties
         - Minimize the harness complexity
         - Focus on key function behaviors
+        - ALWAYS use extern for function declarations
+        - NEVER redeclare the function with different parameter names
         """
     
     else:
@@ -217,14 +221,15 @@ def generator_node(state):
         
         CRITICAL INSTRUCTIONS:
         1. DO NOT include the full function implementation
-        2. Declare the function being tested
-        3. Declare function dependencies WITHOUT implementation
-        4. Modify the main() function to address specific CBMC failures
-        5. Use __CPROVER_assume() to constrain inputs
-        6. Use __CPROVER_assert() to validate key properties
-        7. Address each specific issue from the previous verification
-        8. Minimize the harness complexity
-        9. FOCUS on the verification requirements
+        2. Always use the EXACT parameter names from the original function
+        3. ALWAYS use "extern" keyword for function declarations
+        4. NEVER redefine the function being tested
+        5. Modify the main() function to address specific CBMC failures
+        6. Use __CPROVER_assume() to constrain inputs
+        7. Use __CPROVER_assert() to validate key properties
+        8. Address each specific issue from the previous verification
+        9. Minimize the harness complexity
+        10. FOCUS on the verification requirements
         """
         
         # Add dependency declarations
@@ -284,6 +289,8 @@ def generator_node(state):
         - Add targeted assertions
         - Minimize harness complexity
         - Focus on the specific verification requirements
+        - ALWAYS use extern for function declarations
+        - NEVER redeclare the function with different parameter names
         """
     
     # Generate the harness
@@ -305,8 +312,10 @@ def generator_node(state):
         5. AVOID creating any helper functions or utility code
         6. Create DIRECT tests of the function behavior with appropriate inputs
         7. FOCUS on real verification concerns, not artificial test scenarios
-        8. ALWAYS include the necessary function declarations
-        9. FOLLOW PROPER C CODE STRUCTURE:
+        8. ALWAYS use "extern" for function declarations to avoid redefinition conflicts
+        9. ALWAYS use the EXACT parameter names from the original function
+        10. NEVER redefine the function being tested
+        11. FOLLOW PROPER C CODE STRUCTURE:
            - Include directives first
            - Type definitions next
            - Function declarations next

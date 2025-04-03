@@ -1,0 +1,8 @@
+CBMC version 6.4.1 (cbmc-6.4.1) 64-bit arm64 macos
+Type-checking HTTPClient_AddHeader_harness
+Type-checking core_http_client
+Generating GOTO Program
+Adding CPROVER library (arm64)
+Removal of function pointers and virtual functions
+Generic Property Instrumentation
+Starting Bounded Model Checking

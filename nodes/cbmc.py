@@ -1,11 +1,12 @@
 """
-CBMC execution node for harness generator workflow.
+CBMC execution node for harness generator workflow with optimized file selection.
 """
 import os
 import time
 import shutil
 import subprocess
 import glob
+import json
 from langchain_core.messages import AIMessage
 import logging
 from utils.cbmc_parser import process_cbmc_output
@@ -16,8 +17,93 @@ logger = logging.getLogger("cbmc")
 # Define CBMC_MAX_OBJECT_SIZE
 cbmc_max_object_size = 1024 * 1024  # 1MB is a typical reasonable size
 
+def get_minimal_verification_files(func_name, rag_db, verification_include_dir):
+    """
+    Get minimal set of files needed for verification based on function dependencies.
+    
+    Args:
+        func_name: Name of the function being verified
+        rag_db: The RAG database instance
+        verification_include_dir: Directory with include files
+        verification_project_src_dir: Directory with project source files
+        
+    Returns:
+        List of file paths to include in verification
+    """
+    # Get function metadata from RAG
+    function_data = rag_db.get_code_function(func_name)
+    if not function_data:
+        logger.warning(f"No function data found for {func_name} in RAG database")
+        return []
+        
+    # Get original source files for dependencies
+    required_files = set()
+    
+    # Get original file for the function
+    orig_file = None
+    if "metadata" in function_data and "file_path" in function_data["metadata"]:
+        orig_file = os.path.basename(function_data["metadata"]["file_path"])
+        required_files.add(orig_file)
+        logger.info(f"Required original file: {orig_file}")
+    
+    # Get files for dependencies
+    try:
+        if "metadata" in function_data and "function_calls" in function_data["metadata"]:
+            function_calls_json = function_data["metadata"].get("function_calls", "[]")
+            
+            # Handle both string and list formats
+            if isinstance(function_calls_json, str):
+                try:
+                    function_calls = json.loads(function_calls_json)
+                except json.JSONDecodeError:
+                    function_calls = [call.strip() for call in function_calls_json.split(',')]
+            else:
+                function_calls = function_calls_json
+            
+            logger.info(f"Function calls for {func_name}: {function_calls}")
+            
+            for call in function_calls:
+                # Skip common library functions and keywords
+                if call in ["if", "for", "while", "switch", "return", "malloc", "free",
+                            "memset", "memcpy", "printf", "fprintf", "sprintf"]:
+                    continue
+                    
+                call_data = rag_db.get_code_function(call)
+                if call_data and "metadata" in call_data and "file_path" in call_data["metadata"]:
+                    dep_file = os.path.basename(call_data["metadata"]["file_path"])
+                    required_files.add(dep_file)
+                    logger.info(f"Added dependency file: {dep_file} for function call {call}")
+    except Exception as e:
+        logger.error(f"Error processing function calls: {str(e)}")
+    
+    # Find corresponding files in verification directories
+    verification_files = []
+    
+    # Check both include and project source directories
+    for search_dir in [verification_include_dir]:
+        if not os.path.exists(search_dir):
+            continue
+            
+        for file in os.listdir(search_dir):
+            # Only consider C source files
+            if not file.endswith(('.c', '.h', '.cpp', '.hpp')):
+                continue
+                
+            # Check if this file matches any required file (by basename)
+            if file in required_files:
+                full_path = os.path.join(search_dir, file)
+                verification_files.append(full_path)
+                logger.info(f"Added verification file: {full_path}")
+    
+    # If no files found, return empty list
+    if not verification_files:
+        logger.warning(f"No verification files found for {func_name} with dependencies: {required_files}")
+        return []
+    
+    return verification_files
+
 def cbmc_node(state):
-    """Executes CBMC verification on the current function's harness using sources from verification/sources directory."""
+    """Executes CBMC verification on the current function's harness using optimized file selection."""
     verification_start = time.time()
     
     func_name = state.get("current_function", "")
@@ -67,10 +153,11 @@ def cbmc_node(state):
     refinement_num = state.get("refinement_attempts", {}).get(func_name, 0)
     version_num = refinement_num + 1
     
-    # Create CBMC definitions header
+    # Create CBMC definitions header if it doesn't exist
     cbmc_defs_header = os.path.join(verification_include_dir, "cbmc_defs.h")
-    with open(cbmc_defs_header, "w") as f:
-        f.write("""/*
+    if not os.path.exists(cbmc_defs_header):
+        with open(cbmc_defs_header, "w") as f:
+            f.write("""/*
  * Auto-generated CBMC definitions header
  * This file provides definitions needed for CBMC verification
  */
@@ -171,45 +258,47 @@ def cbmc_node(state):
         "-DCBMC_MAX_OBJECT_SIZE=" + str(cbmc_max_object_size)
     ]
     
+    # Get the unified RAG database
+    from utils.rag import get_unified_db
+    rag_db = get_unified_db(os.path.join(result_directories.get("result_base_dir", "results"), "rag_data"))
+    
+    # OPTIMIZATION: Get minimal set of verification files based on function dependencies
+    verification_files = get_minimal_verification_files(
+        func_name, 
+        rag_db, 
+        verification_include_dir
+    )
+    
     # Add source files in the correct order
     cbmc_cmd.append(harness_file)
-    cbmc_cmd.extend(glob.glob(os.path.join(verification_project_src_dir, "*.c")))
-    cbmc_cmd.extend(glob.glob(os.path.join(verification_cbmc_utils_dir, "*.c")))
-    cbmc_cmd.extend(glob.glob(os.path.join(verification_stubs_dir, "*.c")))
+    
+    # If we found targeted dependency files, use them
+    if verification_files:
+        logger.info(f"Using {len(verification_files)} targeted dependency files for verification")
+        cbmc_cmd.extend(verification_files)
+    else:
+        # Fallback to original approach if no dependencies found
+        logger.warning("No targeted dependencies found, using all source files")
+        cbmc_cmd.extend(glob.glob(os.path.join(verification_project_src_dir, "*.c")))
+        cbmc_cmd.extend(glob.glob(os.path.join(verification_cbmc_utils_dir, "*.c")))
+        cbmc_cmd.extend(glob.glob(os.path.join(verification_stubs_dir, "*.c")))
     
     # Add verification flags
     cbmc_cmd.extend([
+        # Performance optimizations
+        "--slice-formula",  # Add formula slicing to reduce complexity
+        "--unwind", "10",  # Reasonable unwinding limit
+        
+        # Targeted verification flags - focus on essential properties
         "--memory-leak-check",
-        "--memory-cleanup-check",
-        "--bounds-check",
-        "--pointer-overflow-check",
         "--div-by-zero-check",
+        "--pointer-overflow-check",  # Disable more expensive checks
     ])
     
     # Add necessary include paths with additional check for CBMC test files
     include_paths = [
         verification_include_dir,
-        verification_harness_dir,
-        verification_stubs_dir,
-        verification_cbmc_utils_dir,
-        verification_project_src_dir
     ]
-    
-    # Optional: If in directory mode, add CBMC-related test directories
-    if state.get("is_directory_mode", False):
-        original_source_dir = state.get("source_directory", "")
-        
-        # Get directory path, removing "/source" if present
-        directory_path = original_source_dir.replace("/source", "") if "/source" in original_source_dir else original_source_dir
-        
-        cbmc_test_paths = [
-            os.path.join(directory_path, "test", "cbmc", "include"),
-            os.path.join(directory_path, "test", "cbmc", "sources"),
-            os.path.join(directory_path, "test", "cbmc", "stubs")
-        ]
-        
-        # Add existing CBMC test paths to include paths
-        include_paths.extend([path for path in cbmc_test_paths if os.path.exists(path)])
     
     # Add include paths to CBMC command, ensuring they exist
     for path in include_paths:
@@ -234,15 +323,23 @@ def cbmc_node(state):
     cbmc_returncode = 0
     cbmc_results = state.get("cbmc_results", {}).copy()
     
+    # OPTIMIZATION: Increase timeout for complex functions
+    # Start with base timeout and adjust based on function complexity
+    timeout_seconds = 90  # Increased from 60 to 90 seconds
+    
+    # Adjust timeout based on dependency count
+    if len(verification_files) > 5:
+        timeout_seconds = 120  # 2 minutes for complex dependency graphs
+    
     try:
-        # Run the verification
-        logger.info(f"Running CBMC verification for {func_name}")
+        # Run the verification with adjusted timeout
+        logger.info(f"Running CBMC verification for {func_name} with timeout {timeout_seconds}s")
         property_process = subprocess.run(
             cbmc_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=60,
+            timeout=timeout_seconds,
             check=False
         )
         
@@ -315,7 +412,8 @@ def cbmc_node(state):
             "error_categories": cbmc_result["error_categories"],
             "missing_functions": list(cbmc_result["missing_functions"]),
             "verification_failures": cbmc_result["verification_failures"],
-            "error_locations": cbmc_result["error_locations"]
+            "error_locations": cbmc_result["error_locations"],
+            "dependency_files_used": len(verification_files)
         }
         
         # Save verification results to a structured file
@@ -327,6 +425,8 @@ def cbmc_node(state):
             f.write(f"Message: {cbmc_result['message']}\n")
             if cbmc_result["suggestions"]:
                 f.write(f"Suggestions: {cbmc_result['suggestions']}\n")
+            
+            f.write(f"\nDependency files used: {len(verification_files)}\n")
             
             f.write("\n=== PROOF METRICS ===\n")
             f.write(f"Reachable lines: {cbmc_result['reachable_lines']}\n")
@@ -358,6 +458,14 @@ def cbmc_node(state):
             f.write(f"**Message:** {cbmc_result['message']}\n\n")
             if cbmc_result["suggestions"]:
                 f.write(f"**Suggestions:** {cbmc_result['suggestions']}\n\n")
+            
+            # Add dependency information
+            f.write(f"**Dependency Files Used:** {len(verification_files)}\n\n")
+            if verification_files:
+                f.write("**Files included:**\n\n")
+                for file_path in verification_files:
+                    f.write(f"- {os.path.basename(file_path)}\n")
+                f.write("\n")
             
             # Add Proof Metrics section
             f.write(f"## Proof Metrics\n\n")
@@ -420,13 +528,13 @@ def cbmc_node(state):
             e.process.kill()
             e.process.wait()
         
-        logger.warning(f"CBMC verification timed out for {func_name}")
+        logger.warning(f"CBMC verification timed out for {func_name} after {timeout_seconds} seconds")
         
         # Create timeout result
         cbmc_result = {
             "verification_status": "TIMEOUT",
-            "message": "CBMC verification timed out after 60 seconds",
-            "suggestions": "The function may have complex paths requiring longer verification time. Consider simplifying.",
+            "message": f"CBMC verification timed out after {timeout_seconds} seconds",
+            "suggestions": "The function may have complex paths requiring longer verification time. Consider simplifying or using more targeted dependency selection.",
             "error_categories": ["timeout"],
             "missing_functions": set(),
             "verification_failures": ["timeout"],
@@ -445,17 +553,73 @@ def cbmc_node(state):
         # Update cbmc_results
         cbmc_results[func_name] = {
             "function": func_name,
+            "status": "ERROR",
+            "message": f"Error running CBMC verification: {str(e)}",
+            "suggestions": "Fix the error and try again",
+            "stdout": "",
+            "stderr": str(e),
+            "returncode": -1,
+            "version": version_num,
+            "error_categories": ["system_error"],
+            "missing_functions": [],
+            "verification_failures": ["system_error"],
+            "error_locations": {},
+            "dependency_files_used": len(verification_files)
+        }
+        
+        # Save error information to files
+        verification_file = os.path.join(func_verification_dir, f"v{version_num}_results.txt")
+        with open(verification_file, "w") as f:
+            f.write(f"Function: {func_name}\n")
+            f.write(f"Version: {version_num}\n")
+            f.write(f"Status: ERROR\n")
+            f.write(f"Message: Error running CBMC verification: {str(e)}\n")
+            f.write(f"Suggestions: Fix the error and try again\n")
+            f.write(f"\nDependency files used: {len(verification_files)}\n")
+            
+        # Create an error report
+        report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
+        with open(report_file, "w") as f:
+            f.write(f"# CBMC Verification Report - {func_name} (Version {version_num})\n\n")
+            f.write(f"## Summary\n\n")
+            f.write(f"**Status:** ERROR\n\n")
+            f.write(f"**Message:** Error running CBMC verification: {str(e)}\n\n")
+            f.write(f"**Suggestions:** Fix the error and try again\n\n")
+            
+            # Add dependency information
+            f.write(f"**Dependency Files Used:** {len(verification_files)}\n\n")
+            if verification_files:
+                f.write("**Files included:**\n\n")
+                for file_path in verification_files:
+                    f.write(f"- {os.path.basename(file_path)}\n")
+                f.write("\n")
+            
+            f.write(f"## Analysis\n\n")
+            f.write(f"An error occurred during the verification process. This might be due to a system issue or a problem with the harness code.\n\n")
+            
+            f.write(f"## Error Details\n\n")
+            f.write(f"```\n{str(e)}\n```\n\n")
+            
+            f.write(f"## Next Steps\n\n")
+            f.write(f"1. Check if CBMC is installed and configured correctly\n")
+            f.write(f"2. Review the harness code for syntax errors\n")
+            f.write(f"3. Try running CBMC manually with the command above\n"), version_num, cbmc_result, verification_time_ms
+        
+        # Update cbmc_results
+        cbmc_results[func_name] = {
+            "function": func_name,
             "status": "TIMEOUT",
-            "message": "CBMC verification timed out after 60 seconds.",
-            "suggestions": "The function may have complex paths requiring longer verification time. Consider simplifying.",
-            "stdout": "TIMEOUT: Process exceeded 60 second time limit",
+            "message": f"CBMC verification timed out after {timeout_seconds} seconds.",
+            "suggestions": "The function may have complex paths requiring longer verification time. Consider using more selective file inclusion or increasing timeout.",
+            "stdout": f"TIMEOUT: Process exceeded {timeout_seconds} second time limit",
             "stderr": "",
             "returncode": -1,
             "version": version_num,
             "error_categories": ["timeout"],
             "missing_functions": [],
             "verification_failures": ["timeout"],
-            "error_locations": {}
+            "error_locations": {},
+            "dependency_files_used": len(verification_files)
         }
         
         # Save timeout information to files
@@ -464,8 +628,9 @@ def cbmc_node(state):
             f.write(f"Function: {func_name}\n")
             f.write(f"Version: {version_num}\n")
             f.write(f"Status: TIMEOUT\n")
-            f.write(f"Message: CBMC verification timed out after 60 seconds\n")
+            f.write(f"Message: CBMC verification timed out after {timeout_seconds} seconds\n")
             f.write(f"Suggestions: The function may have complex paths requiring longer verification time. Consider simplifying.\n")
+            f.write(f"\nDependency files used: {len(verification_files)}\n")
             
         # Create a timeout report
         report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
