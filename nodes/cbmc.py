@@ -308,7 +308,7 @@ def cbmc_node(state):
     coverage_cmd = cbmc_cmd.copy()
     coverage_cmd.extend([
         "--cover", "location",
-        "--xml-ui"  # Using XML format for consistent parsing
+        "--json-ui"  # Using XML format for consistent parsing
     ])
     
     # Initialize result variables
@@ -345,7 +345,7 @@ def cbmc_node(state):
             f.write("\n\n=== STDERR ===\n")
             f.write(cbmc_stderr)
         
-        # Run coverage checking separately
+        # Run coverage checking separately with JSON output
         try:
             logger.info(f"Running coverage checking for {func_name}")
             coverage_process = subprocess.run(
@@ -359,13 +359,29 @@ def cbmc_node(state):
             
             coverage_stdout = coverage_process.stdout
             
-            # Save coverage output
-            coverage_file = os.path.join(func_verification_dir, f"v{version_num}_coverage.txt")
-            with open(coverage_file, "w") as f:
+            # Save JSON coverage output to a file
+            coverage_json_file = os.path.join(func_verification_dir, f"v{version_num}_coverage.json")
+            with open(coverage_json_file, "w") as f:
                 f.write(coverage_stdout)
+            
+            # Parse the JSON coverage data
+            try:
+                import json
+                json_data = json.loads(coverage_stdout)
                 
-            # Process the combined stdout with coverage
-            cbmc_stdout += "\n" + coverage_stdout
+                # Extract coverage metrics from the JSON data
+                from utils.cbmc_parser import extract_coverage_metrics_from_json
+                # Use the already defined cbmc_result variable (from earlier in the function)
+                coverage_metrics = extract_coverage_metrics_from_json(json_data, func_name)
+                
+                # Add coverage metrics to cbmc_result
+                for key, value in coverage_metrics.items():
+                    cbmc_result[key] = value
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing JSON coverage data: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error processing coverage data: {str(e)}")
             
         except subprocess.TimeoutExpired:
             logger.warning(f"Coverage check timed out for {func_name}")
