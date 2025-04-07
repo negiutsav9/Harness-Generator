@@ -10,7 +10,6 @@ import json
 from langchain_core.messages import AIMessage
 import logging
 from utils.cbmc_parser import process_cbmc_output
-from utils.metrics_utils import get_metrics_tracker
 
 logger = logging.getLogger("cbmc")
 
@@ -370,9 +369,9 @@ def cbmc_node(state):
                 json_data = json.loads(coverage_stdout)
                 
                 # Extract coverage metrics from the JSON data
-                from utils.cbmc_parser import extract_coverage_metrics_from_json
+                from utils.cbmc_parser import extract_coverage_metrics
                 # Use the already defined cbmc_result variable (from earlier in the function)
-                coverage_metrics = extract_coverage_metrics_from_json(json_data, func_name)
+                coverage_metrics = extract_coverage_metrics(json_data, func_name)
                 
                 # Add coverage metrics to cbmc_result
                 for key, value in coverage_metrics.items():
@@ -390,20 +389,6 @@ def cbmc_node(state):
         
         # Process CBMC output using our new parser
         cbmc_result = process_cbmc_output(cbmc_stdout, cbmc_stderr)
-        
-        # Update metrics
-        metrics_tracker = get_metrics_tracker()
-        
-        # Get runtime in milliseconds
-        verification_time_ms = int((time.time() - verification_start) * 1000)
-        
-        # Add metrics to tracker
-        metrics_tracker.add_function_metrics(
-            func_name, 
-            version_num, 
-            cbmc_result,
-            verification_time_ms
-        )
         
         # Create a structured result for the state
         cbmc_results[func_name] = {
@@ -573,11 +558,6 @@ def cbmc_node(state):
             "errors": 0
         }
         
-        # Update metrics tracker
-        metrics_tracker = get_metrics_tracker()
-        verification_time_ms = int((time.time() - verification_start) * 1000)
-        metrics_tracker.add_function_metrics(func_name, version_num, cbmc_result, verification_time_ms)
-        
         # Update cbmc_results
         cbmc_results[func_name] = {
             "function": func_name,
@@ -631,7 +611,7 @@ def cbmc_node(state):
             f.write(f"## Next Steps\n\n")
             f.write(f"1. Check if CBMC is installed and configured correctly\n")
             f.write(f"2. Review the harness code for syntax errors\n")
-            f.write(f"3. Try running CBMC manually with the command above\n"), version_num, cbmc_result, verification_time_ms
+            f.write(f"3. Try running CBMC manually with the command above\n"), version_num, cbmc_result
         
         # Update cbmc_results
         cbmc_results[func_name] = {
@@ -696,10 +676,6 @@ def cbmc_node(state):
             "errors": 1
         }
         
-        # Update metrics tracker
-        metrics_tracker = get_metrics_tracker()
-        verification_time_ms = int((time.time() - verification_start) * 1000)
-        metrics_tracker.add_function_metrics(func_name, version_num, cbmc_result, verification_time_ms)
         
         # Update cbmc_results
         cbmc_results[func_name] = {

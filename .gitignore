@@ -46,6 +46,7 @@ coreJSON
 coreJSON/*
 demo
 notes.txt
+version_*
 
 # ChromaDB files
 .chroma/
