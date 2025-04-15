@@ -91,6 +91,34 @@ def harness_evaluator_node(state):
         if function_result["ids"]:
             func_code = function_result["documents"][0]
     
+    # Make sure we're incrementing the refinement attempts - CRUCIAL FIX
+    # This ensures versioning is consistent even for successful verifications
+    state_refinement_attempts[func_name] = current_attempts + 1
+    
+    # Get harness version
+    refinement_num = current_attempts
+    version_num = refinement_num + 1
+    
+    # Save the harness and report regardless of verification outcome
+    # Ensure the harness is saved to disk
+    harnesses_dir = result_directories.get("harnesses_dir", "harnesses")
+    func_harness_dir = os.path.join(harnesses_dir, func_name)
+    os.makedirs(func_harness_dir, exist_ok=True)
+    
+    # Save harness to file
+    harness_file = os.path.join(func_harness_dir, f"v{version_num}.c")
+    if not os.path.exists(harness_file):
+        with open(harness_file, "w") as f:
+            f.write(harness_code)
+            
+    # Save to harness history
+    harness_history = state.get("harness_history", {}).copy()
+    if func_name not in harness_history:
+        harness_history[func_name] = []
+        
+    if harness_code not in harness_history[func_name]:
+        harness_history[func_name].append(harness_code)
+    
     # Check if verification was successful
     if cbmc_result.get("status") == "SUCCESS":
         logger.info(f"CBMC verification successful for {func_name}, storing solution in RAG database")
@@ -101,28 +129,8 @@ def harness_evaluator_node(state):
             func_name, 
             harness_code, 
             cbmc_result,
-            current_attempts + 1
+            version_num
         )
-        
-        # RESET: Clear existing error and solution data for this function
-        try:
-            # Delete existing errors for this function from error collection
-            existing_errors = rag_db.error_collection.get(
-                where={"func_name": func_name}
-            )
-            if existing_errors["ids"]:
-                rag_db.error_collection.delete(ids=existing_errors["ids"])
-            
-            # Delete existing solutions for this function from solution collection
-            existing_solutions = rag_db.solution_collection.get(
-                where={"func_name": func_name}
-            )
-            if existing_solutions["ids"]:
-                rag_db.solution_collection.delete(ids=existing_solutions["ids"])
-            
-            logger.info(f"Cleared existing error and solution data for {func_name}")
-        except Exception as e:
-            logger.warning(f"Error resetting RAG data for {func_name}: {str(e)}")
         
         # Mark function as processed
         if func_name not in state_processed_functions:
@@ -134,6 +142,7 @@ def harness_evaluator_node(state):
             "processed_functions": state_processed_functions,
             "function_times": function_times,
             "loop_counter": loop_counter,
+            "harness_history": harness_history,  # Make sure to return updated harness history
             "next": "junction"
         }
     
@@ -142,7 +151,7 @@ def harness_evaluator_node(state):
         func_name,
         harness_code,
         cbmc_result,
-        current_attempts
+        version_num
     )
     
     # Generate improvement recommendation
@@ -158,7 +167,7 @@ def harness_evaluator_node(state):
     
     # Modify improvement recommendation with RAG insights
     if rag_recommendations and (rag_recommendations.get('solutions') or rag_recommendations.get('matching_patterns')):
-        # Add RAG-driven enhancements to improvement recommendation
+        # Add RAG-driven enhancements to improvement recommendation 
         improvement_recommendation += "\n\n== RAG KNOWLEDGE BASE INSIGHTS ==\n"
         
         # Add similar error insights
@@ -182,49 +191,27 @@ def harness_evaluator_node(state):
     
     # Determine whether to proceed with refinement or move to next function
     if current_attempts < max_refinements - 1:
-        state_refinement_attempts[func_name] = current_attempts + 1
-
-        
         return {
-            "messages": [AIMessage(content=f"Evaluated harness for {func_name}. Needs improvement (attempt {current_attempts + 1} of {max_refinements}). Using insights from unified knowledge base.")],
+            "messages": [AIMessage(content=f"Evaluated harness for {func_name}. Needs improvement (attempt {version_num} of {max_refinements}). Using insights from unified knowledge base.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
             "improvement_recommendation": improvement_recommendation,
             "function_times": function_times,
             "loop_counter": loop_counter,
+            "harness_history": harness_history,  # Make sure to return updated harness history
             "next": "generator"
         }
     else:
         # Last attempt reached, mark as processed and move on
         if func_name not in state_processed_functions:
             state_processed_functions.append(func_name)
-        state_refinement_attempts[func_name] = max_refinements
-        
-        # RESET: Clear existing error and solution data when max refinements reached
-        try:
-            # Delete existing errors for this function from error collection
-            existing_errors = rag_db.error_collection.get(
-                where={"func_name": func_name}
-            )
-            if existing_errors["ids"]:
-                rag_db.error_collection.delete(ids=existing_errors["ids"])
-            
-            # Delete existing solutions for this function from solution collection
-            existing_solutions = rag_db.solution_collection.get(
-                where={"func_name": func_name}
-            )
-            if existing_solutions["ids"]:
-                rag_db.solution_collection.delete(ids=existing_solutions["ids"])
-            
-            logger.info(f"Cleared RAG data for {func_name} after reaching max refinement attempts")
-        except Exception as e:
-            logger.warning(f"Error resetting RAG data for {func_name} after max refinements: {str(e)}")
         
         return {
             "messages": [AIMessage(content=f"Final refinement attempt for {func_name} completed. Moving to next function.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
             "loop_counter": loop_counter,
+            "harness_history": harness_history,  # Make sure to return updated harness history
             "next": "junction"
         }
 

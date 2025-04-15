@@ -2,10 +2,129 @@
 CBMC output parsing utilities for the harness generator.
 """
 import re
+import json
 import logging
 from typing import Dict, Any, Set, List, Tuple
 
 logger = logging.getLogger("cbmc_parser")
+
+def parse_line_ranges(line_ranges):
+    """
+    Parse a string of line ranges (e.g., '20-24,27') into a set of unique line numbers.
+    :param line_ranges: A string representing line ranges.
+    :return: A set of unique line numbers.
+    """
+    unique_lines = set()
+    for line_range in line_ranges.split(','):
+        if '-' in line_range:
+            start, end = map(int, line_range.split('-'))
+            unique_lines.update(range(start, end + 1))
+        else:
+            unique_lines.add(int(line_range))
+    return unique_lines
+
+def calculate_coverage(json_file_path, target_function_name):
+    """
+    Calculate total coverage and target function coverage.
+
+    :param json_file_path: Path to the JSON file.
+    :param target_function_name: Name of the target function.
+    :return: A dictionary containing total coverage and target function coverage.
+    """
+    with open(json_file_path, 'r') as file:
+        data = json.load(file)
+    
+    # Ensure data is a list
+    if not isinstance(data, list):
+        raise ValueError("Expected JSON root structure to be a list.")
+    
+    # Find the dictionary containing 'goals'
+    goals_dict = None
+    for item in data:
+        if isinstance(item, dict) and "goals" in item:
+            goals_dict = item
+            break
+    
+    if not goals_dict:
+        raise ValueError("No dictionary with 'goals' key found in the JSON file.")
+
+    # Extract goals
+    goals = goals_dict.get("goals", [])
+    
+    # Initialize sets to track lines
+    reachable_lines_main = set()
+    total_lines_main = set()
+    
+    reachable_lines_target_function = set()
+    total_lines_target_function = set()
+    
+    # Define harness file name pattern
+    harness_file_name = f"{target_function_name}_harness.c"
+    
+    for goal in goals:  # Iterate over each goal in the 'goals' list
+        basic_block_lines = goal.get("basicBlockLines", {})
+        
+        for file_path, function_lines in basic_block_lines.items():
+            for function_name, line_ranges in function_lines.items():
+                parsed_lines = parse_line_ranges(line_ranges)
+                
+                # Track lines for main function in harness file
+                if function_name == "main" and harness_file_name in file_path:
+                    total_lines_main.update(parsed_lines)
+                    if goal.get("status") == "satisfied":
+                        reachable_lines_main.update(parsed_lines)
+                
+                # Track lines for target function
+                if function_name == target_function_name:
+                    total_lines_target_function.update(parsed_lines)
+                    if goal.get("status") == "satisfied":
+                        reachable_lines_target_function.update(parsed_lines)
+    
+    # Calculate Total Coverage
+    total_reachable_lines = len(reachable_lines_main.union(reachable_lines_target_function))
+    total_possible_lines = len(total_lines_main.union(total_lines_target_function))
+    
+    total_coverage = total_reachable_lines / total_possible_lines if total_possible_lines > 0 else 0
+    
+    # Calculate Target Function Coverage
+    target_function_coverage = len(reachable_lines_target_function) / len(total_lines_target_function) if len(total_lines_target_function) > 0 else 0
+    
+    # Calculate uncovered lines
+    uncovered_lines_main = total_lines_main - reachable_lines_main
+    uncovered_lines_target_function = total_lines_target_function - reachable_lines_target_function
+    
+    # Print debug information about lines
+    print(f"Total Lines (Main Function): {len(total_lines_main)}")
+    print(f"Reachable Lines (Main Function): {len(reachable_lines_main)}")
+    print(f"Uncovered Lines (Main Function): {len(uncovered_lines_main)}")
+    
+    print(f"Total Lines (Target Function): {len(total_lines_target_function)}")
+    print(f"Reachable Lines (Target Function): {len(reachable_lines_target_function)}")
+    print(f"Uncovered Lines (Target Function): {len(uncovered_lines_target_function)}")
+    
+    print(f"Total Lines (Harness + Target Function): {total_possible_lines}")
+    print(f"Reachable Lines (Harness + Target Function): {total_reachable_lines}")
+    
+    # Print detailed sets of covered and uncovered lines
+    print(f"Covered Lines (Main Function): {sorted(reachable_lines_main)}")
+    print(f"Uncovered Lines (Main Function): {sorted(uncovered_lines_main)}")
+    
+    print(f"Covered Lines (Target Function): {sorted(reachable_lines_target_function)}")
+    print(f"Uncovered Lines (Target Function): {sorted(uncovered_lines_target_function)}")
+    
+    return {
+        "Total Coverage": round(total_coverage * 100, 2),
+        "Target Function Coverage": round(target_function_coverage * 100, 2),
+        # Add detailed metrics
+        "main_total_lines": len(total_lines_main),
+        "main_reachable_lines": len(reachable_lines_main),
+        "main_uncovered_lines": len(uncovered_lines_main),
+        "target_total_lines": len(total_lines_target_function),
+        "target_reachable_lines": len(reachable_lines_target_function),
+        "target_uncovered_lines": len(uncovered_lines_target_function),
+        "total_combined_lines": total_possible_lines,
+        "reachable_combined_lines": total_reachable_lines
+    }
 
 def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     """
@@ -35,6 +154,14 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
         "func_reachable_lines": 0,  # Initialize function-specific metrics
         "func_covered_lines": 0,
         "func_coverage_pct": 0.0,
+        "main_total_lines": 0,      # New enhanced metrics
+        "main_reachable_lines": 0,
+        "main_uncovered_lines": 0,
+        "target_total_lines": 0,
+        "target_reachable_lines": 0,
+        "target_uncovered_lines": 0,
+        "total_combined_lines": 0,
+        "reachable_combined_lines": 0,
         "errors": 0
     }
     
@@ -159,6 +286,66 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
                 func_name = match.group(1)
                 missing_functions.add(func_name)
     
+    # Parse coverage information - extract lines for analysis
+    # Extract lines of code information from coverage output
+    line_info_pattern = r'line (\d+) function ([^,]+), file ([^,]+)'
+    line_matches = re.finditer(line_info_pattern, stdout)
+    
+    # Initialize coverage tracking
+    main_lines = set()
+    main_covered = set()
+    target_lines = set()
+    target_covered = set()
+    
+    # Process all line matches
+    for match in line_matches:
+        line_num = int(match.group(1))
+        func_name = match.group(2)
+        file_name = match.group(3)
+        
+        # Check coverage status
+        is_covered = False
+        # Look at the preceding text for coverage status
+        start_pos = max(0, match.start() - 100)
+        preceding_text = stdout[start_pos:match.start()]
+        if "SATISFIED" in preceding_text or "satisfied" in preceding_text.lower():
+            is_covered = True
+        
+        # Categorize by function
+        if func_name == "main":
+            main_lines.add(line_num)
+            if is_covered:
+                main_covered.add(line_num)
+        else:
+            # Assume other functions are target functions
+            target_lines.add(line_num)
+            if is_covered:
+                target_covered.add(line_num)
+    
+    # Update coverage metrics
+    result["main_total_lines"] = len(main_lines)
+    result["main_reachable_lines"] = len(main_covered)
+    result["main_uncovered_lines"] = len(main_lines) - len(main_covered)
+    
+    result["target_total_lines"] = len(target_lines)
+    result["target_reachable_lines"] = len(target_covered)
+    result["target_uncovered_lines"] = len(target_lines) - len(target_covered)
+    
+    result["total_combined_lines"] = len(main_lines) + len(target_lines)
+    result["reachable_combined_lines"] = len(main_covered) + len(target_covered)
+    
+    # Also set old metrics for backward compatibility
+    result["reachable_lines"] = result["total_combined_lines"]
+    result["covered_lines"] = result["reachable_combined_lines"]
+    
+    if result["total_combined_lines"] > 0:
+        result["coverage_pct"] = (result["reachable_combined_lines"] / result["total_combined_lines"]) * 100
+    
+    result["func_reachable_lines"] = result["target_total_lines"]
+    result["func_covered_lines"] = result["target_reachable_lines"]
+    
+    if result["target_total_lines"] > 0:
+        result["func_coverage_pct"] = (result["target_reachable_lines"] / result["target_total_lines"]) * 100
     
     # Count errors and set suggestions based on categories
     if failure_categories:
@@ -301,15 +488,41 @@ def format_error_for_feedback(result: Dict[str, Any]) -> str:
     if suggestions:
         feedback.append(f"\nSuggestions: {suggestions}")
     
-    # Add function-specific metrics
-    func_reachable = result.get("func_reachable_lines", 0)
-    func_covered = result.get("func_covered_lines", 0)
-    func_coverage = result.get("func_coverage_pct", 0.0)
+    # Add enhanced coverage metrics
+    feedback.append("\nEnhanced Coverage Metrics:")
     
-    feedback.append("\nFunction Coverage Metrics:")
-    feedback.append(f"- Function reachable lines: {func_reachable}")
-    feedback.append(f"- Function covered lines: {func_covered}")
-    feedback.append(f"- Function coverage: {func_coverage:.2f}%")
+    # Main function metrics
+    main_total = result.get("main_total_lines", 0)
+    main_reached = result.get("main_reachable_lines", 0)
+    main_uncovered = result.get("main_uncovered_lines", 0)
+    
+    feedback.append("\nMain Function Coverage:")
+    feedback.append(f"- Total lines: {main_total}")
+    feedback.append(f"- Reachable lines: {main_reached}")
+    feedback.append(f"- Uncovered lines: {main_uncovered}")
+    if main_total > 0:
+        main_coverage = (main_reached / main_total) * 100
+        feedback.append(f"- Coverage: {main_coverage:.2f}%")
+    
+    # Target function metrics
+    target_total = result.get("target_total_lines", 0)
+    target_reached = result.get("target_reachable_lines", 0)
+    target_uncovered = result.get("target_uncovered_lines", 0)
+    
+    feedback.append("\nTarget Function Coverage:")
+    feedback.append(f"- Total lines: {target_total}")
+    feedback.append(f"- Reachable lines: {target_reached}")
+    feedback.append(f"- Uncovered lines: {target_uncovered}")
+    if target_total > 0:
+        target_coverage = (target_reached / target_total) * 100
+        feedback.append(f"- Coverage: {target_coverage:.2f}%")
+    
+    # Combined metrics
+    combined_total = result.get("total_combined_lines", 0)
+    combined_reached = result.get("reachable_combined_lines", 0)
+    if combined_total > 0:
+        combined_coverage = (combined_reached / combined_total) * 100
+        feedback.append(f"\nCombined Coverage: {combined_coverage:.2f}%")
     
     return "\n".join(feedback)
 

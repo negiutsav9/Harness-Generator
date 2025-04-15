@@ -236,9 +236,9 @@ def cbmc_node(state):
                     shutil.copy2(potential_file, dest_file)
                     print(f"Copied CBMC utility file: {util_file}")
     
-    # Write harness to file
+    # Write harness to file with versioned filename
     harness_filename = original_func_name if ":" not in func_name else original_func_name
-    harness_file = os.path.join(verification_harness_dir, f"{harness_filename}_harness.c")
+    harness_file = os.path.join(verification_harness_dir, f"{harness_filename}_harness_v{version_num}.c")
     with open(harness_file, "w") as f:
         # Add include for the CBMC definitions header
         f.write("#include \"cbmc_defs.h\"\n\n")
@@ -408,7 +408,16 @@ def cbmc_node(state):
             # Add function-specific metrics
             "func_reachable_lines": cbmc_result["func_reachable_lines"],
             "func_covered_lines": cbmc_result["func_covered_lines"],
-            "func_coverage_pct": cbmc_result["func_coverage_pct"]
+            "func_coverage_pct": cbmc_result["func_coverage_pct"],
+            # Add new enhanced metrics
+            "main_reachable_lines": cbmc_result.get("main_reachable_lines", 0),
+            "main_total_lines": cbmc_result.get("main_total_lines", 0),
+            "main_uncovered_lines": cbmc_result.get("main_uncovered_lines", 0),
+            "target_total_lines": cbmc_result.get("target_total_lines", 0),
+            "target_reachable_lines": cbmc_result.get("target_reachable_lines", 0),
+            "target_uncovered_lines": cbmc_result.get("target_uncovered_lines", 0),
+            "total_combined_lines": cbmc_result.get("total_combined_lines", 0),
+            "reachable_combined_lines": cbmc_result.get("reachable_combined_lines", 0)
         }
         
         # Save verification results to a structured file
@@ -435,6 +444,17 @@ def cbmc_node(state):
             f.write(f"Function covered lines: {cbmc_result['func_covered_lines']}\n")
             f.write(f"Function coverage: {cbmc_result['func_coverage_pct']:.2f}%\n")
             
+            # Add enhanced metrics
+            f.write("\n=== ENHANCED COVERAGE METRICS ===\n")
+            f.write(f"Main Total Lines: {cbmc_result.get('main_total_lines', 0)}\n")
+            f.write(f"Main Reachable Lines: {cbmc_result.get('main_reachable_lines', 0)}\n")
+            f.write(f"Main Uncovered Lines: {cbmc_result.get('main_uncovered_lines', 0)}\n")
+            f.write(f"Target Total Lines: {cbmc_result.get('target_total_lines', 0)}\n")
+            f.write(f"Target Reachable Lines: {cbmc_result.get('target_reachable_lines', 0)}\n")
+            f.write(f"Target Uncovered Lines: {cbmc_result.get('target_uncovered_lines', 0)}\n")
+            f.write(f"Total Combined Lines: {cbmc_result.get('total_combined_lines', 0)}\n")
+            f.write(f"Reachable Combined Lines: {cbmc_result.get('reachable_combined_lines', 0)}\n")
+            
             if cbmc_result["error_categories"]:
                 f.write("\n=== ERROR CATEGORIES ===\n")
                 for category in cbmc_result["error_categories"]:
@@ -457,7 +477,11 @@ def cbmc_node(state):
             f.write(f"## Summary\n\n")
             f.write(f"**Status:** {cbmc_result['verification_status']}\n\n")
             f.write(f"**Message:** {cbmc_result['message']}\n\n")
-            if cbmc_result["suggestions"]:
+            
+            # Add specific text for successful verifications
+            if cbmc_result['verification_status'] == "SUCCESS":
+                f.write(f"**Verification passed successfully**. No verification failures were detected.\n\n") 
+            elif cbmc_result["suggestions"]:
                 f.write(f"**Suggestions:** {cbmc_result['suggestions']}\n\n")
             
             # Add dependency information
@@ -481,6 +505,14 @@ def cbmc_node(state):
             f.write(f"## Enhanced Function-Specific Metrics\n\n")
             f.write(f"| Metric | Value |\n")
             f.write(f"|--------|-------|\n")
+            f.write(f"| Main Total Lines | {cbmc_result.get('main_total_lines', 0)} |\n")
+            f.write(f"| Main Reachable Lines | {cbmc_result.get('main_reachable_lines', 0)} |\n")
+            f.write(f"| Main Uncovered Lines | {cbmc_result.get('main_uncovered_lines', 0)} |\n")
+            f.write(f"| Target Total Lines | {cbmc_result.get('target_total_lines', 0)} |\n")
+            f.write(f"| Target Reachable Lines | {cbmc_result.get('target_reachable_lines', 0)} |\n")
+            f.write(f"| Target Uncovered Lines | {cbmc_result.get('target_uncovered_lines', 0)} |\n")
+            f.write(f"| Total Combined Lines | {cbmc_result.get('total_combined_lines', 0)} |\n")
+            f.write(f"| Reachable Combined Lines | {cbmc_result.get('reachable_combined_lines', 0)} |\n")
             f.write(f"| Function reachable lines | {cbmc_result['func_reachable_lines']} |\n")
             f.write(f"| Function covered lines | {cbmc_result['func_covered_lines']} |\n")
             f.write(f"| Function coverage | {cbmc_result['func_coverage_pct']:.2f}% |\n")
@@ -508,9 +540,8 @@ def cbmc_node(state):
                 f.write("\n")
             
             # Add harness details
-            harness_path = os.path.join(harnesses_dir, func_name, f"v{version_num}.c")
             f.write(f"## Harness Details\n\n")
-            f.write(f"The harness file is located at: `{harness_path}`\n\n")
+            f.write(f"The harness file is located at: `{harness_file}`\n\n")
             
             f.write(f"## Verification Command\n\n")
             f.write(f"```\n{' '.join(cbmc_cmd)}\n```\n\n")

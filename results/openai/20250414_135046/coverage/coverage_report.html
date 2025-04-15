@@ -1,0 +1,527 @@
+
+        <html>
+        <head>
+            <title>CBMC Coverage Analysis Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1, h2 { color: #2c3e50; }
+                table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+                th { background-color: #f2f2f2; }
+                tr:nth-child(even) { background-color: #f9f9f9; }
+                .function-name { text-align: left; font-weight: bold; }
+                .good { color: green; }
+                .medium { color: orange; }
+                .poor { color: red; }
+                .version-header { 
+                    background-color: #d5d5d5; 
+                    font-weight: bold; 
+                    text-align: center;
+                }
+                .subheader {
+                    background-color: #e8e8e8;
+                    font-weight: normal;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>CBMC Coverage Analysis Report</h1>
+            
+            <h2>Summary Statistics</h2>
+            <p>Total Functions Analyzed: 36</p>
+            <p>Total Versions: 9</p>
+            
+            <h2>Coverage by Function and Version</h2>
+            <table>
+                <tr>
+                    <th rowspan="2">Function</th>
+        <th colspan="8" class="version-header">Version 1</th><th colspan="8" class="version-header">Version 2</th><th colspan="8" class="version-header">Version 3</th><th colspan="8" class="version-header">Version 4</th><th colspan="8" class="version-header">Version 5</th><th colspan="8" class="version-header">Version 6</th><th colspan="8" class="version-header">Version 7</th><th colspan="8" class="version-header">Version 8</th><th colspan="8" class="version-header">Version 9</th></tr><tr><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th><th class="subheader">Main Total</th><th class="subheader">Main Reached</th><th class="subheader">Main Uncovered</th><th class="subheader">Target Total</th><th class="subheader">Target Reached</th><th class="subheader">Target Uncovered</th><th class="subheader">Total Coverage</th><th class="subheader">Target Coverage</th></tr><tr><td class="function-name">core_json.c:JSON_Iterate</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:JSON_SearchConst</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:JSON_SearchT</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:JSON_Validate</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:arraySearch</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:countHighBits</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:hexToInt</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:multiSearch</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:nextKeyValuePair</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:nextValue</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:shortestUTF8</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipAnyLiteral</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipAnyScalar</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipArrayScalars</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipCollection</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipDecimals</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipDigits</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipEscape</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipExponent</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipHexEscape</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipLiteral</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipNumber</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipObjectScalars</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipOneHexEscape</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipQueryPart</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipScalars</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipSpace</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipSpaceAndComma</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipString</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipUTF8</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:skipUTF8MultiByte</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">core_json.c:strnEq</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">pattern:core_json.c:for</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">pattern:core_json.c:if</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">pattern:core_json.c:switch</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr><tr><td class="function-name">pattern:core_json.c:while</td><td>3</td><td>0</td><td>3</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td><td>84</td><td>0</td><td>84</td><td>1</td><td>0</td><td>0</td><td class="poor">0.00%</td><td class="poor">0.00%</td></tr>
+            </table>
+            
+            <h2>Coverage Improvement</h2>
+            <table>
+                <tr>
+                    <th>Function</th>
+                    <th>Versions</th>
+                    <th>Initial Total Lines</th>
+                    <th>Final Total Lines</th>
+                    <th>Initial Main Coverage</th>
+                    <th>Final Main Coverage</th>
+                    <th>Initial Target Coverage</th>
+                    <th>Final Target Coverage</th>
+                    <th>Total Improvement</th>
+                    <th>Error Reduction</th>
+                </tr>
+        
+                    <tr>
+                        <td class="function-name">core_json.c:skipArrayScalars</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:multiSearch</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipSpaceAndComma</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:JSON_Iterate</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:hexToInt</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipAnyLiteral</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">pattern:core_json.c:switch</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:nextKeyValuePair</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipDecimals</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipCollection</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipAnyScalar</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:shortestUTF8</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">pattern:core_json.c:if</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:strnEq</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:JSON_Validate</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:JSON_SearchT</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipOneHexEscape</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">pattern:core_json.c:for</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipString</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipExponent</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipQueryPart</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipDigits</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipScalars</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipNumber</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipUTF8</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:nextValue</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:JSON_SearchConst</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipSpace</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">pattern:core_json.c:while</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipEscape</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipObjectScalars</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipLiteral</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipHexEscape</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:arraySearch</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:countHighBits</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+                    <tr>
+                        <td class="function-name">core_json.c:skipUTF8MultiByte</td>
+                        <td>9</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td>0.00%</td>
+                        <td class="medium">0.00%</td>
+                        <td class="medium">0</td>
+                    </tr>
+                
+            </table>
+        </body>
+        </html>
+        
