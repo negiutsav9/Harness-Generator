@@ -45,8 +45,11 @@ coreHTTP/*
 coreJSON
 coreJSON/*
 demo
+coverage
 notes.txt
 version_*
+Device-Defender-for-AWS-IoT-embedded-sdk
+Device-Defender-for-AWS-IoT-embedded-sdk/*
 
 # ChromaDB files
 .chroma/

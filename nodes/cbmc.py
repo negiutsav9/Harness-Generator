@@ -2,6 +2,7 @@
 CBMC execution node for harness generator workflow with optimized file selection.
 """
 import os
+import re
 import time
 import shutil
 import subprocess
@@ -9,7 +10,7 @@ import glob
 import json
 from langchain_core.messages import AIMessage
 import logging
-from utils.cbmc_parser import process_cbmc_output
+from utils.cbmc_parser import extract_coverage_metrics_from_json, process_cbmc_output
 
 logger = logging.getLogger("cbmc")
 
@@ -114,6 +115,7 @@ def cbmc_node(state):
     result_directories = state.get("result_directories", {})
     verification_base_dir = result_directories.get("verification_dir", "verification")
     harnesses_dir = result_directories.get("harnesses_dir", "harnesses")
+    result_base_dir = result_directories.get("result_base_dir", "results")
     
     if not harness_code:
         logger.error(f"No harness available for function {func_name}")
@@ -184,6 +186,7 @@ def cbmc_node(state):
         
         # Predefined paths for CBMC test files
         test_cbmc_paths = [
+            os.path.join(directory_path, "test", "include"),
             os.path.join(directory_path, "test", "cbmc", "include"),
             os.path.join(directory_path, "test", "cbmc", "sources"),
             os.path.join(directory_path, "test", "cbmc", "stubs")
@@ -239,6 +242,12 @@ def cbmc_node(state):
     # Write harness to file with versioned filename
     harness_filename = original_func_name if ":" not in func_name else original_func_name
     harness_file = os.path.join(verification_harness_dir, f"{harness_filename}_harness_v{version_num}.c")
+    
+    # Remove any remaining markdown code block syntax
+    harness_code = re.sub(r'```(?:c|cpp)?', '', harness_code)
+    harness_code = re.sub(r'```', '', harness_code)
+    harness_code = harness_code.strip()
+    
     with open(harness_file, "w") as f:
         # Add include for the CBMC definitions header
         f.write("#include \"cbmc_defs.h\"\n\n")
@@ -307,7 +316,7 @@ def cbmc_node(state):
     coverage_cmd = cbmc_cmd.copy()
     coverage_cmd.extend([
         "--cover", "location",
-        "--json-ui"  # Using XML format for consistent parsing
+        "--json-ui"  # Using JSON format for consistent parsing
     ])
     
     # Initialize result variables
@@ -352,7 +361,7 @@ def cbmc_node(state):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=30,  # Shorter timeout for coverage
+                timeout=timeout_seconds,  # Shorter timeout for coverage
                 check=False
             )
             
@@ -363,15 +372,80 @@ def cbmc_node(state):
             with open(coverage_json_file, "w") as f:
                 f.write(coverage_stdout)
             
-            # Parse the JSON coverage data
+            # Process the coverage JSON immediately
             try:
-                import json
+                # Parse the JSON coverage data
                 json_data = json.loads(coverage_stdout)
                 
-                # Extract coverage metrics from the JSON data
-                from utils.cbmc_parser import extract_coverage_metrics
-                # Use the already defined cbmc_result variable (from earlier in the function)
-                coverage_metrics = extract_coverage_metrics(json_data, func_name)
+                # Define function to parse line ranges
+                def parse_line_ranges(line_ranges):
+                    """Parse a string of line ranges into a set of unique line numbers."""
+                    unique_lines = set()
+                    for line_range in line_ranges.split(','):
+                        if '-' in line_range:
+                            start, end = map(int, line_range.split('-'))
+                            unique_lines.update(range(start, end + 1))
+                        else:
+                            try:
+                                unique_lines.add(int(line_range))
+                            except ValueError:
+                                pass  # Skip if not a valid integer
+                    return unique_lines
+
+                # Extract coverage metrics
+                coverage_metrics = extract_coverage_metrics_from_json(json_data, func_name, version_num)
+                
+                # Store metrics in a dedicated file
+                metrics_file = os.path.join(func_verification_dir, f"v{version_num}_metrics.json")
+                with open(metrics_file, "w") as f:
+                    json.dump(coverage_metrics, f, indent=2)
+                    
+                # Create coverage directory structure for centralized collection
+                coverage_dir = os.path.join(result_base_dir, "coverage", "data")
+                os.makedirs(coverage_dir, exist_ok=True)
+                
+                # Create flattened data for CSV storage
+                flat_data = {
+                    "function": func_name,
+                    "version": version_num,
+                    "total_coverage_pct": coverage_metrics.get("total_coverage_pct", 0),
+                    "func_coverage_pct": coverage_metrics.get("func_coverage_pct", 0),
+                    "main_total_lines": coverage_metrics.get("main_total_lines", 0),
+                    "main_reachable_lines": coverage_metrics.get("main_reachable_lines", 0),
+                    "main_uncovered_lines": coverage_metrics.get("main_uncovered_lines", 0),
+                    "target_total_lines": coverage_metrics.get("target_total_lines", 0),
+                    "target_reachable_lines": coverage_metrics.get("target_reachable_lines", 0),
+                    "target_uncovered_lines": coverage_metrics.get("target_uncovered_lines", 0),
+                    "total_combined_lines": coverage_metrics.get("total_combined_lines", 0),
+                    "reachable_combined_lines": coverage_metrics.get("reachable_combined_lines", 0),
+                }
+                
+                # Save as JSON for each function version
+                func_metrics_file = os.path.join(coverage_dir, f"{func_name}_v{version_num}.json")
+                with open(func_metrics_file, "w") as f:
+                    json.dump(flat_data, f, indent=2)
+                
+                # Update the running CSV file
+                csv_path = os.path.join(coverage_dir, "coverage_metrics.csv")
+                file_exists = os.path.exists(csv_path)
+                
+                with open(csv_path, "a") as f:
+                    # Write headers if file is new
+                    if not file_exists:
+                        headers = ",".join(flat_data.keys())
+                        f.write(f"{headers}\n")
+                    
+                    # Write data row
+                    values = [str(v).replace(",", ";") for v in flat_data.values()]
+                    f.write(f"{','.join(values)}\n")
+                
+                # Print coverage summary
+                print(f"\n=== Coverage Metrics for {func_name} (v{version_num}) ===")
+                print(f"Main function: {coverage_metrics['main_reachable_lines']}/{coverage_metrics['main_total_lines']} lines")
+                print(f"Target function: {coverage_metrics['target_reachable_lines']}/{coverage_metrics['target_total_lines']} lines")
+                print(f"Total coverage: {coverage_metrics['total_coverage_pct']:.2f}%")
+                print(f"Function coverage: {coverage_metrics['func_coverage_pct']:.2f}%")
+                print("=" * 50)
                 
                 # Add coverage metrics to cbmc_result
                 for key, value in coverage_metrics.items():

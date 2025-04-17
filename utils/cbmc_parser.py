@@ -1,12 +1,235 @@
 """
 CBMC output parsing utilities for the harness generator.
 """
+import os
 import re
+import glob
 import json
 import logging
 from typing import Dict, Any, Set, List, Tuple
 
 logger = logging.getLogger("cbmc_parser")
+
+def read_all_coverage_data(result_base_dir):
+    """
+    Read all stored coverage data files and combine into a DataFrame.
+    
+    Args:
+        result_base_dir: Base directory for results
+        
+    Returns:
+        DataFrame with all coverage data
+    """
+    import polars as pl
+    
+    coverage_dir = os.path.join(result_base_dir, "coverage", "data")
+    if not os.path.exists(coverage_dir):
+        return pl.DataFrame()
+    
+    # Use the CSV file if it exists
+    csv_path = os.path.join(coverage_dir, "coverage_metrics.csv")
+    if os.path.exists(csv_path):
+        try:
+            return pl.read_csv(csv_path)
+        except Exception as e:
+            logger.error(f"Error reading coverage CSV: {str(e)}")
+    
+    # Fallback to reading individual JSON files
+    coverage_files = glob.glob(os.path.join(coverage_dir, "*.json"))
+    if not coverage_files:
+        return pl.DataFrame()
+    
+    # Read each JSON file
+    coverage_data = []
+    for file_path in coverage_files:
+        try:
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                coverage_data.append(data)
+        except Exception as e:
+            logger.error(f"Error reading coverage file {file_path}: {str(e)}")
+    
+    if coverage_data:
+        return pl.DataFrame(coverage_data)
+    else:
+        return pl.DataFrame()
+
+def extract_coverage_metrics_from_json(json_data, target_function_name, version_num, verification_status=None):
+    """
+    Extract coverage metrics from CBMC JSON output using the enhanced JSON structure.
+    
+    Args:
+        json_data: The JSON data from CBMC output
+        target_function_name: Name of the function being analyzed
+        
+    Returns:
+        Dictionary with coverage metrics
+    """
+    # Initialize metrics
+    metrics = {
+        "total_reachable_lines": 0,
+        "total_covered_lines": 0,
+        "total_coverage_pct": 0.0,
+        "func_reachable_lines": 0,
+        "func_covered_lines": 0,
+        "func_coverage_pct": 0.0,
+        "main_total_lines": 0,
+        "main_reachable_lines": 0,
+        "main_uncovered_lines": 0,
+        "target_total_lines": 0,
+        "target_reachable_lines": 0,
+        "target_uncovered_lines": 0,
+        "total_combined_lines": 0,
+        "reachable_combined_lines": 0,
+    }
+    
+    # Extract target function name without file prefix
+    target_function = target_function_name
+    if ":" in target_function_name:
+        target_function = target_function_name.split(":")[-1]
+    
+    try:
+        # Process goals data to extract coverage metrics
+        goals_dict = None
+        
+        # Find the goals dictionary in the JSON data
+        if isinstance(json_data, list):
+            for item in json_data:
+                if isinstance(item, dict) and "goals" in item:
+                    goals_dict = item
+                    break
+        elif isinstance(json_data, dict) and "goals" in json_data:
+            goals_dict = json_data
+        
+        if goals_dict and "goals" in goals_dict:
+            goals = goals_dict["goals"]
+            
+            # Initialize sets to track lines
+            reachable_lines_main = set()
+            total_lines_main = set()
+            
+            reachable_lines_target_function = set()
+            total_lines_target_function = set()
+            
+            # Define harness file name pattern
+            harness_file_name = f"{target_function}_harness_v{version_num}.c"
+            
+            for goal in goals:
+                # Check for basicBlockLines field
+                basic_block_lines = goal.get("basicBlockLines", {})
+                
+                for file_path, function_lines in basic_block_lines.items():
+                    for function_name, line_ranges in function_lines.items():
+                        # Parse line ranges
+                        parsed_lines = parse_line_ranges(line_ranges)
+                        
+                        # Track lines for main function in harness file
+                        if function_name == "main" and harness_file_name in file_path:
+                            total_lines_main.update(parsed_lines)
+                            if goal.get("status") == "satisfied":
+                                reachable_lines_main.update(parsed_lines)
+                        
+                        # Track lines for target function
+                        if function_name == target_function:
+                            total_lines_target_function.update(parsed_lines)
+                            if goal.get("status") == "satisfied":
+                                reachable_lines_target_function.update(parsed_lines)
+            
+            # Calculate Total Coverage
+            total_reachable_lines = len(reachable_lines_main.union(reachable_lines_target_function))
+            total_possible_lines = len(total_lines_main.union(total_lines_target_function))
+            
+            total_coverage = total_reachable_lines / total_possible_lines if total_possible_lines > 0 else 0
+            
+            # Calculate Target Function Coverage
+            target_function_coverage = len(reachable_lines_target_function) / len(total_lines_target_function) if len(total_lines_target_function) > 0 else 0
+            
+            # Calculate uncovered lines
+            uncovered_lines_main = total_lines_main - reachable_lines_main
+            uncovered_lines_target_function = total_lines_target_function - reachable_lines_target_function
+            
+            # Update metrics dictionary
+            metrics["main_total_lines"] = len(total_lines_main)
+            metrics["main_reachable_lines"] = len(reachable_lines_main)
+            metrics["main_uncovered_lines"] = len(uncovered_lines_main)
+            
+            metrics["target_total_lines"] = len(total_lines_target_function)
+            metrics["target_reachable_lines"] = len(reachable_lines_target_function)
+            metrics["target_uncovered_lines"] = len(uncovered_lines_target_function)
+            
+            metrics["total_combined_lines"] = total_possible_lines
+            metrics["reachable_combined_lines"] = total_reachable_lines
+            
+            metrics["total_reachable_lines"] = total_reachable_lines
+            metrics["total_covered_lines"] = total_reachable_lines
+            metrics["total_coverage_pct"] = total_coverage * 100
+            
+            metrics["func_reachable_lines"] = len(reachable_lines_target_function)
+            metrics["func_covered_lines"] = len(reachable_lines_target_function)
+            metrics["func_coverage_pct"] = target_function_coverage * 100
+            
+            # Log the coverage metrics clearly
+            logger.info(f"Coverage Metrics for {target_function_name}:")
+            logger.info(f"  Main function: {len(reachable_lines_main)}/{len(total_lines_main)} lines covered ({metrics['main_uncovered_lines']} uncovered)")
+            logger.info(f"  Target function: {len(reachable_lines_target_function)}/{len(total_lines_target_function)} lines covered ({metrics['target_uncovered_lines']} uncovered)")
+            logger.info(f"  Total coverage: {metrics['total_coverage_pct']:.2f}%")
+            logger.info(f"  Function coverage: {metrics['func_coverage_pct']:.2f}%")
+        else:
+            # If we couldn't find goals, try a simplified approach that looks at the raw JSON
+            # Count blocks based on the presence of patterns in the string representation
+            json_str = json.dumps(json_data)
+            
+            # Count total blocks
+            total_blocks = json_str.count('"block"') + json_str.count('"coverage"')
+            satisfied_blocks = json_str.count('"status":"satisfied"') + json_str.count('status="satisfied"')
+            
+            # Count function-specific blocks
+            target_pattern = f'"{target_function}"'
+            func_blocks = json_str.count(target_pattern)
+            func_satisfied = 0
+            
+            # Estimate satisfaction rate for function blocks based on overall rate
+            if total_blocks > 0 and func_blocks > 0:
+                func_satisfied = int(func_blocks * (satisfied_blocks / total_blocks))
+            
+            # For main function, estimate
+            main_blocks = json_str.count('"main"') + json_str.count('function="main"')
+            main_satisfied = 0
+            
+            if total_blocks > 0 and main_blocks > 0:
+                main_satisfied = int(main_blocks * (satisfied_blocks / total_blocks))
+            
+            # Update metrics with these estimates
+            metrics["main_total_lines"] = max(main_blocks, 1)
+            metrics["main_reachable_lines"] = main_satisfied
+            metrics["main_uncovered_lines"] = max(main_blocks - main_satisfied, 0)
+            
+            metrics["target_total_lines"] = max(func_blocks, 1)
+            metrics["target_reachable_lines"] = func_satisfied
+            metrics["target_uncovered_lines"] = max(func_blocks - func_satisfied, 0)
+            
+            metrics["total_combined_lines"] = max(total_blocks, 1)
+            metrics["reachable_combined_lines"] = satisfied_blocks
+            
+            metrics["total_reachable_lines"] = max(total_blocks, 1)
+            metrics["total_covered_lines"] = satisfied_blocks
+            metrics["total_coverage_pct"] = (satisfied_blocks / max(total_blocks, 1)) * 100
+            
+            metrics["func_reachable_lines"] = max(func_blocks, 1)
+            metrics["func_covered_lines"] = func_satisfied
+            metrics["func_coverage_pct"] = (func_satisfied / max(func_blocks, 1)) * 100
+            
+            # Log the estimated coverage metrics
+            logger.info(f"Estimated Coverage Metrics for {target_function_name}:")
+            logger.info(f"  Main function: {metrics['main_reachable_lines']}/{metrics['main_total_lines']} lines covered (estimate)")
+            logger.info(f"  Target function: {metrics['target_reachable_lines']}/{metrics['target_total_lines']} lines covered (estimate)")
+            logger.info(f"  Total coverage: {metrics['total_coverage_pct']:.2f}% (estimate)")
+            logger.info(f"  Function coverage: {metrics['func_coverage_pct']:.2f}% (estimate)")
+        
+    except Exception as e:
+        logger.error(f"Error extracting coverage metrics from JSON: {str(e)}")
+    
+    return metrics
 
 def parse_line_ranges(line_ranges):
     """
@@ -20,7 +243,10 @@ def parse_line_ranges(line_ranges):
             start, end = map(int, line_range.split('-'))
             unique_lines.update(range(start, end + 1))
         else:
-            unique_lines.add(int(line_range))
+            try:
+                unique_lines.add(int(line_range))
+            except ValueError:
+                pass  # Skip if not a valid integer
     return unique_lines
 
 def calculate_coverage(json_file_path, target_function_name):

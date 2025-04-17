@@ -624,9 +624,22 @@ def generator_node(state):
         
         # Extract the harness code
         harness_code = response.content
-        match = re.search(r'```(?:c)?\n(.+?)\n```', harness_code, re.DOTALL)
-        if match:
-            harness_code = match.group(1)
+        
+        # Remove markdown code block syntax
+        # First try to extract code between triple backticks
+        code_block_pattern = r'```(?:c|cpp)?\s*([\s\S]*?)```'
+        code_blocks = re.findall(code_block_pattern, harness_code, re.MULTILINE)
+        
+        if code_blocks:
+            # Use the largest code block found
+            harness_code = max(code_blocks, key=len)
+        else:
+            # If no code blocks found with triple backticks, remove any triple backticks that might be present
+            harness_code = re.sub(r'```(?:c|cpp)?', '', harness_code)
+            harness_code = re.sub(r'```', '', harness_code)
+        
+        # Final cleanup - remove any leftover backtick markers and trim whitespace
+        harness_code = harness_code.strip()
         
         # Validate harness completeness
         has_main = "void main(" in harness_code or "int main(" in harness_code
