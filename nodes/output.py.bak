@@ -486,12 +486,6 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
         coverage_df: Coverage DataFrame
         coverage_dir: Directory to save the report
     """
-    # Create output directory if it doesn't exist
-    os.makedirs(coverage_dir, exist_ok=True)
-    
-    # Initialize variables for the case when no JSON files are found
-    all_json_functions = []
-    all_json_versions = []
     # Generate HTML report
     try:
         html_report = f"""
@@ -553,11 +547,216 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                     all_json_functions = sorted(json_coverage_data.keys())
                     all_json_versions = sorted(set(v for func_data in json_coverage_data.values() for v in func_data.keys()))
                     
-                    # Add a summary line for total functions
-                    html_report += f"""
-                        <p>Total Functions Analyzed: {len(all_json_functions)}</p>
-                        <p>Total Versions: {len(all_json_versions)}</p>
+                    html_report += """
+                        <h2>Coverage Matrix from JSON Data</h2>
+                        <p>This table shows coverage metrics extracted directly from JSON data files:</p>
+                        <table>
+                            <tr>
+                                <th rowspan="2">Function</th>
                     """
+                    
+                    # Add version column headers
+                    for version in all_json_versions:
+                        html_report += f'<th colspan="2" class="version-header">Version {version}</th>'
+                    
+                    # Add sub-headers for total and func coverage
+                    html_report += "</tr><tr>"
+                    for _ in all_json_versions:
+                        html_report += '<th class="subheader">Total %</th>'
+                        html_report += '<th class="subheader">Func %</th>'
+                    html_report += "</tr>"
+                    
+                    # Add data rows
+                    for func_name in all_json_functions:
+                        html_report += f'<tr><td class="function-name">{func_name}</td>'
+                        
+                        for version in all_json_versions:
+                            data = json_coverage_data.get(func_name, {}).get(version)
+                            
+                            if data:
+                                total_cov = data.get("total_coverage_pct", 0)
+                                func_cov = data.get("func_coverage_pct", 0)
+                                
+                                # Determine color classes
+                                total_class = "good" if total_cov >= 80 else "medium" if total_cov >= 50 else "poor"
+                                func_class = "good" if func_cov >= 80 else "medium" if func_cov >= 50 else "poor"
+                                
+                                html_report += f'<td class="{total_class}">{total_cov:.2f}%</td>'
+                                html_report += f'<td class="{func_class}">{func_cov:.2f}%</td>'
+                            else:
+                                html_report += '<td>-</td><td>-</td>'
+                        
+                        html_report += '</tr>'
+                    
+                    html_report += """
+                        </table>
+                    """
+        
+        html_report += """
+        </body>
+        </html>
+        """
+        
+        # Save HTML report
+        with open(os.path.join(coverage_dir, "coverage_report.html"), "w") as f:
+            f.write(html_report)
+            
+    except Exception as e:
+        logger.error(f"Error generating HTML report: {str(e)}")
+            continue
+        
+        # Get initial and final versions
+        versions = sorted(func_df["version"].unique())
+        initial_version = versions[0]
+        final_version = versions[-1]
+        
+        initial_metrics = func_df.filter(pl.col("version") == initial_version).row(0, named=True)
+        final_metrics = func_df.filter(pl.col("version") == final_version).row(0, named=True)
+        
+        # Calculate improvements
+        total_cov_improvement = final_metrics["total_coverage_pct"] - initial_metrics["total_coverage_pct"]
+        func_cov_improvement = final_metrics["func_coverage_pct"] - initial_metrics["func_coverage_pct"]
+        error_reduction = initial_metrics["reported_errors"] - final_metrics["reported_errors"]
+        
+        improvement_data.append({
+            "function": func_name,
+            "versions": len(versions),
+            "initial_version": initial_version,
+            "final_version": final_version,
+            "initial_total_coverage": initial_metrics["total_coverage_pct"],
+            "final_total_coverage": final_metrics["total_coverage_pct"],
+            "total_coverage_improvement": total_cov_improvement,
+            "initial_func_coverage": initial_metrics["func_coverage_pct"],
+            "final_func_coverage": final_metrics["func_coverage_pct"],
+            "func_coverage_improvement": func_cov_improvement,
+            "initial_errors": initial_metrics["reported_errors"],
+            "final_errors": final_metrics["reported_errors"],
+            "error_reduction": error_reduction
+        })
+    
+    # Create improvement DataFrame
+    if improvement_data:
+        improvement_df = pl.DataFrame(improvement_data)
+        improvement_df.write_csv(os.path.join(coverage_dir, "improvement_metrics.csv"))
+    
+    # Generate HTML report
+    try:
+        # Get the list of all versions and functions
+        all_versions = sorted(coverage_df["version"].unique())
+        all_functions = sorted(coverage_df["function"].unique())
+        
+        html_report = f"""
+        <html>
+        <head>
+            <title>CBMC Coverage Analysis Report</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                h1, h2 {{ color: #2c3e50; }}
+                table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: center; }}
+                th {{ background-color: #f2f2f2; }}
+                tr:nth-child(even) {{ background-color: #f9f9f9; }}
+                .function-name {{ text-align: left; font-weight: bold; }}
+                .good {{ color: green; }}
+                .medium {{ color: orange; }}
+                .poor {{ color: red; }}
+                .version-header {{ 
+                    background-color: #d5d5d5; 
+                    font-weight: bold; 
+                    text-align: center;
+                }}
+                .subheader {{
+                    background-color: #e8e8e8;
+                    font-weight: normal;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>CBMC Coverage Analysis Report</h1>
+            
+            <h2>Summary Statistics</h2>
+            <p>Total Functions Analyzed: {len(all_functions)}</p>
+            <p>Total Versions: {len(all_versions)}</p>
+            
+            <h2>Coverage by Function and Version</h2>
+            <table>
+                <tr>
+                    <th rowspan="2">Function</th>
+        """
+        
+        # Add version column headers with sub-columns
+        for version in all_versions:
+            html_report += f'<th colspan="3" class="version-header">Version {version}</th>'
+        
+        # Add sub-headers for each version
+        html_report += "</tr><tr>"
+        for _ in all_versions:
+            html_report += '<th class="subheader">Total Coverage</th>'
+            html_report += '<th class="subheader">Function Coverage</th>'
+            html_report += '<th class="subheader">Errors</th>'
+        html_report += "</tr>"
+        
+        # Add data rows for each function
+        for func_name in all_functions:
+            html_report += f'<tr><td class="function-name">{func_name}</td>'
+            
+            # Add metrics for each version
+            for version in all_versions:
+                # Check if this version exists for this function
+                func_version_data = coverage_df.filter(
+                    (pl.col("function") == func_name) & (pl.col("version") == version)
+                )
+                
+                if not func_version_data.is_empty():
+                    metrics = func_version_data.row(0, named=True)
+                    
+                    # Determine color classes
+                    total_cov_class = "good" if metrics["total_coverage_pct"] >= 80 else "medium" if metrics["total_coverage_pct"] >= 50 else "poor"
+                    func_cov_class = "good" if metrics["func_coverage_pct"] >= 80 else "medium" if metrics["func_coverage_pct"] >= 50 else "poor"
+                    error_class = "good" if metrics["reported_errors"] == 0 else "poor"
+                    
+                    # Add cells with proper formatting
+                    html_report += f'<td class="{total_cov_class}">{metrics["total_coverage_pct"]:.2f}%</td>'
+                    html_report += f'<td class="{func_cov_class}">{metrics["func_coverage_pct"]:.2f}%</td>'
+                    html_report += f'<td class="{error_class}">{metrics["reported_errors"]}</td>'
+                else:
+                    # No data for this version - empty cells
+                    html_report += '<td>-</td><td>-</td><td>-</td>'
+            
+            html_report += '</tr>'
+            
+        html_report += """
+            </table>
+        """
+            
+        # Add function coverage matrix from JSON files in the data directory
+        data_dir = os.path.join(coverage_dir, "data")
+        if os.path.exists(data_dir):
+            json_files = glob.glob(os.path.join(data_dir, "*.json"))
+            if json_files:
+                logger.info(f"Adding coverage matrix from {len(json_files)} JSON files in data directory")
+                
+                # Create a mapping of function and version to metrics
+                json_coverage_data = {}
+                
+                for json_file in json_files:
+                    try:
+                        with open(json_file, 'r') as f:
+                            data = json.load(f)
+                            function = data.get("function")
+                            version = data.get("version")
+                            
+                            if function and version is not None:
+                                if function not in json_coverage_data:
+                                    json_coverage_data[function] = {}
+                                json_coverage_data[function][version] = data
+                    except Exception as e:
+                        logger.error(f"Error reading JSON file {json_file}: {str(e)}")
+                
+                if json_coverage_data:
+                    # Add a new section for the matrix from JSON data
+                    all_json_functions = sorted(json_coverage_data.keys())
+                    all_json_versions = sorted(set(v for func_data in json_coverage_data.values() for v in func_data.keys()))
                     
                     html_report += """
                         <h2>Coverage Matrix from JSON Data</h2>
@@ -586,39 +785,15 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                             data = json_coverage_data.get(func_name, {}).get(version)
                             
                             if data:
-                                # Ensure values are numeric
-                                try:
-                                    total_cov_val = data.get("total_coverage_pct", 0)
-                                    func_cov_val = data.get("func_coverage_pct", 0)
-                                    
-                                    # Check if values are "NA" or strings
-                                    if total_cov_val == "NA" or not isinstance(total_cov_val, (int, float)):
-                                        total_cov = 0
-                                    else:
-                                        total_cov = float(total_cov_val)
-                                        
-                                    if func_cov_val == "NA" or not isinstance(func_cov_val, (int, float)):
-                                        func_cov = 0
-                                    else:
-                                        func_cov = float(func_cov_val)
-                                    
-                                    # Determine color classes
-                                    total_class = "good" if total_cov >= 80 else "medium" if total_cov >= 50 else "poor"
-                                    func_class = "good" if func_cov >= 80 else "medium" if func_cov >= 50 else "poor"
-                                    
-                                    # Display appropriate values
-                                    if total_cov_val == "NA":
-                                        html_report += f'<td>N/A</td>'
-                                    else:
-                                        html_report += f'<td class="{total_class}">{total_cov:.2f}%</td>'
-                                        
-                                    if func_cov_val == "NA":
-                                        html_report += f'<td>N/A</td>'
-                                    else:
-                                        html_report += f'<td class="{func_class}">{func_cov:.2f}%</td>'
-                                except (ValueError, TypeError):
-                                    # Handle non-numeric values
-                                    html_report += f'<td>N/A</td><td>N/A</td>'
+                                total_cov = data.get("total_coverage_pct", 0)
+                                func_cov = data.get("func_coverage_pct", 0)
+                                
+                                # Determine color classes
+                                total_class = "good" if total_cov >= 80 else "medium" if total_cov >= 50 else "poor"
+                                func_class = "good" if func_cov >= 80 else "medium" if func_cov >= 50 else "poor"
+                                
+                                html_report += f'<td class="{total_class}">{total_cov:.2f}%</td>'
+                                html_report += f'<td class="{func_class}">{func_cov:.2f}%</td>'
                             else:
                                 html_report += '<td>-</td><td>-</td>'
                         
@@ -629,6 +804,84 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                     """
         
         html_report += """
+            <h2>Coverage Improvement</h2>
+            <table>
+                <tr>
+                    <th>Function</th>
+                    <th>Versions</th>
+                    <th>Initial Func Coverage</th>
+                    <th>Final Func Coverage</th>
+                    <th>Improvement</th>
+                    <th>Error Reduction</th>
+                </tr>
+        """
+        
+        # Add data rows for each function
+        for func_name in all_functions:
+            html_report += f'<tr><td class="function-name">{func_name}</td>'
+            
+            # Add metrics for each version
+            for version in all_versions:
+                # Check if this version exists for this function
+                func_version_data = coverage_df.filter(
+                    (pl.col("function") == func_name) & (pl.col("version") == version)
+                )
+                
+                if not func_version_data.is_empty():
+                    metrics = func_version_data.row(0, named=True)
+                    
+                    # Determine color classes
+                    total_cov_class = "good" if metrics["total_coverage_pct"] >= 80 else "medium" if metrics["total_coverage_pct"] >= 50 else "poor"
+                    func_cov_class = "good" if metrics["func_coverage_pct"] >= 80 else "medium" if metrics["func_coverage_pct"] >= 50 else "poor"
+                    error_class = "good" if metrics["reported_errors"] == 0 else "poor"
+                    
+                    # Add cells with proper formatting
+                    html_report += f'<td class="{total_cov_class}">{metrics["total_coverage_pct"]:.2f}%</td>'
+                    html_report += f'<td class="{func_cov_class}">{metrics["func_coverage_pct"]:.2f}%</td>'
+                    html_report += f'<td class="{error_class}">{metrics["reported_errors"]}</td>'
+                else:
+                    # No data for this version - empty cells
+                    html_report += '<td>-</td><td>-</td><td>-</td>'
+            
+            html_report += '</tr>'
+            
+        html_report += """
+            </table>
+            
+            <h2>Coverage Improvement</h2>
+            <table>
+                <tr>
+                    <th>Function</th>
+                    <th>Versions</th>
+                    <th>Initial Func Coverage</th>
+                    <th>Final Func Coverage</th>
+                    <th>Improvement</th>
+                    <th>Error Reduction</th>
+                </tr>
+        """
+        
+        # Add improvement data
+        if improvement_data:
+            # Sort by improvement
+            improvement_data.sort(key=lambda x: x["func_coverage_improvement"], reverse=True)
+            
+            for item in improvement_data:
+                improvement_class = "good" if item["func_coverage_improvement"] > 0 else "medium" if item["func_coverage_improvement"] == 0 else "poor"
+                error_class = "good" if item["error_reduction"] > 0 else "medium" if item["error_reduction"] == 0 else "poor"
+                
+                html_report += f"""
+                    <tr>
+                        <td class="function-name">{item["function"]}</td>
+                        <td>{item["versions"]}</td>
+                        <td>{item["initial_func_coverage"]:.2f}%</td>
+                        <td>{item["final_func_coverage"]:.2f}%</td>
+                        <td class="{improvement_class}">{item["func_coverage_improvement"]:.2f}%</td>
+                        <td class="{error_class}">{item["error_reduction"]}</td>
+                    </tr>
+                """
+        
+        html_report += """
+            </table>
         </body>
         </html>
         """
@@ -717,37 +970,28 @@ def output_node(state):
             
             latest_metrics.append(metrics)
             
-            # Add to aggregate totals - ensure we're adding numeric values only
-            if isinstance(metrics["total_reachable_lines"], (int, float)) and metrics["total_reachable_lines"] != "NA":
-                aggregate_metrics["total_reachable_lines"] += int(metrics["total_reachable_lines"])
-            
-            if isinstance(metrics["total_covered_lines"], (int, float)) and metrics["total_covered_lines"] != "NA":
-                aggregate_metrics["total_covered_lines"] += int(metrics["total_covered_lines"])
-            
-            if isinstance(metrics["func_reachable_lines"], (int, float)) and metrics["func_reachable_lines"] != "NA":
-                aggregate_metrics["func_reachable_lines"] += int(metrics["func_reachable_lines"])
-            
-            if isinstance(metrics["func_covered_lines"], (int, float)) and metrics["func_covered_lines"] != "NA":
-                aggregate_metrics["func_covered_lines"] += int(metrics["func_covered_lines"])
-            
-            if isinstance(metrics["reported_errors"], (int, float)) and metrics["reported_errors"] != "NA":
-                aggregate_metrics["total_reported_errors"] += int(metrics["reported_errors"])
+            # Add to aggregate totals
+            aggregate_metrics["total_reachable_lines"] += metrics["total_reachable_lines"]
+            aggregate_metrics["total_covered_lines"] += metrics["total_covered_lines"]
+            aggregate_metrics["func_reachable_lines"] += metrics["func_reachable_lines"]
+            aggregate_metrics["func_covered_lines"] += metrics["func_covered_lines"]
+            aggregate_metrics["total_reported_errors"] += metrics["reported_errors"]
             
             # Count functions with full coverage
-            if isinstance(metrics["func_coverage_pct"], (int, float)) and metrics["func_coverage_pct"] != "NA" and float(metrics["func_coverage_pct"]) >= 95.0:  # Consider 95%+ as full coverage
+            if metrics["func_coverage_pct"] >= 95.0:  # Consider 95%+ as full coverage
                 aggregate_metrics["functions_with_full_coverage"] += 1
                 
             # Count functions without errors
-            if isinstance(metrics["reported_errors"], (int, float)) and metrics["reported_errors"] != "NA" and int(metrics["reported_errors"]) == 0:
+            if metrics["reported_errors"] == 0:
                 aggregate_metrics["functions_without_errors"] += 1
     
     # Calculate overall coverage percentages with safety checks
     overall_total_coverage = 0.0
-    if aggregate_metrics["total_reachable_lines"] > 0 and aggregate_metrics["total_covered_lines"] > 0:
+    if aggregate_metrics["total_reachable_lines"] > 0:
         overall_total_coverage = (aggregate_metrics["total_covered_lines"] / aggregate_metrics["total_reachable_lines"]) * 100
         
     overall_func_coverage = 0.0
-    if aggregate_metrics["func_reachable_lines"] > 0 and aggregate_metrics["func_covered_lines"] > 0:
+    if aggregate_metrics["func_reachable_lines"] > 0:
         overall_func_coverage = (aggregate_metrics["func_covered_lines"] / aggregate_metrics["func_reachable_lines"]) * 100
     
     # Create performance metrics
@@ -938,6 +1182,7 @@ def output_node(state):
         "",
         "## Coverage Analysis",
         f"Coverage report available at: {os.path.join('coverage', 'coverage_report.html')}",
+        f"Detailed metrics available in: {os.path.join('coverage', 'coverage_metrics.csv')}",
         "",
         "## Summary of Results"
     ])

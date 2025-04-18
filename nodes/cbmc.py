@@ -447,9 +447,9 @@ def cbmc_node(state):
                 print(f"Function coverage: {coverage_metrics['func_coverage_pct']:.2f}%")
                 print("=" * 50)
                 
-                # Add coverage metrics to cbmc_result
-                for key, value in coverage_metrics.items():
-                    cbmc_result[key] = value
+                # Store coverage metrics for later use with cbmc_result
+                # We'll apply them after cbmc_result is initialized
+                stored_coverage_metrics = coverage_metrics.copy()
                 
             except json.JSONDecodeError as e:
                 logger.error(f"Error parsing JSON coverage data: {str(e)}")
@@ -463,6 +463,12 @@ def cbmc_node(state):
         
         # Process CBMC output using our new parser
         cbmc_result = process_cbmc_output(cbmc_stdout, cbmc_stderr)
+        
+        # Apply the stored coverage metrics if they were successfully collected
+        stored_coverage_metrics = locals().get('stored_coverage_metrics')
+        if stored_coverage_metrics:
+            for key, value in stored_coverage_metrics.items():
+                cbmc_result[key] = value
         
         # Create a structured result for the state
         cbmc_results[func_name] = {
@@ -491,7 +497,10 @@ def cbmc_node(state):
             "target_reachable_lines": cbmc_result.get("target_reachable_lines", 0),
             "target_uncovered_lines": cbmc_result.get("target_uncovered_lines", 0),
             "total_combined_lines": cbmc_result.get("total_combined_lines", 0),
-            "reachable_combined_lines": cbmc_result.get("reachable_combined_lines", 0)
+            "reachable_combined_lines": cbmc_result.get("reachable_combined_lines", 0),
+            # Add failure and error counts
+            "failure_count": cbmc_result.get("failure_count", 0),
+            "error_count": cbmc_result.get("error_count", 0)
         }
         
         # Save verification results to a structured file

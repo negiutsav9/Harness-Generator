@@ -119,6 +119,88 @@ def harness_evaluator_node(state):
     if harness_code not in harness_history[func_name]:
         harness_history[func_name].append(harness_code)
     
+    # IMPORTANT: Store previous error categories in current result for tracking progress
+    # This allows us to compare them in the next iteration
+    curr_error_categories = cbmc_result.get("error_categories", [])
+    prev_result = cbmc_results.get(func_name, {})
+    if prev_result and "error_categories" in prev_result and version_num > 1:
+        cbmc_result["previous_error_categories"] = prev_result.get("error_categories", [])
+    
+    # NEW: Check for repeated errors - if same errors in consecutive versions, consider the solution ineffective
+    error_categories = cbmc_result.get("error_categories", [])
+    previous_error_categories = cbmc_result.get("previous_error_categories", [])
+    
+    # Track the failure count to monitor progress
+    current_failure_count = cbmc_result.get("failure_count", 0)
+    
+    # Store current failure count and error categories for the next iteration
+    previous_cbmc_result = cbmc_results.get(func_name, {})
+    if previous_cbmc_result and previous_cbmc_result.get("version", 0) < version_num:
+        cbmc_result["previous_failure_count"] = previous_cbmc_result.get("failure_count", 0)
+    
+    # For this comparison, use both error categories and failure counts
+    if error_categories and previous_error_categories:
+        previous_failure_count = cbmc_result.get("previous_failure_count", 0)
+        
+        # Log the actual counts for debugging
+        logger.info(f"Previous failure count for {func_name}: {previous_failure_count}")
+        logger.info(f"Current failure count for {func_name}: {current_failure_count}")
+        
+        # First, retrieve any existing persistent_errors from the state
+        state_persistent_errors = state.get("persistent_errors", {})
+        if func_name not in state_persistent_errors:
+            state_persistent_errors[func_name] = {}
+        
+        # Check for persistent errors across versions by comparing error categories
+        if set(error_categories) == set(previous_error_categories) and current_failure_count >= previous_failure_count and current_failure_count > 0:
+            logger.warning(f"Same errors persist between versions for {func_name} with no improvement in failures. This solution is ineffective.")
+            
+            # Update persistent errors counter in state AND in CBMC result
+            for error in error_categories:
+                if error not in state_persistent_errors[func_name]:
+                    state_persistent_errors[func_name][error] = 1
+                else:
+                    state_persistent_errors[func_name][error] += 1
+                
+                # Find the highest persistence count for any error
+                max_persistence = max(state_persistent_errors[func_name].values())
+                
+                # Log this for debugging
+                logger.warning(f"Error '{error}' has persisted for {state_persistent_errors[func_name][error]} versions (max: {max_persistence})")
+                
+                # Set flags directly for generator to use
+                state["has_persistent_errors"] = True
+                state["persistent_error_count"] = max_persistence
+            
+            # Update the persistent errors in cbmc_result
+            cbmc_result["persistent_errors"] = state_persistent_errors[func_name]
+            
+            # Also update error-specific persistence counts
+            for err_cat in error_categories:
+                persistence_key = f"persistence_{err_cat}"
+                cbmc_result[persistence_key] = state_persistent_errors[func_name].get(err_cat, 1)
+            
+            # Mark the solution as ineffective in the RAG database
+            rag_db.mark_ineffective_solution(func_name, version_num-1)
+        else:
+            # Reset persistent error counts for categories that have been fixed
+            for error in previous_error_categories:
+                if error not in error_categories and error in state_persistent_errors[func_name]:
+                    logger.info(f"Error '{error}' has been fixed for {func_name}")
+                    del state_persistent_errors[func_name][error]
+                    
+            # If we've fixed all previous errors, clear the persistent error flags
+            if not state_persistent_errors[func_name]:
+                state["has_persistent_errors"] = False
+                state["persistent_error_count"] = 0
+        
+        # Update the state with the modified persistent errors dictionary
+        state["persistent_errors"] = state_persistent_errors
+    
+    # Check coverage against target
+    coverage_percentage = cbmc_result.get("func_coverage_pct", 0.0)
+    target_coverage = 85.0  # Target is 85% coverage
+    
     # Check if verification was successful
     if cbmc_result.get("status") == "SUCCESS":
         logger.info(f"CBMC verification successful for {func_name}, storing solution in RAG database")
@@ -146,7 +228,46 @@ def harness_evaluator_node(state):
             "next": "junction"
         }
     
-    # If verification failed, store the error and generate recommendations
+    # NEW: If coverage is below target but no errors, we should refine to improve coverage
+    if cbmc_result.get("status") != "SUCCESS" and coverage_percentage < target_coverage and not error_categories:
+        logger.info(f"Coverage for {func_name} is {coverage_percentage:.2f}%, which is below target of {target_coverage}%. Refinement needed.")
+        
+        # Store the error and generate coverage improvement recommendations
+        error_id = rag_db.store_error(
+            func_name,
+            harness_code,
+            cbmc_result,
+            version_num
+        )
+        
+        # Generate improvement recommendation focused on coverage
+        improvement_recommendation = generate_coverage_improvement_recommendation(harness_code, func_code, cbmc_result, target_coverage)
+        
+        # Determine whether to proceed with refinement or move to next function
+        if current_attempts < max_refinements - 1:
+            # Create update_state with all the necessary information
+            update_state = {
+                "messages": [AIMessage(content=f"Evaluated harness for {func_name}. Coverage is {coverage_percentage:.2f}%, which is below target of {target_coverage}%. Refinement needed (attempt {version_num} of {max_refinements}).")],
+                "refinement_attempts": state_refinement_attempts,
+                "processed_functions": state_processed_functions,
+                "improvement_recommendation": improvement_recommendation,
+                "function_times": function_times,
+                "loop_counter": loop_counter,
+                "harness_history": harness_history,
+                "next": "generator"
+            }
+            
+            # Make sure to pass all persistent error tracking in the state
+            if "persistent_errors" in state:
+                update_state["persistent_errors"] = state["persistent_errors"]
+            if "has_persistent_errors" in state:
+                update_state["has_persistent_errors"] = state["has_persistent_errors"]
+            if "persistent_error_count" in state:
+                update_state["persistent_error_count"] = state["persistent_error_count"]
+                
+            return update_state
+    
+    # If verification failed with errors, store the error and generate recommendations
     error_id = rag_db.store_error(
         func_name,
         harness_code,
@@ -156,6 +277,18 @@ def harness_evaluator_node(state):
     
     # Generate improvement recommendation
     improvement_recommendation = generate_improvement_recommendation(harness_code, func_code, cbmc_result)
+    
+    # If we have detected persistent errors, add more emphatic messaging
+    if state.get("has_persistent_errors", False) and state.get("persistent_error_count", 0) >= 3:
+        # For very persistent errors, add an extremely clear warning message
+        improvement_recommendation = f"""
+        ⚠️ CRITICAL WARNING: SAME ERRORS PERSISTING FOR {state.get('persistent_error_count', 0)} VERSIONS ⚠️ 
+        You MUST take a completely different approach! Previous strategies have failed repeatedly.
+        
+        {improvement_recommendation}
+        
+        🚨 DO NOT CONTINUE THE SAME APPROACH - START FRESH! 🚨
+        """
     
     # Get RAG recommendations
     rag_recommendations = rag_db.get_recommendations(
@@ -189,9 +322,19 @@ def harness_evaluator_node(state):
             for name, pattern in rag_recommendations['matching_patterns'].items():
                 improvement_recommendation += f"- {name}: {pattern.get('description', 'No description')}\n"
     
+    # Add details about error counts
+    failure_count = cbmc_result.get("failure_count", 0)
+    error_count = cbmc_result.get("error_count", 0)
+    
+    if failure_count > 0 or error_count > 0:
+        improvement_recommendation += f"\n\n== ERROR COUNTS ==\n"
+        improvement_recommendation += f"FAILURE messages: {failure_count}\n"
+        improvement_recommendation += f"Error messages: {error_count}\n"
+    
     # Determine whether to proceed with refinement or move to next function
     if current_attempts < max_refinements - 1:
-        return {
+        # Create update_state with all the necessary information
+        update_state = {
             "messages": [AIMessage(content=f"Evaluated harness for {func_name}. Needs improvement (attempt {version_num} of {max_refinements}). Using insights from unified knowledge base.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
@@ -201,6 +344,16 @@ def harness_evaluator_node(state):
             "harness_history": harness_history,  # Make sure to return updated harness history
             "next": "generator"
         }
+        
+        # Make sure to pass all persistent error tracking in the state
+        if "persistent_errors" in state:
+            update_state["persistent_errors"] = state["persistent_errors"]
+        if "has_persistent_errors" in state:
+            update_state["has_persistent_errors"] = state["has_persistent_errors"]
+        if "persistent_error_count" in state:
+            update_state["persistent_error_count"] = state["persistent_error_count"]
+        
+        return update_state
     else:
         # Last attempt reached, mark as processed and move on
         if func_name not in state_processed_functions:
@@ -214,6 +367,86 @@ def harness_evaluator_node(state):
             "harness_history": harness_history,  # Make sure to return updated harness history
             "next": "junction"
         }
+
+def generate_coverage_improvement_recommendation(harness_code, func_code, cbmc_result, target_coverage):
+    """
+    Generate recommendations specifically focused on improving code coverage.
+    
+    Args:
+        harness_code: The current harness code
+        func_code: The original function code
+        cbmc_result: The CBMC verification result
+        target_coverage: The target coverage percentage
+        
+    Returns:
+        A detailed improvement recommendation focused on coverage
+    """
+    # Get current coverage metrics
+    current_coverage = cbmc_result.get("func_coverage_pct", 0.0)
+    
+    # Calculate uncovered lines
+    uncovered_lines = cbmc_result.get("target_uncovered_lines", 0)
+    total_lines = cbmc_result.get("target_total_lines", 0)
+    
+    # Start building the recommendation
+    recommendation = [
+        f"== COVERAGE IMPROVEMENT NEEDED ==",
+        f"Current coverage: {current_coverage:.2f}%",
+        f"Target coverage: {target_coverage:.2f}%",
+        f"Uncovered lines: {uncovered_lines} of {total_lines}",
+        "\nTo improve coverage, consider the following strategies:",
+    ]
+    
+    # Analyze function for branch conditions
+    if "if" in func_code or "switch" in func_code or "?" in func_code:
+        recommendation.append(
+            "1. Improve branch coverage by testing more conditional paths:\n"
+            "   - Use additional test cases with different values\n"
+            "   - Add __CPROVER_assume() statements to direct execution through specific branches\n"
+            "   - Consider edge case values that might trigger different code paths"
+        )
+    
+    # Check for loops
+    if "for" in func_code or "while" in func_code:
+        recommendation.append(
+            "2. Improve loop coverage:\n"
+            "   - Ensure loops execute at least once\n"
+            "   - Consider unwinding loops to a specific depth with --unwind flag\n"
+            "   - Test edge cases for loop boundaries"
+        )
+    
+    # Check for error paths
+    if "return" in func_code and ("NULL" in func_code or "0" in func_code or "-1" in func_code):
+        recommendation.append(
+            "3. Ensure error paths are covered:\n"
+            "   - Create test cases that trigger error conditions\n"
+            "   - Make sure both success and failure paths are exercised"
+        )
+
+    
+    
+    # Add generic recommendations
+    recommendation.append(
+        "4. General coverage improvements:\n"
+        "   - Use nondet values with constraints to target specific execution paths\n"
+        "   - Add assertions to verify critical properties along paths\n"
+        "   - Structure inputs to exercise different code paths\n"
+        "   - Consider adding symbolic values with __CPROVER_nondet functions"
+    )
+    
+    # Add current harness
+    recommendation.append("\nCurrent harness:")
+    recommendation.append("```c")
+    recommendation.append(harness_code.strip())
+    recommendation.append("```")
+    
+    # Add original function
+    recommendation.append("\nOriginal function:")
+    recommendation.append("```c")
+    recommendation.append(func_code.strip())
+    recommendation.append("```")
+    
+    return "\n".join(recommendation)
 
 def route_from_evaluator(state):
     """Routes from evaluator to either generator (for refinement) or junction (for next function)."""

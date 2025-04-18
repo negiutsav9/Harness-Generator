@@ -74,7 +74,7 @@ def setup_llm(model_choice='claude'):
                 sys.exit(1)
             
             _global_llm = ChatOpenAI(
-                model="gpt-4o",  # Use GPT-4o for best code generation capabilities
+                model="gpt-4.1",  # Use GPT-4o for best code generation capabilities
                 openai_api_key=openai_api_key,
                 temperature=0.2,
                 max_tokens=4000,

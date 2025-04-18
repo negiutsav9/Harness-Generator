@@ -388,7 +388,11 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
         "target_uncovered_lines": 0,
         "total_combined_lines": 0,
         "reachable_combined_lines": 0,
-        "errors": 0
+        "errors": 0,
+        "failure_count": 0,         # Track number of FAILURE messages
+        "error_count": 0,           # Track number of ERROR messages
+        "has_redeclaration_error": False,  # Track redeclaration errors specifically
+        "redeclared_symbols": []    # List of redeclared symbols
     }
     
     # Check for successful verification first
@@ -407,7 +411,18 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
         error_messages = []
         error_locations = []
         
+        # Check for redeclaration errors specifically
         for line in stderr.split('\n'):
+            # Check for redeclaration errors
+            if 'redeclaration' in line.lower():
+                result["has_redeclaration_error"] = True
+                # Extract the redeclared symbol
+                redecl_match = re.search(r"redeclaration of '([^']+)'", line)
+                if redecl_match:
+                    redecl_symbol = redecl_match.group(1)
+                    if redecl_symbol not in result["redeclared_symbols"]:
+                        result["redeclared_symbols"].append(redecl_symbol)
+                
             # Look for typical error message patterns
             if 'error:' in line or 'warning:' in line or 'note:' in line:
                 error_messages.append(line.strip())
@@ -458,9 +473,19 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     failure_lines = []
     failure_categories = set()
     failure_locations = {}
+    failure_count = 0
+    error_count = 0
     
     # Process each line of stdout for detailed failure information
     for line in stdout.split('\n'):
+        # Count FAILURE occurrences
+        if "FAILURE" in line:
+            failure_count += 1
+            
+        # Count ERROR occurrences
+        if "ERROR" in line:
+            error_count += 1
+            
         if "FAILURE" in line or "FAILED" in line:
             # Skip unwinding assertions as they're often not relevant to core bugs
             if "unwinding assertion" in line:
@@ -572,6 +597,10 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     
     if result["target_total_lines"] > 0:
         result["func_coverage_pct"] = (result["target_reachable_lines"] / result["target_total_lines"]) * 100
+    
+    # Add the failure and error counts to the result
+    result["failure_count"] = failure_count
+    result["error_count"] = error_count
     
     # Count errors and set suggestions based on categories
     if failure_categories:
@@ -768,12 +797,273 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
         # Start with the error feedback
         recommendation = [format_error_for_feedback(cbmc_result)]
         
+        # Check for persistent errors and add specific guidance when errors repeat
+        persistent_errors = cbmc_result.get("persistent_errors", {})
+        
+        # Also look for any special persistence flags
+        special_persistence_flags = {}
+        for key in cbmc_result.keys():
+            if key.startswith("persistence_"):
+                error_type = key.replace("persistence_", "")
+                special_persistence_flags[error_type] = cbmc_result[key]
+        
+        # Get overall persistence count
+        max_persistence = 0
+        for error_type, count in persistent_errors.items():
+            max_persistence = max(max_persistence, count)
+        for error_type, count in special_persistence_flags.items():
+            max_persistence = max(max_persistence, count)
+        
+        # If we have persistent errors OR special persistence flags
+        if persistent_errors or special_persistence_flags:
+            recommendation.append("\n== PERSISTENT ERRORS DETECTED ==")
+            recommendation.append("The following errors have persisted across multiple versions:")
+            
+            # List persistent errors from both sources
+            if persistent_errors:
+                for error, count in persistent_errors.items():
+                    recommendation.append(f"- '{error}' has persisted for {count} version(s)")
+            
+            for error_type, count in special_persistence_flags.items():
+                if count > 1 and error_type not in persistent_errors:
+                    recommendation.append(f"- '{error_type}' has persisted for {count} version(s)")
+            
+            # Adjust the severity of the recommendation based on persistence count
+            if max_persistence >= 4:
+                recommendation.append("\n⚠️ CRITICAL PERSISTENT ERRORS! A COMPLETE REDESIGN IS MANDATORY! ⚠️")
+            elif max_persistence >= 2:
+                recommendation.append("\nSince these errors are persisting, try a COMPLETELY DIFFERENT APPROACH:")
+            else:
+                recommendation.append("\nThese errors have persisted, consider a different approach:")
+            
+            # Add specific recommendations based on persistent error types and their severity
+            if "memory_leak" in persistent_errors or "memory_leak" in special_persistence_flags:
+                leak_count = persistent_errors.get("memory_leak", special_persistence_flags.get("memory_leak", 0))
+                recommendation.append(f"1. For persistent memory leaks (seen in {leak_count} versions):")
+                if leak_count >= 3:
+                    recommendation.append("   - 🔴 CRITICAL: COMPLETELY ELIMINATE ALL DYNAMIC MEMORY ALLOCATION")
+                    recommendation.append("   - 🔴 Use fixed-size static arrays ONLY - NO malloc() calls at all")
+                    recommendation.append("   - 🔴 Rewrite the entire harness with a different approach")
+                else:
+                    recommendation.append("   - Avoid allocating memory completely if possible")
+                    recommendation.append("   - Use stack-allocated arrays or fixed-size buffers instead of malloc")
+                    recommendation.append("   - Place all free() calls in a single location at the end of main()")
+                    recommendation.append("   - Add __CPROVER_cleanup blocks to ensure memory is freed even in error paths")
+            
+            if "null_pointer" in persistent_errors or "null_pointer" in special_persistence_flags:
+                null_count = persistent_errors.get("null_pointer", special_persistence_flags.get("null_pointer", 0))
+                recommendation.append(f"2. For persistent null pointer issues (seen in {null_count} versions):")
+                if null_count >= 3:
+                    recommendation.append("   - 🔴 CRITICAL: COMPLETELY ELIMINATE ALL POINTER USAGE WHERE POSSIBLE")
+                    recommendation.append("   - 🔴 Use direct stack variables instead of pointers")
+                    recommendation.append("   - 🔴 Add explicit NULL checks before EVERY pointer dereference")
+                    recommendation.append("   - 🔴 Rewrite the entire harness with a different approach")
+                else:
+                    recommendation.append("   - Add explicit NULL checks BEFORE every pointer use")
+                    recommendation.append("   - Use __CPROVER_assume(ptr != NULL) immediately after each pointer definition")
+                    recommendation.append("   - Consider using a simple fixed array instead of dynamic allocation")
+            
+            if "redeclaration" in persistent_errors or cbmc_result.get("has_redeclaration_error", False):
+                recommendation.append("3. For persistent redeclaration issues:")
+                recommendation.append("   - REMOVE ALL declarations and rely only on included headers")
+                recommendation.append("   - Try a minimal set of includes (remove any that might cause conflicts)")
+                recommendation.append("   - Use only fully qualified names for all types")
+            
+            # General guidance for any persistent errors, more forceful with higher persistence
+            if max_persistence >= 3:
+                recommendation.append("\n🔄 REQUIRED COMPLETE REDESIGN STRATEGY:")
+                recommendation.append("1. THROW AWAY THE CURRENT HARNESS COMPLETELY")
+                recommendation.append("2. START FROM SCRATCH with the most minimal possible approach")
+                recommendation.append("3. FOCUS ONLY on calling the function with the MINIMUM required setup")
+                recommendation.append("4. ELIMINATE ALL DYNAMIC ALLOCATION - use static buffers only")
+                recommendation.append("5. ADD EXPLICIT NULL CHECKS before every pointer use")
+            else:
+                recommendation.append("\nGENERAL STRATEGY FOR PERSISTENT ERRORS:")
+                recommendation.append("1. Use a simpler approach with fewer dependencies")
+                recommendation.append("2. Focus on the MINIMAL code needed to call the function")
+                recommendation.append("3. Reduce the complexity of inputs")
+                recommendation.append("4. For memory issues, try using static or stack-allocated memory instead of dynamic allocation")
+                recommendation.append("5. Try writing the harness from scratch rather than modifying the previous version")
+
+        # Get redeclaration error information
+        stderr = cbmc_result.get("stderr", "")
+        stdout = cbmc_result.get("stdout", "")
+        error_msg = cbmc_result.get("message", "")
+        has_redeclaration_error = cbmc_result.get("has_redeclaration_error", False)
+        redeclared_symbols = cbmc_result.get("redeclared_symbols", [])
+        
+        # If we don't have specific symbols but detect redeclaration in output, try to extract them
+        if (not redeclared_symbols and 
+            ("redeclaration" in stderr or "redeclaration" in stdout or "redeclaration" in error_msg)):
+            has_redeclaration_error = True
+            
+            # Find all redeclaration mentions
+            all_redecl_matches = re.findall(r"redeclaration of '([^']+)'", stderr + stdout)
+            for redecl_match in all_redecl_matches:
+                if redecl_match not in redeclared_symbols:
+                    redeclared_symbols.append(redecl_match)
+                    
+            # If we still didn't find any, add a placeholder
+            if not redeclared_symbols:
+                redeclared_symbols = ["unknown symbol"]
+        
+        # Provide specific guidance for redeclaration errors
+        if has_redeclaration_error or redeclared_symbols:
+            recommendation.append(f"\n== REDECLARATION ERROR DETECTED ==")
+            
+            # List all identified symbols with redeclaration errors
+            if redeclared_symbols:
+                recommendation.append("The following symbols have redeclaration errors:")
+                for symbol in redeclared_symbols:
+                    recommendation.append(f"- '{symbol}'")
+                
+            recommendation.append("\nTo fix these redeclaration issues:")
+            recommendation.append("1. REMOVE all declarations for symbols already defined in included headers")
+            recommendation.append("2. Do NOT redeclare any function, type, enum, or struct from an included header")
+            recommendation.append("3. Check each included header to see what symbols it already defines")
+            recommendation.append("4. If you absolutely must declare something, use 'extern' and match signatures exactly")
+            recommendation.append("5. Remove duplicate declarations in your harness code")
+            recommendation.append("6. For 'redeclaration with no linkage' errors, use extern or remove the declaration completely\n")
+            
+            recommendation.append("RESOLUTION STRATEGY:")
+            recommendation.append("1. First try REMOVING the declarations completely (preferred solution)")
+            recommendation.append("2. Only if removal doesn't work, add 'extern' keyword")
+            recommendation.append("3. Check your include order - some headers may need to be included before others")
+            
+            # Provide a correct declaration example
+            recommendation.append("\nExample of proper external declaration (only if needed):")
+            recommendation.append("extern ReturnType FunctionName(ParameterType paramName);")
+            
+            # For "no linkage" errors, add specific guidance
+            if any("no linkage" in err for err in [stderr, stdout, error_msg]):
+                recommendation.append("\nSPECIFIC GUIDANCE FOR 'NO LINKAGE' ERRORS:")
+                recommendation.append("- These often involve enum values, struct types, or macros")
+                recommendation.append("- Check if the symbol is defined as an enum value, macro, or typedef")
+                recommendation.append("- For enums and structs: you cannot redeclare them at all")
+                recommendation.append("- Solution: remove your declarations and use what's in the header")
+        
+        # Add line-specific error mapping
+        error_locations = cbmc_result.get("error_locations", {})
+        if error_locations:
+            # Add specific section for line-based error mapping
+            recommendation.append("\n== LINE-SPECIFIC ERROR TRACING ==")
+            recommendation.append("The following line numbers in your harness have verification failures:")
+            
+            # Track by file
+            for file_name, line_numbers in error_locations.items():
+                # If this is the harness file (look for a pattern like "*_harness_*.c")
+                if "_harness_" in file_name or "harness" in file_name:
+                    recommendation.append(f"\nIn harness file '{file_name}':")
+                    
+                    # Get lines from harness code
+                    harness_lines = harness_code.strip().split('\n')
+                    
+                    # Map each error line to actual code
+                    for line_num in sorted(line_numbers):
+                        # Adjust for 0-based indexing in our code representation
+                        line_index = line_num - 1
+                        
+                        # Safety check to avoid index errors
+                        if 0 <= line_index < len(harness_lines):
+                            line_content = harness_lines[line_index].strip()
+                            if line_content:
+                                recommendation.append(f"Line {line_num}: {line_content}")
+                                
+                                # Add specific improvement hint based on line content
+                                if "malloc" in line_content and not "free" in harness_code:
+                                    recommendation.append(f"  ↪ FIX NEEDED: Add free() for memory allocated on this line")
+                                elif "->" in line_content or "*" in line_content:
+                                    recommendation.append(f"  ↪ FIX NEEDED: Add NULL check before pointer dereference")
+                                elif "[" in line_content and "]" in line_content:
+                                    recommendation.append(f"  ↪ FIX NEEDED: Add bounds check for array access")
+                                elif "/" in line_content:
+                                    recommendation.append(f"  ↪ FIX NEEDED: Add check to prevent division by zero")
+                        else:
+                            recommendation.append(f"Line {line_num}: [Line number out of range]")
+                else:
+                    # This is a source file, not the harness
+                    recommendation.append(f"\nIn source file '{file_name}':")
+                    for line_num in sorted(line_numbers):
+                        recommendation.append(f"Line {line_num}: Error originated in source code (likely called from harness)")
+            
+            # Add tracing guidance
+            recommendation.append("\nRemember to trace each error to its root cause in your harness:")
+            recommendation.append("- For memory leaks: Add free() for every malloc()/calloc()")
+            recommendation.append("- For null pointer: Add NULL checks before dereferencing")
+            recommendation.append("- For array bounds: Add boundary constraints with __CPROVER_assume()")
+
+            # Find harness code snippets that may contain related problematic code
+            if "null_pointer" in cbmc_result.get("error_categories", []):
+                # Find pointer dereference patterns without null checks
+                ptr_derefs = re.findall(r'(\w+)\s*->\s*\w+', harness_code)
+                for ptr in ptr_derefs:
+                    if f"if ({ptr} != NULL)" not in harness_code and f"__CPROVER_assume({ptr} != NULL)" not in harness_code:
+                        recommendation.append(f"\nUnchecked pointer dereference found: '{ptr}->'")
+                        recommendation.append(f"Add this before using: if ({ptr} != NULL) {{ ... }}")
+            
+            if "memory_leak" in cbmc_result.get("error_categories", []):
+                # Find malloc without corresponding free
+                malloc_vars = re.findall(r'(\w+)\s*=\s*(?:malloc|calloc)\([^;]+\)', harness_code)
+                for var in malloc_vars:
+                    if f"free({var})" not in harness_code:
+                        recommendation.append(f"\nMemory leak detected: '{var}' is allocated but never freed")
+                        recommendation.append(f"Add this before end of function: free({var});")
+        
         # Add code patterns for specific error types
         patterns = []
         
-        # Look for error categories in either location
+        # Look for error categories and their persistence
         error_categories = cbmc_result.get("error_categories", [])
+        persistent_errors = cbmc_result.get("persistent_errors", {})
         
+        # Check for highly persistent null pointer errors to give more specific guidance
+        null_persistence = persistent_errors.get("null_pointer", 0)
+        if null_persistence >= 2:
+            # For errors that have persisted 2+ versions, give more specific advice
+            patterns.append(f"""
+            // PERSISTENT ({null_persistence} versions) NULL POINTER ERROR - MAJOR REDESIGN NEEDED
+            // Try using a completely different approach with these patterns:
+            
+            // APPROACH 1: Avoid pointers entirely when possible
+            char static_buffer[BUFFER_SIZE]; // Use stack allocation instead of malloc
+            size_t buffer_len = BUFFER_SIZE;
+            
+            // APPROACH 2: If you must use pointers, do extensive checking
+            if (ptr != NULL) {{
+                // Only use ptr inside this block
+                // ...
+            }}
+            else {{
+                // Handle null case explicitly
+                return ERROR_CODE;
+            }}
+            """)
+        
+        # Check for highly persistent memory leaks
+        memory_persistence = persistent_errors.get("memory_leak", 0)
+        if memory_persistence >= 2:
+            patterns.append(f"""
+            // PERSISTENT ({memory_persistence} versions) MEMORY LEAK - MAJOR REDESIGN NEEDED
+            // Try using a completely different approach with these patterns:
+            
+            // APPROACH 1: Avoid dynamic allocation entirely
+            char static_buffer[BUFFER_SIZE]; // Use fixed size buffer on stack
+            
+            // APPROACH 2: Single allocation pattern with guaranteed cleanup
+            void* ptr = malloc(size);
+            DefenderStatus_t status = DefenderFailure;
+            
+            if (ptr != NULL) {{
+                // Use ptr...
+                status = process_with_ptr(ptr);
+                // Always free at the end, regardless of logic paths
+                free(ptr);
+                return status;
+            }}
+            return DefenderFailure;
+            """)
+            
+        # Standard pattern suggestions
         if "memory_leak" in error_categories:
             patterns.append("""
             // Memory management pattern
@@ -869,12 +1159,13 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
         # Add critical instructions
         recommendation.append("""
         CRITICAL INSTRUCTIONS:
-        1. Fix the specific issues identified in the error feedback
-        2. Ensure proper memory management (allocation and freeing)
-        3. Add appropriate constraints using __CPROVER_assume()
-        4. Implement any missing function bodies or avoid calling them
-        5. Follow the recommended patterns for specific error types
-        6. Focus on creating a minimal, focused harness that verifies the function
+        1. Fix the specific issues identified in the line-by-line error feedback
+        2. Target fixes to the exact line numbers indicated in error locations
+        3. Ensure proper memory management (allocation and freeing)
+        4. Add appropriate constraints using __CPROVER_assume()
+        5. Implement any missing function bodies or avoid calling them
+        6. Follow the recommended patterns for specific error types
+        7. Focus on creating a minimal, focused harness that verifies the function
         """)
         
         return "\n".join(recommendation)
