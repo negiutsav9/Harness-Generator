@@ -106,6 +106,18 @@ def cbmc_node(state):
     verification_start = time.time()
     
     func_name = state.get("current_function", "")
+    
+    # Check if we're dealing with a C keyword function and ensure we use the right name
+    c_keywords = ["free", "malloc", "if", "while", "for", "return", "switch", "case", "default", "break"]
+    if func_name in c_keywords:
+        original_func_name = func_name
+        func_name = f"function_{func_name}"
+        logger.warning(f"Function name '{original_func_name}' is a C keyword. Using '{func_name}' internally to avoid conflicts.")
+        # Update state for downstream processes
+        state["current_function"] = func_name
+        # Keep track of the original name
+        state["original_function_name"] = original_func_name
+    
     harnesses = state.get("harnesses", {})
     harness_code = harnesses.get(func_name, "")
 
@@ -348,10 +360,11 @@ def cbmc_node(state):
         # Save raw output immediately
         raw_output_file = os.path.join(func_verification_dir, f"v{version_num}_raw_output.txt")
         with open(raw_output_file, "w") as f:
-            f.write("=== STDOUT ===\n")
-            f.write(cbmc_stdout)
-            f.write("\n\n=== STDERR ===\n")
+            # Put STDERR first to highlight important error details
+            f.write("=== STDERR (CRITICAL ERRORS) ===\n")
             f.write(cbmc_stderr)
+            f.write("\n\n=== STDOUT (VERIFICATION OUTPUT) ===\n")
+            f.write(cbmc_stdout)
         
         # Run coverage checking separately with JSON output
         try:
@@ -361,7 +374,7 @@ def cbmc_node(state):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout_seconds,  # Shorter timeout for coverage
+                timeout=timeout_seconds*2,  # Shorter timeout for coverage
                 check=False
             )
             
@@ -461,8 +474,25 @@ def cbmc_node(state):
         except Exception as e:
             logger.error(f"Error running coverage check: {str(e)}")
         
-        # Process CBMC output using our new parser
+        # Process CBMC output using our enhanced parser (with stderr prioritization)
+        # The process_cbmc_output function now automatically preserves stderr in the result
         cbmc_result = process_cbmc_output(cbmc_stdout, cbmc_stderr)
+        
+        # Double-check that stderr is included in the result for line-specific error tracing
+        if "stderr" not in cbmc_result:
+            cbmc_result["stderr"] = cbmc_stderr
+            
+        # Make sure we prioritize stderr output when there are critical errors
+        # This ensures that downstream components focus on the most important error information
+        if cbmc_stderr and ("error:" in cbmc_stderr or "undefined reference" in cbmc_stderr):
+            logger.warning("Critical errors found in STDERR output, prioritizing these errors")
+            
+            # Ensure error categories reflect stderr issues
+            if "redeclaration" in cbmc_stderr and "redeclaration" not in cbmc_result["error_categories"]:
+                cbmc_result["error_categories"].append("redeclaration")
+                
+            if "undefined reference" in cbmc_stderr and "linking_error" not in cbmc_result["error_categories"]:
+                cbmc_result["error_categories"].append("linking_error")
         
         # Apply the stored coverage metrics if they were successfully collected
         stored_coverage_metrics = locals().get('stored_coverage_metrics')
@@ -477,7 +507,7 @@ def cbmc_node(state):
             "message": cbmc_result["message"],
             "suggestions": cbmc_result["suggestions"],
             "stdout": cbmc_stdout,
-            "stderr": cbmc_stderr,
+            "stderr": cbmc_stderr,  # Make sure stderr is included
             "returncode": cbmc_returncode,
             "version": version_num,
             "error_categories": cbmc_result["error_categories"],
@@ -548,10 +578,11 @@ def cbmc_node(state):
                 for func in cbmc_result["missing_functions"]:
                     f.write(f"- {func}\n")
             
-            f.write("\n=== STDOUT ===\n")
-            f.write(cbmc_stdout)
-            f.write("\n\n=== STDERR ===\n")
+            # Put STDERR first to highlight important error details
+            f.write("\n=== STDERR (CRITICAL ERRORS) ===\n")
             f.write(cbmc_stderr)
+            f.write("\n\n=== STDOUT (VERIFICATION OUTPUT) ===\n")
+            f.write(cbmc_stdout)
         
         # Generate a more helpful report in markdown format
         report_file = os.path.join(func_verification_dir, f"v{version_num}_report.md")
@@ -608,12 +639,49 @@ def cbmc_node(state):
                     f.write(f"- {category}\n")
                 f.write("\n")
             
-            # Add error locations if any
+            # Add error locations if any - with enhanced line number tracing
             if cbmc_result["error_locations"]:
-                f.write(f"## Error Locations\n\n")
+                f.write(f"## Error Locations - Line-Specific Tracing\n\n")
+                
+                # First, get any detailed error messages from stderr
+                detailed_errors = {}
+                if cbmc_stderr:
+                    for line in cbmc_stderr.split('\n'):
+                        if 'error:' in line or ('warning:' in line and any(critical in line.lower() 
+                                                                 for critical in ['pointer', 'memory', 'null', 'invalid'])):
+                            # Extract line information using improved regex
+                            loc_match = re.search(r'([^:]+):(\d+)(?::\d+)?:', line)
+                            if loc_match:
+                                file_name = loc_match.group(1)
+                                line_num = int(loc_match.group(2))
+                                error_msg = line.split(':', 3)[-1].strip() if len(line.split(':', 3)) >= 4 else line
+                                
+                                key = f"{file_name}:{line_num}"
+                                if key not in detailed_errors:
+                                    detailed_errors[key] = []
+                                detailed_errors[key].append(error_msg)
+                
+                # Process each file and its error lines 
                 for file, lines in cbmc_result["error_locations"].items():
-                    f.write(f"**File:** {file}\n\n")
-                    f.write(f"Error lines: {', '.join(map(str, sorted(lines)))}\n\n")
+                    f.write(f"### File: `{file}`\n\n")
+                    f.write(f"| Line | Error Details |\n")
+                    f.write(f"|------|---------------|\n")
+                    
+                    for line_num in sorted(lines):
+                        key = f"{file}:{line_num}"
+                        error_detail = "No specific error details available"
+                        
+                        # Check if we have detailed error message for this line
+                        if key in detailed_errors and detailed_errors[key]:
+                            error_detail = "; ".join(detailed_errors[key])
+                        
+                        # If it's a harness file, try to include line content
+                        if "_harness_" in file or "harness" in file:
+                            f.write(f"| **{line_num}** | {error_detail} |\n")
+                        else:
+                            f.write(f"| **{line_num}** | {error_detail} |\n")
+                
+                f.write("\n> **Note:** Look at these specific line numbers in your code to identify and fix issues.\n\n")
             
             # Add missing functions if any
             if cbmc_result["missing_functions"]:
@@ -845,8 +913,40 @@ def cbmc_node(state):
         function_times[func_name] = {}
     function_times[func_name]["verification"] = verification_time
     
-    # Update result message
-    result_message = f"CBMC verification for function {func_name} v{version_num} complete in {verification_time:.2f}s. Status: {cbmc_results[func_name]['status']}."
+    # Check for slow verification that might indicate potential future timeouts
+    is_slow_verification = verification_time > 45  # Over 45 seconds is considered slow
+    if is_slow_verification and cbmc_results[func_name].get("status") != "TIMEOUT":
+        logger.warning(f"Slow verification detected for {func_name}: {verification_time:.2f}s")
+        
+        # Add special flag and suggestion for slow verification
+        cbmc_results[func_name]["is_slow_verification"] = True
+        cbmc_results[func_name]["slow_verification_time"] = verification_time
+        
+        # Add performance warning to error categories
+        if "error_categories" not in cbmc_results[func_name]:
+            cbmc_results[func_name]["error_categories"] = []
+        if "performance_warning" not in cbmc_results[func_name]["error_categories"]:
+            cbmc_results[func_name]["error_categories"].append("performance_warning")
+        
+        # Add special suggestion for performance
+        if "suggestions" not in cbmc_results[func_name] or not cbmc_results[func_name]["suggestions"]:
+            cbmc_results[func_name]["suggestions"] = "Consider simplifying the harness to improve verification speed and prevent future timeouts"
+        else:
+            cbmc_results[func_name]["suggestions"] += ". Also consider simplifying the harness to improve verification speed"
+    
+    # Update result message with appropriate status indicators
+    status = cbmc_results[func_name].get("status", "UNKNOWN")
+    status_indicator = ""
+    if status == "TIMEOUT":
+        status_indicator = "⏱️ TIMEOUT"
+    elif status == "SUCCESS":
+        status_indicator = "✅ SUCCESS"
+    elif is_slow_verification:
+        status_indicator = "⚠️ SLOW"
+    else:
+        status_indicator = "❌ FAILED"
+        
+    result_message = f"CBMC verification for {func_name} v{version_num} complete in {verification_time:.2f}s. Status: {status_indicator}"
     
     return {
         "messages": [AIMessage(content=result_message)],

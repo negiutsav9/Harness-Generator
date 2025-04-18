@@ -235,9 +235,13 @@ def generator_node(state):
     improvement_recommendation = state.get("improvement_recommendation", "")
     is_refinement = bool(improvement_recommendation)
     
-    # Track harness history
-    harness_history = state.get("harness_history", {})
+    # Track harness history - defensive initialization
+    harness_history = state.get("harness_history", {}).copy()  # Ensure we have a copy
     if func_name not in harness_history:
+        harness_history[func_name] = []
+    elif not isinstance(harness_history[func_name], list):
+        # Fix any corrupted state - ensure it's always a list
+        logger.warning(f"Harness history for {func_name} was not a list. Reinitializing.")
         harness_history[func_name] = []
     
     # Get previous harness if refining
@@ -354,9 +358,8 @@ def generator_node(state):
     
     # Find implementations for dependencies
     for called_func in function_calls:
-        # Skip standard library and control flow functions
-        if called_func in ["if", "for", "while", "switch", "return", "malloc", "free",
-                          "memset", "memcpy", "printf", "fprintf", "sprintf"]:
+        # Skip control flow functions, standard library functions are allowed now
+        if called_func in ["if", "for", "while", "switch", "return"]:
             continue
         
         # Try to find the dependency in the unified database first
@@ -475,8 +478,8 @@ def generator_node(state):
         5. Create a main() function that calls the target function
         6. Use __CPROVER_assume() for input constraints
         7. Use nondet_* functions (like nondet_int(), nondet_char()) for nondeterministic inputs
-        8. PRIORITIZE PROJECT RESOURCES - use project-specific headers and functions FIRST when available
-        9. You MAY use standard library headers and functions when project resources are insufficient
+        8. You are ENCOURAGED to use both project-specific resources AND standard library headers/functions
+        9. Standard library usage is fully allowed and encouraged where appropriate
         10. Ensure all declarations are complete and syntactically correct
         11. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
         12. DO NOT CREATE STUBS for existing function dependencies
@@ -486,7 +489,7 @@ def generator_node(state):
         CBMC Verification Flags that will be used:
         {cbmc_flags}
         
-        Available Project Headers (PRIORITIZE THESE OVER STANDARD LIBRARY HEADERS):
+        Available Project Headers (FEEL FREE TO USE THESE ALONG WITH STANDARD LIBRARY HEADERS):
         """
         
         # Add available headers
@@ -551,8 +554,8 @@ def generator_node(state):
         # Add clear instructions
         generator_prompt += """
         KEY VERIFICATION PRINCIPLES:
-        - PRIORITIZE project-specific headers and functions over standard library
-        - You MAY use standard library headers/functions ONLY when project resources are insufficient
+        - Feel free to use BOTH project-specific resources AND standard library headers/functions
+        - Standard library usage is fully allowed and encouraged where appropriate
         - Place project-specific #includes BEFORE standard library includes
         - Use project-specific macros when relevant to the verification task
         - Use __CPROVER_assume() to set realistic input constraints
@@ -567,6 +570,24 @@ def generator_node(state):
     
     else:
         # For refinement, focus on specific CBMC verification issues and improving coverage
+        
+        # Detect specific issues from CBMC results that need focused handling
+        has_stderr_errors = cbmc_result.get("has_stderr_errors", False)
+        has_redeclaration_error = cbmc_result.get("has_redeclaration_error", False) or "redeclaration" in cbmc_result.get("error_categories", [])
+        has_linking_error = "linking_error" in cbmc_result.get("error_categories", [])
+        has_missing_file_error = "missing_file" in cbmc_result.get("error_categories", [])
+        
+        # Extract specific information from STDERR if available
+        stderr_info = ""
+        if "stderr" in cbmc_result and cbmc_result["stderr"]:
+            stderr_lines = cbmc_result["stderr"].split('\n')
+            # Only include the first 10 stderr lines to keep prompt focused
+            stderr_info = "\nCRITICAL STDERR INFORMATION:\n"
+            stderr_info += "\n".join(stderr_lines[:10])
+            if len(stderr_lines) > 10:
+                stderr_info += f"\n...and {len(stderr_lines) - 10} more lines (truncated)"
+        
+        # Create focused prompt for refinement with critical STDERR issues highlighted
         generator_prompt = f"""
         You are a specialized harness generator for CBMC verification.
         You need to REFINE a harness based on SPECIFIC CBMC verification failures.
@@ -586,7 +607,80 @@ def generator_node(state):
         
         Current Coverage: {current_coverage:.2f}%
         Target Coverage: {target_coverage:.2f}%
+        """
         
+        # Add specialized guidance for critical STDERR issues
+        if has_stderr_errors:
+            generator_prompt += f"""
+            {stderr_info}
+            
+            🔴 CRITICAL STDERR ERRORS DETECTED! These errors must be fixed first before any other issues.
+            """
+            
+            # Add specialized instructions based on error type
+            if has_redeclaration_error:
+                generator_prompt += """
+                REDECLARATION ERROR INSTRUCTIONS:
+                1. REMOVE ALL declarations for symbols already defined in included headers
+                2. Add "extern" to ALL function declarations
+                3. Check for and remove duplicate declarations
+                4. NEVER redeclare types, enums, or structs defined in headers
+                5. Fix the redeclaration issues FIRST, before addressing any other errors
+                """
+                
+            if has_linking_error:
+                generator_prompt += """
+                LINKING ERROR INSTRUCTIONS:
+                1. Check for "undefined reference" errors in the STDERR output
+                2. Make sure all functions called are either:
+                   - Declared with proper "extern" keyword
+                   - Fully implemented in the harness if not available elsewhere
+                3. Do not call any functions that are not available in the project
+                4. If you need a function that doesn't exist, implement a minimal stub version
+                """
+                
+            if has_missing_file_error:
+                generator_prompt += """
+                MISSING FILE ERROR INSTRUCTIONS:
+                1. Check for "cannot open file" errors in the STDERR output
+                2. Make sure all #include directives use EXACTLY the filenames provided
+                3. Use double quotes for project headers (#include "project_header.h")
+                4. Use angle brackets only for standard library headers (#include <stdlib.h>)
+                5. Remove any includes for files that don't exist
+                """
+        
+        # Add specialized guidance for timeout and performance issues
+        is_timeout = cbmc_result.get("status") == "TIMEOUT" or "timeout" in cbmc_result.get("error_categories", [])
+        is_slow = cbmc_result.get("is_slow_verification", False) or "performance_warning" in cbmc_result.get("error_categories", [])
+        
+        if is_timeout or is_slow:
+            verification_time = cbmc_result.get("slow_verification_time", 60.0)  # Default to 60s if not specified
+            
+            performance_warning = "⏱️ TIMEOUT DETECTED!" if is_timeout else f"⚠️ SLOW VERIFICATION DETECTED ({verification_time:.1f}s)"
+            
+            generator_prompt += f"""
+            {performance_warning} The verification process is too complex or contains unbounded operations.
+            
+            PERFORMANCE OPTIMIZATION INSTRUCTIONS:
+            1. SIGNIFICANTLY SIMPLIFY the harness - it's currently too complex for CBMC to verify efficiently
+            2. REMOVE or LIMIT all loops by adding bounds (__CPROVER_assume(i < 3))
+            3. REDUCE the number of memory allocations (use stack-based fixed arrays when possible)
+            4. REDUCE the size of allocated memory (use smaller buffer sizes)
+            5. ADD specific constraints to all inputs to limit state space
+            6. Use SMALL CONSTANTS throughout the harness (use values < 10)
+            7. REMOVE any unnecessary function calls or complex operations
+            
+            EXAMPLES OF PERFORMANCE OPTIMIZATIONS:
+            - Replace: while(condition) {{ ... }}
+              With:    for(int i=0; i<3; i++) {{ ... }}
+            
+            - Replace: char* buffer = malloc(size);
+              With:    char buffer[10]; // Fixed small size
+            
+            - Add constraints: __CPROVER_assume(value > 0 && value < 10);
+            """
+        
+        generator_prompt += """
         CRITICAL INSTRUCTIONS:
         1. DO NOT include the full function implementation
         2. Always use the EXACT parameter names from the original function
@@ -599,7 +693,7 @@ def generator_node(state):
         9. You MAY use standard library headers and functions when project resources are insufficient
         10. Use project-specific macros when relevant to the verification task
         11. Make sure to use the EXACT header include names as provided
-        12. FOCUS on the verification requirements and achieving {target_coverage}% coverage
+        12. FOCUS on the verification requirements and achieving 85% coverage
         13. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
         14. Follow any specific memory leak resolution instructions in the verification results
         15. DO NOT CREATE STUBS for existing function dependencies - only add stubs for truly missing functions
@@ -607,8 +701,8 @@ def generator_node(state):
         
         # Standard libraries are now allowed, but we still prioritize project-specific resources
         generator_prompt += """
-        16. REMEMBER: You may use standard library functions and headers, but ONLY after considering 
-            project-specific resources first. Always prioritize project headers, functions, and macros.
+        16. IMPORTANT: You are ENCOURAGED to use standard library functions and headers as needed.
+            Standard library usage is fully allowed and encouraged where appropriate.
             When using standard libraries, prefer memory-safe functions and add proper error checking.
             """
         
@@ -616,7 +710,7 @@ def generator_node(state):
         CBMC Verification Flags that will be used:
         {cbmc_flags}
         
-        Available Project Headers (USE THESE WHEN POSSIBLE):
+        Available Project Headers (FEEL FREE TO USE THESE ALONG WITH STANDARD LIBRARY HEADERS):
         """
         
         # Add available headers
@@ -734,8 +828,8 @@ def generator_node(state):
         
         generator_prompt += """
         VERIFICATION REFINEMENT PRINCIPLES:
-        - PRIORITIZE project-specific headers and functions over standard library
-        - You MAY use standard library headers/functions when project resources are insufficient
+        - Feel free to use BOTH project-specific resources AND standard library headers/functions
+        - Standard library usage is fully allowed and encouraged where appropriate
         - Place project-specific #includes BEFORE standard library includes
         - Use CBMC built-in nondet_* functions for inputs
         - Use project-specific macros when they help with verification
@@ -765,10 +859,10 @@ def generator_node(state):
             IMPORTANT RULES:
             1. ALWAYS create a function named 'void main()' as the ONLY entry point
             2. DO NOT create functions named 'harness()', 'test_harness()', or any other entry point
-            3. PRIORITIZE project-specific headers and functions FIRST when available
-            4. You MAY use standard library headers and functions when project resources are insufficient
+            3. Feel free to use BOTH project-specific resources AND standard library headers/functions
+            4. Standard library usage is fully allowed and encouraged where appropriate
             5. When using both project resources and standard libraries, always put project #includes FIRST
-            6. CREATE A HARNESS USING PROJECT RESOURCES FIRST, STANDARD LIBRARIES ONLY WHEN NEEDED
+            6. CREATE A HARNESS USING BOTH PROJECT RESOURCES AND STANDARD LIBRARIES AS NEEDED
             7. ALWAYS use the EXACT parameter names from the original function
             8. NEVER redefine the function being tested
             9. FUNCTION DECLARATION BEST PRACTICES:
@@ -809,7 +903,7 @@ def generator_node(state):
             logger.info(f"- Memory leak errors: {memory_leak_count}")
             logger.info(f"- Redeclaration errors: {redeclaration_count}")
             
-            if reset_approach and highest_persistence >= 4:
+            if reset_approach and highest_persistence >= 3:
                 # For extremely persistent errors (4+ versions), provide a pre-built template
                 # as a starting point rather than asking the LLM to create from scratch again
                 
@@ -931,12 +1025,12 @@ def generator_node(state):
                 YOU MUST FOLLOW THIS TEMPLATE - NO EXCEPTIONS!
                 """
                 
-            elif has_persistent_errors and persistent_error_count >= 2:
+            elif has_persistent_errors and persistent_error_count >= 3:
                 # Standard approach for moderately persistent errors
                 specific_advice = ""
                 
                 # Add more specific guidance based on error types
-                if has_persistent_null_pointer and null_pointer_count >= 2:
+                if has_persistent_null_pointer and null_pointer_count >= 3:
                     specific_advice += f"""
                     NULL POINTER ERROR has persisted for {null_pointer_count} versions!
                     For this specific error:
@@ -946,7 +1040,7 @@ def generator_node(state):
                     4. Consider using stack-allocated arrays instead of dynamic memory
                     """
                 
-                if has_persistent_memory_leak and memory_leak_count >= 2:
+                if has_persistent_memory_leak and memory_leak_count >= 3:
                     specific_advice += f"""
                     MEMORY LEAK ERROR has persisted for {memory_leak_count} versions!
                     For this specific error:
@@ -985,7 +1079,7 @@ def generator_node(state):
                 3. ALWAYS use the EXACT parameter names from the original function
                 4. NEVER redefine the function being tested
                 5. ONLY use headers from the PROVIDED LIST - do not make up header names
-                6. PRIORITIZE project-specific headers and functions FIRST when available
+                6. Feel free to use BOTH project-specific resources AND standard library headers/functions
                 7. USE COMPLETELY DIFFERENT PATTERNS than previous versions
                 8. FOCUS ON EXTREMELY BASIC VERIFICATION - just enough to exercise the function's core behavior
                 """
@@ -997,10 +1091,10 @@ def generator_node(state):
                 IMPORTANT RULES:
                 1. ALWAYS create a function named 'void main()' as the ONLY entry point
                 2. DO NOT create functions named 'harness()', 'test_harness()', or any other entry point
-                3. PRIORITIZE project-specific headers and functions FIRST when available
-                4. You MAY use standard library headers and functions when project resources are insufficient
+                3. Feel free to use BOTH project-specific resources AND standard library headers/functions
+                4. Standard library usage is fully allowed and encouraged where appropriate
                 5. When using both project resources and standard libraries, always put project #includes FIRST
-                6. CREATE A HARNESS USING PROJECT RESOURCES FIRST, STANDARD LIBRARIES ONLY WHEN NEEDED
+                6. CREATE A HARNESS USING BOTH PROJECT RESOURCES AND STANDARD LIBRARIES AS NEEDED
                 7. HANDLING FUNCTION DECLARATIONS - PREVENT REDECLARATION ERRORS:
                    - NEVER redeclare ANY symbol (function, enum, struct, typedef) that's defined in an included header
                    - First try to REMOVE declarations of symbols from included headers
@@ -1089,40 +1183,20 @@ def generator_node(state):
             if not has_main:
                 harness_code += "\n\nvoid main() {\n    // Auto-generated main function\n}"
         
-        # We're now allowing standard libraries, but we'll add a comment to remind that local headers should be prioritized
-        # Ensure all standard library includes have a comment indicating they should be used only when necessary
+        # Remove any comments restricting standard library usage as standard libraries are now fully allowed
+        # If needed, add a comment indicating standard libraries are fully allowed
         std_lib_pattern = r'(#include\s+<[^>]+>)'
-        harness_code = re.sub(std_lib_pattern, r'\1  // Standard library - use only when project headers insufficient', harness_code)
+        harness_code = re.sub(std_lib_pattern, r'\1  // Standard library', harness_code)
         
         # Ensure all project headers start with double quotes (not angle brackets)
         for header in available_headers:
             if f"#include <{header}>" in harness_code:
-                harness_code = harness_code.replace(f"#include <{header}>", f'#include "{header}"')
-        
-        # ENHANCEMENT: Check for memory leaks by finding malloc calls without corresponding free
-        malloc_vars = re.findall(r'(\w+)\s*=\s*(?:malloc|calloc)\([^;]+\)', harness_code)
-        missing_free = []
-        
-        for var in malloc_vars:
-            if f"free({var})" not in harness_code:
-                missing_free.append(var)
-        
-        if missing_free:
-            logger.warning(f"Found {len(missing_free)} allocated variables without free in harness")
+                harness_code = harness_code.replace(f"#include <{header}>", f'#include "{header}"')                    
+
+        # Save the new harness to history - ensure func_name exists in harness_history
+        if func_name not in harness_history:
+            harness_history[func_name] = []
             
-            # Add free operations before the end of main function
-            main_end_match = re.search(r'}(\s*)$', harness_code)
-            if main_end_match:
-                # Insert free operations before the closing brace of main
-                free_block = "\n    // Free allocated memory to prevent leaks\n"
-                for var in missing_free:
-                    free_block += f"    free({var});\n"
-                
-                # Replace the closing brace with our free block plus closing brace
-                harness_code = harness_code[:main_end_match.start()] + free_block + "}" + harness_code[main_end_match.end():]
-                logger.info(f"Added free operations for {len(missing_free)} variables to prevent memory leaks")
-        
-        # Save the new harness to history
         if harness_code not in harness_history[func_name]:
             harness_history[func_name].append(harness_code)
         

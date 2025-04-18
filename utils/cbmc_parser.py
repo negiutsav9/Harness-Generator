@@ -355,6 +355,7 @@ def calculate_coverage(json_file_path, target_function_name):
 def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     """
     Process CBMC output and extract structured error information.
+    Prioritizes STDERR over STDOUT for error identification and uses precise line number tracing.
     
     Args:
         stdout: The standard output from CBMC
@@ -395,48 +396,79 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
         "redeclared_symbols": []    # List of redeclared symbols
     }
     
-    # Check for successful verification first
-    if "VERIFICATION SUCCESSFUL" in stdout:
-        result["verification_status"] = "SUCCESS"
-        result["message"] = "Verification successful"
-        return result
+    # IMPORTANT: Ensure stderr is preserved in the result for downstream processing
+    result["stderr"] = stderr
     
-    # Check for critical errors in stderr
-    if "PARSING ERROR" in stderr or "preprocessing failed" in stderr.lower() or "error generated" in stderr.lower():
-        result["verification_status"] = "FAILED"
-        result["has_preprocessing_error"] = True
-        result["message"] = "Preprocessing error detected"
-        
-        # Extract specific error messages
-        error_messages = []
-        error_locations = []
-        
-        # Check for redeclaration errors specifically
+    # First, check if we have any content in stderr (prioritize stderr)
+    has_stderr_content = stderr.strip() != ""
+    
+    # Extract line-specific errors from stderr first
+    stderr_error_locations = {}
+    stderr_error_messages = []
+    stderr_redeclaration_errors = []
+    
+    if has_stderr_content:
+        # Look for specific error patterns in stderr with line numbers
         for line in stderr.split('\n'):
+            # Skip warning lines unless they contain critical information
+            if 'warning:' in line.lower() and not any(critical in line.lower() 
+                                                     for critical in ['pointer', 'memory', 'null', 'invalid', 'error']):
+                continue
+                
             # Check for redeclaration errors
             if 'redeclaration' in line.lower():
                 result["has_redeclaration_error"] = True
+                stderr_redeclaration_errors.append(line.strip())
+                
                 # Extract the redeclared symbol
                 redecl_match = re.search(r"redeclaration of '([^']+)'", line)
                 if redecl_match:
                     redecl_symbol = redecl_match.group(1)
                     if redecl_symbol not in result["redeclared_symbols"]:
                         result["redeclared_symbols"].append(redecl_symbol)
+            
+            # Look for error message patterns with line numbers
+            if 'error:' in line or ('warning:' in line and any(critical in line.lower() 
+                                                             for critical in ['pointer', 'memory', 'null', 'invalid'])):
+                stderr_error_messages.append(line.strip())
                 
-            # Look for typical error message patterns
-            if 'error:' in line or 'warning:' in line or 'note:' in line:
-                error_messages.append(line.strip())
-                
-                # Extract specific location information
-                loc_match = re.search(r'([^:]+):(\d+):', line)
+                # Extract file and line information using improved regex pattern
+                # This handles both "file.c:123:" and "file.c:123:12:" formats
+                loc_match = re.search(r'([^:]+):(\d+)(?::\d+)?:', line)
                 if loc_match:
                     file_name = loc_match.group(1)
-                    line_num = loc_match.group(2)
-                    location = f"{file_name}:{line_num}"
-                    if location not in error_locations:
-                        error_locations.append(location)
+                    line_num = int(loc_match.group(2))
+                    
+                    # Add to location tracking
+                    if file_name not in stderr_error_locations:
+                        stderr_error_locations[file_name] = []
+                    if line_num not in stderr_error_locations[file_name]:
+                        stderr_error_locations[file_name].append(line_num)
+    
+    # Check for preprocessing errors, parsing errors, or other critical errors in stderr
+    if has_stderr_content and ("PARSING ERROR" in stderr or "preprocessing failed" in stderr.lower() 
+                              or "error generated" in stderr.lower() or "error:" in stderr.lower() 
+                              or "undefined reference" in stderr.lower()):
+        result["verification_status"] = "FAILED"
+        result["has_preprocessing_error"] = True
+        result["message"] = "Preprocessing error detected"
         
-        # Look for macro-related errors specifically
+        # Extract specific error messages from stderr
+        if stderr_error_messages:  # Use the already extracted error messages
+            error_description = "; ".join(stderr_error_messages[:3])
+            result["message"] = f"PREPROCESSING ERROR: {error_description}"
+            result["suggestions"] = "Fix syntax errors in the harness or source code"
+            result["error_messages"] = stderr_error_messages
+        else:
+            # Add generic error message if no specific messages were found
+            result["message"] = "PREPROCESSING ERROR: GCC preprocessing failed - check for syntax errors"
+            result["suggestions"] = "Fix syntax errors and ensure all necessary includes are available"
+        
+        # Use the already extracted error locations
+        if stderr_error_locations:
+            result["error_locations"] = stderr_error_locations
+        
+        # Extract macro-related errors specifically
         macro_errors = []
         for line in stderr.split('\n'):
             if 'macro' in line.lower() and ('error' in line.lower() or 'defined' in line.lower()):
@@ -447,26 +479,21 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
                     macro_name = macro_match.group(1)
                     macro_errors.append(f"Problematic macro: {macro_name}")
         
-        # Create a more detailed error description
+        # Add specific macro errors if found
         if macro_errors:
             error_description = "Macro definition error: " + "; ".join(macro_errors[:2])
             result["message"] = f"PREPROCESSING ERROR: {error_description}"
             result["suggestions"] = "Fix macro definitions and ensure they are properly defined"
-        elif error_messages:
-            error_description = "; ".join(error_messages[:3])
-            result["message"] = f"PREPROCESSING ERROR: {error_description}"
-            result["suggestions"] = "Fix syntax errors in the harness or source code"
-        else:
-            result["message"] = "PREPROCESSING ERROR: GCC preprocessing failed - check for syntax errors"
-            result["suggestions"] = "Fix syntax errors and ensure all necessary includes are available"
-        
-        result["error_messages"] = error_messages
-        if error_locations:
-            result["error_locations"] = {"preprocessing_errors": error_locations}
         
         return result
     
-    # Check for verification failures - we know it's failed if we got here
+    # Check for successful verification 
+    if "VERIFICATION SUCCESSFUL" in stdout:
+        result["verification_status"] = "SUCCESS"
+        result["message"] = "Verification successful"
+        return result
+    
+    # If we've gotten this far, it's a verification failure not a preprocessing error
     result["verification_status"] = "FAILED" 
     
     # Extract all failure information
@@ -476,13 +503,18 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     failure_count = 0
     error_count = 0
     
+    # First check if we have stderr_error_locations (from line-specific errors in stderr)
+    # and use those as our primary error locations
+    if stderr_error_locations:
+        failure_locations = stderr_error_locations.copy()
+    
     # Process each line of stdout for detailed failure information
     for line in stdout.split('\n'):
         # Count FAILURE occurrences
         if "FAILURE" in line:
             failure_count += 1
             
-        # Count ERROR occurrences
+        # Count ERROR occurrences 
         if "ERROR" in line:
             error_count += 1
             
@@ -520,7 +552,6 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
             if loc_match:
                 file_name = loc_match.group(1)
                 line_num = int(loc_match.group(2))
-                location = f"{file_name}:{line_num}"
                 
                 # Add to location tracking
                 if file_name not in failure_locations:
@@ -784,6 +815,7 @@ def format_error_for_feedback(result: Dict[str, Any]) -> str:
 def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_result: Dict[str, Any]) -> str:
     """
     Generate a targeted improvement recommendation based on CBMC results.
+    Includes specialized guidance for timeout issues and other performance problems.
     
     Args:
         harness_code: The current harness code
@@ -942,12 +974,56 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
                 recommendation.append("- For enums and structs: you cannot redeclare them at all")
                 recommendation.append("- Solution: remove your declarations and use what's in the header")
         
-        # Add line-specific error mapping
+        # Add line-specific error mapping with enhanced pinpointing
         error_locations = cbmc_result.get("error_locations", {})
+        # Also check if we have stderr content for more line-specific error details
+        stderr = cbmc_result.get("stderr", "")
+        
         if error_locations:
             # Add specific section for line-based error mapping
             recommendation.append("\n== LINE-SPECIFIC ERROR TRACING ==")
             recommendation.append("The following line numbers in your harness have verification failures:")
+            
+            # First extract more detailed error information from CBMC stderr output to map lines to specific errors
+            # This maps file+line to detailed error message
+            detailed_line_errors = {}
+            
+            # Extract line-specific error messages from stderr first (more detail)
+            if stderr:
+                for line in stderr.split('\n'):
+                    if 'error:' in line or (('warning:' in line) and any(critical in line.lower() 
+                                                                 for critical in ['pointer', 'memory', 'null', 'invalid'])):
+                        # Extract file and line information using improved regex
+                        loc_match = re.search(r'([^:]+):(\d+)(?::\d+)?:', line)
+                        if loc_match:
+                            file_name = loc_match.group(1)
+                            line_num = int(loc_match.group(2))
+                            # Extract the actual error message
+                            error_msg = line.split(':', 3)[-1].strip() if len(line.split(':', 3)) >= 4 else line
+                            
+                            # Create key for the detailed_line_errors dictionary
+                            key = f"{file_name}:{line_num}"
+                            if key not in detailed_line_errors:
+                                detailed_line_errors[key] = []
+                            # Add this specific error message
+                            detailed_line_errors[key].append(error_msg)
+            
+            # Now extract error messages from stdout for lines that don't have stderr details
+            for line in cbmc_result.get("stdout", "").split('\n'):
+                if "FAILED" in line or "FAILURE" in line or "ERROR" in line:
+                    loc_match = re.search(r'file ([^:]+):(\d+)', line)
+                    if loc_match:
+                        file_name = loc_match.group(1)
+                        line_num = int(loc_match.group(2))
+                        key = f"{file_name}:{line_num}"
+                        
+                        # Only add if we don't already have stderr details for this line
+                        if key not in detailed_line_errors:
+                            detailed_line_errors[key] = []
+                            # Extract the error type and message if possible
+                            error_type_match = re.search(r'\[(.*?)\]', line)
+                            error_type = error_type_match.group(1) if error_type_match else "general"
+                            detailed_line_errors[key].append(f"{error_type}: {line.strip()}")
             
             # Track by file
             for file_name, line_numbers in error_locations.items():
@@ -958,33 +1034,177 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
                     # Get lines from harness code
                     harness_lines = harness_code.strip().split('\n')
                     
-                    # Map each error line to actual code
+                    # For context, we'll show surrounding lines as well
+                    context_lines = 2  # Number of lines before and after error line
+                    
+                    # Map each error line to actual code with context
                     for line_num in sorted(line_numbers):
                         # Adjust for 0-based indexing in our code representation
                         line_index = line_num - 1
                         
                         # Safety check to avoid index errors
                         if 0 <= line_index < len(harness_lines):
+                            # Get the error line content
                             line_content = harness_lines[line_index].strip()
                             if line_content:
-                                recommendation.append(f"Line {line_num}: {line_content}")
+                                recommendation.append(f"\n🔴 Line {line_num}: {line_content}")
                                 
-                                # Add specific improvement hint based on line content
+                                # Add the detailed error message if available
+                                key = f"{file_name}:{line_num}"
+                                if key in detailed_line_errors and detailed_line_errors[key]:
+                                    recommendation.append(f"  SPECIFIC ERROR: {'; '.join(detailed_line_errors[key])}")
+                                
+                                # Add specific improvement hint based on line content and error message
+                                specific_error = detailed_line_errors.get(key, [])
+                                specific_error_str = ' '.join(specific_error).lower()
+                                
                                 if "malloc" in line_content and not "free" in harness_code:
                                     recommendation.append(f"  ↪ FIX NEEDED: Add free() for memory allocated on this line")
-                                elif "->" in line_content or "*" in line_content:
+                                elif "->" in line_content or "*" in line_content or "null" in specific_error_str or "nullptr" in specific_error_str:
                                     recommendation.append(f"  ↪ FIX NEEDED: Add NULL check before pointer dereference")
-                                elif "[" in line_content and "]" in line_content:
+                                    recommendation.append(f"    Example: if (ptr != NULL) {{ ... }}")
+                                elif "[" in line_content and "]" in line_content or "bounds" in specific_error_str or "index" in specific_error_str:
                                     recommendation.append(f"  ↪ FIX NEEDED: Add bounds check for array access")
-                                elif "/" in line_content:
+                                    recommendation.append(f"    Example: __CPROVER_assume(index < array_size);")
+                                elif "/" in line_content or "division" in specific_error_str:
                                     recommendation.append(f"  ↪ FIX NEEDED: Add check to prevent division by zero")
+                                    recommendation.append(f"    Example: __CPROVER_assume(divisor != 0);")
+                                elif "overflow" in specific_error_str:
+                                    recommendation.append(f"  ↪ FIX NEEDED: Add checks to prevent arithmetic overflow")
+                                    recommendation.append(f"    Example: __CPROVER_assume(x < INT_MAX/2);")
+                                
+                                # Show context before and after
+                                recommendation.append("\n  Context:")
+                                start_ctx = max(0, line_index - context_lines)
+                                end_ctx = min(len(harness_lines), line_index + context_lines + 1)
+                                
+                                for ctx_idx in range(start_ctx, end_ctx):
+                                    if ctx_idx == line_index:  # Skip the error line as it's already shown
+                                        continue
+                                    
+                                    prefix = "  → " if ctx_idx < line_index else "  → "
+                                    recommendation.append(f"{prefix}Line {ctx_idx+1}: {harness_lines[ctx_idx].strip()}")
+                            
                         else:
                             recommendation.append(f"Line {line_num}: [Line number out of range]")
                 else:
                     # This is a source file, not the harness
                     recommendation.append(f"\nIn source file '{file_name}':")
                     for line_num in sorted(line_numbers):
-                        recommendation.append(f"Line {line_num}: Error originated in source code (likely called from harness)")
+                        # Add the detailed error message if available
+                        key = f"{file_name}:{line_num}"
+                        error_detail = ""
+                        if key in detailed_line_errors and detailed_line_errors[key]:
+                            error_detail = f" - {'; '.join(detailed_line_errors[key])}"
+                            
+                        recommendation.append(f"Line {line_num}: Error originated in source code{error_detail}")
+            
+            # Add additional suggestions for common issues based on error patterns
+            common_issues = []
+            
+            # Look at all detailed errors to identify patterns
+            for key, errors in detailed_line_errors.items():
+                error_str = ' '.join(errors).lower()
+                
+                if "null" in error_str or "nullptr" in error_str:
+                    common_issues.append("🔍 NULL POINTER DEREFERENCE detected - Add checks before using pointers")
+                if "memory" in error_str and ("leak" in error_str or "free" in error_str):
+                    common_issues.append("🔍 MEMORY LEAK detected - Ensure all allocated memory is freed")
+                if "bounds" in error_str or "index" in error_str:
+                    common_issues.append("🔍 ARRAY BOUNDS issue detected - Add bounds checks before accessing arrays")
+                if "division" in error_str and "zero" in error_str:
+                    common_issues.append("🔍 DIVISION BY ZERO detected - Add checks to ensure divisors are non-zero")
+            
+            # Add common issues without duplication
+            if common_issues:
+                recommendation.append("\nCommon Issues Detected:")
+                for issue in sorted(set(common_issues)):
+                    recommendation.append(f"{issue}")
+            
+            # Add tracing guidance
+            recommendation.append("\nRemember to trace each error to its root cause in your harness:")
+            recommendation.append("- For memory leaks: Add free() for every malloc()/calloc()")
+            recommendation.append("- For null pointer: Add NULL checks before dereferencing")
+            recommendation.append("- For array bounds: Add boundary constraints with __CPROVER_assume()")
+            recommendation.append("- For division by zero: Add checks with __CPROVER_assume(divisor != 0)")
+            
+            # Add suggested patterns for fixing the identified issues
+            recommendation.append("\nSuggested Fix Patterns:")
+            if any("null" in ' '.join(errors).lower() for errors in detailed_line_errors.values()):
+                recommendation.append("""
+// NULL pointer check pattern:
+if (ptr != NULL) {
+    // Use ptr only inside this block
+    result = ptr->field;  // Safe to dereference
+} else {
+    // Handle NULL case
+    return ERROR_CODE;
+}
+
+// Alternatively, use CBMC assume:
+__CPROVER_assume(ptr != NULL);
+result = ptr->field;  // Now safe because CBMC knows ptr is not NULL
+""")
+            
+            if any("memory" in ' '.join(errors).lower() and "leak" in ' '.join(errors).lower() 
+                  for errors in detailed_line_errors.values()):
+                recommendation.append("""
+// Memory management pattern:
+void* buffer = malloc(size);
+__CPROVER_assume(buffer != NULL);
+// ... use buffer ...
+free(buffer);  // Always free allocated memory at the end
+
+// OR use stack allocation instead:
+char static_buffer[SIZE];  // No need for malloc/free
+""")
+                
+            if any("bounds" in ' '.join(errors).lower() or "index" in ' '.join(errors).lower() 
+                  for errors in detailed_line_errors.values()):
+                recommendation.append("""
+// Array bounds check pattern:
+size_t index = nondet_size_t();
+__CPROVER_assume(index < array_size);  // Ensure index is within bounds
+array[index] = value;  // Safe array access
+""")
+        
+            # Find harness code snippets that may contain related problematic code
+            if "null_pointer" in cbmc_result.get("error_categories", []):
+                # Find pointer dereference patterns without null checks
+                ptr_derefs = re.findall(r'(\w+)\s*->\s*\w+', harness_code)
+                ptr_derefs += re.findall(r'\*\s*(\w+)', harness_code)  # Also catch *ptr dereferencing
+                
+                unchecked_ptrs = []
+                for ptr in ptr_derefs:
+                    if (f"if ({ptr} != NULL)" not in harness_code and 
+                        f"__CPROVER_assume({ptr} != NULL)" not in harness_code and
+                        f"if (NULL != {ptr})" not in harness_code):
+                        unchecked_ptrs.append(ptr)
+                
+                if unchecked_ptrs:
+                    recommendation.append("\nUnchecked pointer dereferences found:")
+                    for ptr in sorted(set(unchecked_ptrs)):
+                        recommendation.append(f"- '{ptr}' is used without NULL check")
+                    recommendation.append("\nAdd null checks before using these pointers:")
+                    recommendation.append(f"if ({unchecked_ptrs[0]} != NULL) {{ /* use {unchecked_ptrs[0]} */ }}")
+                    recommendation.append(f"OR: __CPROVER_assume({unchecked_ptrs[0]} != NULL);")
+            
+            if "memory_leak" in cbmc_result.get("error_categories", []):
+                # Find malloc without corresponding free
+                malloc_vars = re.findall(r'(\w+)\s*=\s*(?:malloc|calloc)\([^;]+\)', harness_code)
+                unfree_vars = []
+                
+                for var in malloc_vars:
+                    if f"free({var})" not in harness_code:
+                        unfree_vars.append(var)
+                
+                if unfree_vars:
+                    recommendation.append("\nMemory leaks detected:")
+                    for var in unfree_vars:
+                        recommendation.append(f"- '{var}' is allocated but never freed")
+                    recommendation.append("\nAdd these lines before the end of main():")
+                    for var in unfree_vars:
+                        recommendation.append(f"free({var});  // Free allocated memory")
             
             # Add tracing guidance
             recommendation.append("\nRemember to trace each error to its root cause in your harness:")
@@ -1009,6 +1229,86 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
                         recommendation.append(f"\nMemory leak detected: '{var}' is allocated but never freed")
                         recommendation.append(f"Add this before end of function: free({var});")
         
+        # Add specific recommendations for timeout issues
+        if cbmc_result.get("verification_status") == "TIMEOUT" or "timeout" in cbmc_result.get("error_categories", []):
+            recommendation.append("\n== TIMEOUT ISSUES DETECTED ==")
+            recommendation.append("CBMC verification timed out, which often indicates excessive complexity in the harness.")
+            recommendation.append("Here are specific recommendations to prevent timeouts:")
+            
+            # Check harness complexity
+            complexity_issues = []
+            if "while" in harness_code and "__CPROVER_assume" not in harness_code:
+                complexity_issues.append("- Harness contains loops without CPROVER constraints")
+            if harness_code.count("malloc(") > 3:
+                complexity_issues.append("- Harness has excessive memory allocations (>3)")
+            if len(harness_code.split('\n')) > 100:
+                complexity_issues.append("- Harness is excessively long (>100 lines)")
+            
+            # Add found complexity issues or generic guidance
+            if complexity_issues:
+                recommendation.append("\nDetected complexity issues in harness:")
+                recommendation.extend(complexity_issues)
+            
+            recommendation.append("\nTimeout resolution strategies:")
+            recommendation.append("1. REDUCE COMPLEXITY: Create a significantly simpler harness")
+            recommendation.append("   - Remove unnecessary loops or limit iterations with __CPROVER_assume(i < 3)")
+            recommendation.append("   - Reduce the number of malloc() calls and the size of allocated memory")
+            recommendation.append("   - Use smaller, fixed-size buffers instead of dynamic allocation")
+            recommendation.append("   - Add specific constraints to limit input values")
+            
+            recommendation.append("\n2. AVOID UNBOUNDED LOOPS:")
+            recommendation.append("   - Add bounds to all loops: for(int i=0; i < N; i++) where N is small (≤3)")
+            recommendation.append("   - Add __CPROVER_assume(counter < MAX) before any while loop")
+            recommendation.append("   - Replace while loops with equivalent fixed-iteration for loops when possible")
+            
+            recommendation.append("\n3. USE SPECIFIC BOUNDS ON INPUTS:")
+            recommendation.append("   - Add constraints on all nondeterministic inputs")
+            recommendation.append("   - Examples:")
+            recommendation.append("     - __CPROVER_assume(size > 0 && size < 10);")
+            recommendation.append("     - __CPROVER_assume(ptr != NULL && is_valid(ptr));")
+            
+            recommendation.append("\n4. SIMPLIFY MEMORY ALLOCATION:")
+            recommendation.append("   - Use stack allocation instead of dynamic memory when possible:")
+            recommendation.append("     char buffer[SIZE]; // Instead of malloc(SIZE)")
+            recommendation.append("   - Limit allocated memory to small sizes:")
+            recommendation.append("     malloc(size); where __CPROVER_assume(size < 10);")
+            
+            recommendation.append("\n5. USE THE --UNWIND FLAG:")
+            recommendation.append("   - Add specific unwinding limits in the harness comment:")
+            recommendation.append("     // --unwind 3")
+            recommendation.append("   - This helps CBMC limit loop iterations")
+            
+            # Example of a minimal timeout-resistant harness
+            recommendation.append("\nExample of a minimal timeout-resistant harness:")
+            recommendation.append("```c")
+            recommendation.append("// Minimal harness pattern to avoid timeouts")
+            recommendation.append("#include <stdlib.h>")
+            recommendation.append("")
+            recommendation.append("void main() {")
+            recommendation.append("    // Use constrained inputs")
+            recommendation.append("    int size = nondet_int();")
+            recommendation.append("    __CPROVER_assume(size > 0 && size < 10);  // Small, bounded size")
+            recommendation.append("")
+            recommendation.append("    // Prefer stack allocation when possible")
+            recommendation.append("    char fixed_buffer[10];  // Fixed small size")
+            recommendation.append("")
+            recommendation.append("    // If malloc is necessary, use small sizes and null checks")
+            recommendation.append("    char* dynamic_buffer = NULL;")
+            recommendation.append("    if (size > 5) {  // Conditional allocation")
+            recommendation.append("        dynamic_buffer = malloc(size);")
+            recommendation.append("        __CPROVER_assume(dynamic_buffer != NULL);")
+            recommendation.append("    }")
+            recommendation.append("")
+            recommendation.append("    // Call function with carefully constrained inputs")
+            recommendation.append("    int result = target_function(fixed_buffer, size);")
+            recommendation.append("")
+            recommendation.append("    // Always free allocated memory")
+            recommendation.append("    if (dynamic_buffer != NULL) {")
+            recommendation.append("        free(dynamic_buffer);")
+            recommendation.append("    }")
+            recommendation.append("}")
+            recommendation.append("```")
+            
         # Add code patterns for specific error types
         patterns = []
         

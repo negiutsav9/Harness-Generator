@@ -594,27 +594,20 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                                     # Check if values are "NA" or strings
                                     if total_cov_val == "NA" or not isinstance(total_cov_val, (int, float)):
                                         total_cov = 0
+                                        html_report += f'<td>N/A</td>'
                                     else:
                                         total_cov = float(total_cov_val)
+                                        # Determine color class
+                                        total_class = "good" if total_cov >= 80 else "medium" if total_cov >= 50 else "poor"
+                                        html_report += f'<td class="{total_class}">{total_cov:.2f}%</td>'
                                         
                                     if func_cov_val == "NA" or not isinstance(func_cov_val, (int, float)):
                                         func_cov = 0
+                                        html_report += f'<td>N/A</td>'
                                     else:
                                         func_cov = float(func_cov_val)
-                                    
-                                    # Determine color classes
-                                    total_class = "good" if total_cov >= 80 else "medium" if total_cov >= 50 else "poor"
-                                    func_class = "good" if func_cov >= 80 else "medium" if func_cov >= 50 else "poor"
-                                    
-                                    # Display appropriate values
-                                    if total_cov_val == "NA":
-                                        html_report += f'<td>N/A</td>'
-                                    else:
-                                        html_report += f'<td class="{total_class}">{total_cov:.2f}%</td>'
-                                        
-                                    if func_cov_val == "NA":
-                                        html_report += f'<td>N/A</td>'
-                                    else:
+                                        # Determine color class
+                                        func_class = "good" if func_cov >= 80 else "medium" if func_cov >= 50 else "poor"
                                         html_report += f'<td class="{func_class}">{func_cov:.2f}%</td>'
                                 except (ValueError, TypeError):
                                     # Handle non-numeric values
@@ -679,21 +672,23 @@ def output_node(state):
     function_times = state.get("function_times", {})
     total_refinements = sum(state.get("refinement_attempts", {}).values())
     
-    # Run coverage analysis only if all harnesses are complete
+    # Instead of running coverage analysis, directly load the existing CSV file 
+    # Construct the path using the LLM model and result directories
+    coverage_dir = os.path.join(result_base_dir, "coverage", "data")
+    coverage_file_path = os.path.join(coverage_dir, "coverage_metrics.csv")
     coverage_df = pl.DataFrame()
-    if all_harnesses_complete:
-        logger.info("All harnesses generated and verified. Running coverage analysis...")
-        coverage_df = analyze_coverage_by_version(result_base_dir, harnesses_dir, verification_dir)
-        
-        # Generate coverage report
-        if not coverage_df.is_empty():
-            coverage_dir = os.path.join(result_base_dir, "coverage")
-            generate_coverage_report(coverage_df, coverage_dir)
-            logger.info(f"Coverage report generated in {coverage_dir}")
-    else:
-        logger.warning("Not all harnesses have been generated and verified. Skipping coverage analysis.")
     
-    # Calculate aggregate metrics from the coverage analysis
+    if os.path.exists(coverage_file_path):
+        logger.info(f"Loading coverage metrics from {coverage_file_path}")
+        try:
+            coverage_df = pl.read_csv(coverage_file_path)
+            logger.info(f"Loaded coverage data with {len(coverage_df)} rows")
+        except Exception as e:
+            logger.error(f"Error reading coverage CSV: {str(e)}")
+    else:
+        logger.warning(f"Coverage metrics file not found at {coverage_file_path}")
+    
+    # Calculate aggregate metrics from the coverage data if loaded
     aggregate_metrics = {
         "total_reachable_lines": 0,
         "total_covered_lines": 0,
@@ -706,40 +701,44 @@ def output_node(state):
     
     if not coverage_df.is_empty():
         # Get latest version for each function
-        latest_versions = coverage_df.group_by("function").agg(pl.max("version").alias("max_version"))
-        latest_metrics = []
-        
-        for func_name, max_version in zip(latest_versions["function"], latest_versions["max_version"]):
-            # Get metrics for this function and version
-            metrics = coverage_df.filter(
-                (pl.col("function") == func_name) & (pl.col("version") == max_version)
-            ).row(0, named=True)
+        try:
+            latest_versions = coverage_df.group_by("function").agg(pl.max("version").alias("max_version"))
+            latest_metrics = []
             
-            latest_metrics.append(metrics)
-            
-            # Add to aggregate totals - ensure we're adding numeric values only
-            if isinstance(metrics["total_reachable_lines"], (int, float)) and metrics["total_reachable_lines"] != "NA":
-                aggregate_metrics["total_reachable_lines"] += int(metrics["total_reachable_lines"])
-            
-            if isinstance(metrics["total_covered_lines"], (int, float)) and metrics["total_covered_lines"] != "NA":
-                aggregate_metrics["total_covered_lines"] += int(metrics["total_covered_lines"])
-            
-            if isinstance(metrics["func_reachable_lines"], (int, float)) and metrics["func_reachable_lines"] != "NA":
-                aggregate_metrics["func_reachable_lines"] += int(metrics["func_reachable_lines"])
-            
-            if isinstance(metrics["func_covered_lines"], (int, float)) and metrics["func_covered_lines"] != "NA":
-                aggregate_metrics["func_covered_lines"] += int(metrics["func_covered_lines"])
-            
-            if isinstance(metrics["reported_errors"], (int, float)) and metrics["reported_errors"] != "NA":
-                aggregate_metrics["total_reported_errors"] += int(metrics["reported_errors"])
-            
-            # Count functions with full coverage
-            if isinstance(metrics["func_coverage_pct"], (int, float)) and metrics["func_coverage_pct"] != "NA" and float(metrics["func_coverage_pct"]) >= 95.0:  # Consider 95%+ as full coverage
-                aggregate_metrics["functions_with_full_coverage"] += 1
+            for func_name, max_version in zip(latest_versions["function"], latest_versions["max_version"]):
+                # Get metrics for this function and version
+                metrics = coverage_df.filter(
+                    (pl.col("function") == func_name) & (pl.col("version") == max_version)
+                ).row(0, named=True)
                 
-            # Count functions without errors
-            if isinstance(metrics["reported_errors"], (int, float)) and metrics["reported_errors"] != "NA" and int(metrics["reported_errors"]) == 0:
-                aggregate_metrics["functions_without_errors"] += 1
+                latest_metrics.append(metrics)
+                
+                # Add to aggregate totals - ensure we're handling numeric values only
+                for metric_key in ["total_reachable_lines", "total_covered_lines", "func_reachable_lines", "func_covered_lines"]:
+                    if metric_key in metrics:
+                        metric_val = metrics[metric_key]
+                        if isinstance(metric_val, (int, float)) and metric_val != "NA":
+                            aggregate_metrics[metric_key] += int(metric_val)
+                
+                # Count reported errors (if available)
+                if "reported_errors" in metrics:
+                    error_val = metrics["reported_errors"]
+                    if isinstance(error_val, (int, float)) and error_val != "NA":
+                        aggregate_metrics["total_reported_errors"] += int(error_val)
+                
+                # Count functions with full coverage
+                if "func_coverage_pct" in metrics:
+                    coverage_val = metrics["func_coverage_pct"]
+                    if isinstance(coverage_val, (int, float)) and coverage_val != "NA" and float(coverage_val) >= 95.0:
+                        aggregate_metrics["functions_with_full_coverage"] += 1
+                
+                # Count functions without errors
+                if "reported_errors" in metrics:
+                    error_val = metrics["reported_errors"]
+                    if isinstance(error_val, (int, float)) and error_val != "NA" and int(error_val) == 0:
+                        aggregate_metrics["functions_without_errors"] += 1
+        except Exception as e:
+            logger.error(f"Error processing coverage data: {str(e)}")
     
     # Calculate overall coverage percentages with safety checks
     overall_total_coverage = 0.0
@@ -861,73 +860,95 @@ def output_node(state):
         "- Loop unwinding assertions are excluded from error count",
     ])
     
-    # Generate the coverage matrix table from JSON files
-    coverage_data_dir = os.path.join(result_base_dir, "coverage", "data")
-    if os.path.exists(coverage_data_dir):
-        # Check if there are JSON files
-        json_files = glob.glob(os.path.join(coverage_data_dir, "*.json"))
-        if json_files:
-            logger.info(f"Creating coverage matrix table from {len(json_files)} JSON files")
-            
-            # Load all JSON files
-            coverage_records = []
-            for json_file in json_files:
+    # Generate the enhanced coverage matrix table with more detailed metrics
+    if not coverage_df.is_empty():
+        # Extract functions and versions from the dataframe
+        functions = sorted(list(set(coverage_df["function"].to_list())))
+        versions = sorted(list(set(coverage_df["version"].to_list())))
+        
+        # Add table title
+        header.extend([
+            "",
+            "## Detailed Coverage Matrix by Function and Version",
+            "",
+            "The table below shows detailed metrics for each function across different versions of the generated harnesses:",
+            ""
+        ])
+        
+        # Create markdown table with functions as rows and versions as columns
+        # For each version, we have three sub-columns: Total Coverage, Functional Coverage, and Errors
+        
+        # Table header row with version columns
+        header_row = "| Function "
+        for version in versions:
+            header_row += f"| Version {version} |||"
+        header.append(header_row)
+        
+        # Sub-header row with Total, Func, and Errors columns for each version
+        subheader_row = "| --- "
+        for _ in versions:
+            subheader_row += "| Total % | Func % | Errors |"
+        header.append(subheader_row)
+        
+        # Data rows
+        for function in functions:
+            func_row = f"| {function} "
+            for version in versions:
+                # Find the record for this function and version
                 try:
-                    with open(json_file, 'r') as f:
-                        data = json.load(f)
-                        coverage_records.append(data)
-                except Exception as e:
-                    logger.error(f"Error reading JSON file {json_file}: {str(e)}")
-            
-            if coverage_records:
-                # Extract all unique functions and versions
-                functions = sorted(list(set([record["function"] for record in coverage_records])))
-                versions = sorted(list(set([record["version"] for record in coverage_records])))
-                
-                # Add table title
-                header.extend([
-                    "",
-                    "## Coverage Matrix by Function and Version",
-                    "",
-                    "The table below shows the coverage metrics for each function across different versions of the generated harnesses:",
-                    ""
-                ])
-                
-                # Create markdown table with functions as rows and versions as columns
-                # For each version, we have two sub-columns: Total Coverage and Functional Coverage
-                
-                # Table header row with version columns
-                header_row = "| Function "
-                for version in versions:
-                    header_row += f"| Version {version} ||"
-                header.append(header_row)
-                
-                # Sub-header row with Total and Func columns for each version
-                subheader_row = "| --- "
-                for _ in versions:
-                    subheader_row += "| Total | Func |"
-                header.append(subheader_row)
-                
-                # Data rows
-                for function in functions:
-                    func_row = f"| {function} "
-                    for version in versions:
-                        # Find the record for this function and version
-                        record = next((r for r in coverage_records if r["function"] == function and r["version"] == version), None)
-                        if record:
-                            total_cov = f"{record['total_coverage_pct']:.2f}%"
-                            func_cov = f"{record['func_coverage_pct']:.2f}%"
-                            func_row += f"| {total_cov} | {func_cov} |"
+                    func_data = coverage_df.filter(
+                        (pl.col("function") == function) & (pl.col("version") == version)
+                    )
+                    
+                    if not func_data.is_empty():
+                        record = func_data.row(0, named=True)
+                        
+                        # Handle both numeric and string values safely
+                        total_cov_val = record.get("total_coverage_pct", "N/A")
+                        func_cov_val = record.get("func_coverage_pct", "N/A")
+                        errors_val = record.get("reported_errors", "N/A")
+                        
+                        # Also check for failure_count which might be present instead of reported_errors
+                        if errors_val == "N/A" and "failure_count" in record:
+                            errors_val = record.get("failure_count", "N/A")
+                        # Also check for error_count which might be present instead
+                        if errors_val == "N/A" and "error_count" in record:
+                            errors_val = record.get("error_count", "N/A")
+                        
+                        # Format values properly
+                        if isinstance(total_cov_val, (int, float)):
+                            total_cov = f"{total_cov_val:.2f}%"
                         else:
-                            func_row += "| - | - |"
-                    header.append(func_row)
-                
-                # Add a note about the coverage metrics
-                header.extend([
-                    "",
-                    "**Note:** 'Total' shows the percentage of all reachable lines that were covered during verification. 'Func' shows the percentage of target function lines that were covered."
-                ])
-
+                            total_cov = "N/A"
+                            
+                        if isinstance(func_cov_val, (int, float)):
+                            func_cov = f"{func_cov_val:.2f}%"
+                        else:
+                            func_cov = "N/A"
+                            
+                        if isinstance(errors_val, (int, float)):
+                            errors = str(errors_val)
+                        else:
+                            errors = "N/A"
+                            
+                        func_row += f"| {total_cov} | {func_cov} | {errors} |"
+                    else:
+                        func_row += "| - | - | - |"
+                except Exception as e:
+                    logger.error(f"Error formatting coverage data: {str(e)}")
+                    func_row += "| - | - | - |"
+            
+            header.append(func_row)
+        
+        # Add a note about the metrics
+        header.extend([
+            "",
+            "**Metrics Legend:**",
+            "- **Total %**: Percentage of all reachable lines that were covered during verification.",
+            "- **Func %**: Percentage of target function lines that were covered.",
+            "- **Errors**: Number of verification errors or failures detected."
+        ])
+    
     # Add performance metrics
     header.extend([
         "",
@@ -972,11 +993,23 @@ def output_node(state):
                     func_metrics = func_data.filter(pl.col("version") == max_version).row(0, named=True)
                     
                     header.append(f"\n#### Coverage Metrics")
-                    header.append(f"- Total reachable lines: {func_metrics['total_reachable_lines']}")
-                    header.append(f"- Total coverage: {func_metrics['total_coverage_pct']:.2f}%")
-                    header.append(f"- Function reachable lines: {func_metrics['func_reachable_lines']}")
-                    header.append(f"- Function coverage: {func_metrics['func_coverage_pct']:.2f}%")
-                    header.append(f"- Reported errors: {func_metrics['reported_errors']}")
+                    
+                    # Handle different metric names and potential string values
+                    for metric_name, display_name in [
+                        ("total_reachable_lines", "Total reachable lines"),
+                        ("total_covered_lines", "Total coverage"),
+                        ("func_reachable_lines", "Function reachable lines"),
+                        ("func_coverage_pct", "Function coverage"),
+                        ("reported_errors", "Reported errors")
+                    ]:
+                        if metric_name in func_metrics:
+                            metric_value = func_metrics[metric_name]
+                            
+                            # Format percentage values appropriately
+                            if metric_name.endswith("_pct") and isinstance(metric_value, (int, float)):
+                                header.append(f"- {display_name}: {metric_value:.2f}%")
+                            else:
+                                header.append(f"- {display_name}: {metric_value}")
                     
                     # Add evolution metrics if function has multiple versions
                     versions = func_data["version"].unique()
@@ -984,14 +1017,23 @@ def output_node(state):
                         first_version = versions.min()
                         first_metrics = func_data.filter(pl.col("version") == first_version).row(0, named=True)
                         
-                        cov_improvement = func_metrics['func_coverage_pct'] - first_metrics['func_coverage_pct']
-                        error_reduction = first_metrics['reported_errors'] - func_metrics['reported_errors']
-                        
-                        header.append(f"\n#### Coverage Evolution")
-                        header.append(f"- Initial coverage (v{first_version}): {first_metrics['func_coverage_pct']:.2f}%")
-                        header.append(f"- Final coverage (v{max_version}): {func_metrics['func_coverage_pct']:.2f}%")
-                        header.append(f"- Coverage improvement: {cov_improvement:.2f}%")
-                        header.append(f"- Error reduction: {error_reduction}")
+                        # Handle potential string values for coverage metrics
+                        try:
+                            initial_cov = float(first_metrics.get('func_coverage_pct', 0))
+                            final_cov = float(func_metrics.get('func_coverage_pct', 0))
+                            cov_improvement = final_cov - initial_cov
+                            
+                            initial_errors = int(first_metrics.get('reported_errors', 0))
+                            final_errors = int(func_metrics.get('reported_errors', 0))
+                            error_reduction = initial_errors - final_errors
+                            
+                            header.append(f"\n#### Coverage Evolution")
+                            header.append(f"- Initial coverage (v{first_version}): {initial_cov:.2f}%")
+                            header.append(f"- Final coverage (v{max_version}): {final_cov:.2f}%")
+                            header.append(f"- Coverage improvement: {cov_improvement:.2f}%")
+                            header.append(f"- Error reduction: {error_reduction}")
+                        except (ValueError, TypeError) as e:
+                            logger.error(f"Error calculating coverage evolution: {str(e)}")
             
             # Add harness evolution information
             harness_history = state.get("harness_history", {}).get(func_name, [])
@@ -1083,10 +1125,12 @@ def output_node(state):
         
         # Add coverage report link
         f.write("<h2>Coverage Reports</h2>")
-        if not coverage_df.is_empty():
-            f.write(f"<p><a href='../coverage/coverage_report.html'>View Detailed Coverage Report</a></p>")
+        coverage_report_path = os.path.join(result_base_dir, "coverage", "coverage_report.html")
+        if os.path.exists(coverage_report_path):
+            rel_path = os.path.relpath(coverage_report_path, reports_dir)
+            f.write(f"<p><a href='{rel_path}'>View Detailed Coverage Report</a></p>")
         else:
-            f.write("<p>Coverage analysis was not performed or did not produce results.</p>")
+            f.write("<p>Coverage report not found.</p>")
         
         # Add unit proof metrics summary table
         f.write("<h2>Unit Proof Metrics Summary</h2>")
@@ -1101,11 +1145,37 @@ def output_node(state):
         f.write(f"<tr><td>Functions without errors</td><td>{aggregate_metrics['functions_without_errors']} of {len(state.get('cbmc_results', {}))}</td></tr>")
         f.write("</table>")
         
-        # Table of function reports
+        # Table of function reports with enhanced metrics
         f.write("<h2>Function Reports</h2>")
         f.write("<table>")
-        f.write("<tr><th>Function</th><th>File</th><th>Status</th><th>Coverage</th><th>Errors</th><th>Versions</th><th>Reports</th></tr>")
+        f.write("<tr><th rowspan='2'>Function</th><th rowspan='2'>File</th><th rowspan='2'>Status</th>")
         
+        # Add version column headers
+        if not coverage_df.is_empty():
+            versions = sorted(list(set(coverage_df["version"].to_list())))
+            for version in versions:
+                f.write(f"<th colspan='3'>Version {version}</th>")
+            f.write("</tr><tr>")
+            
+            # Add subheaders for each version
+            for _ in versions:
+                f.write("<th>Total %</th><th>Func %</th><th>Errors</th>")
+        
+        f.write("</tr>")
+        
+        # Function to get color based on class name
+        def get_color_for_class(class_name):
+            """Return a color hex code based on the class name."""
+            if class_name == "good":
+                return "#00691c"  # Dark green
+            elif class_name == "medium":
+                return "#FFA500"  # Orange
+            elif class_name == "poor":
+                return "#d32f2f"  # Red
+            else:
+                return "#000000"  # Black
+        
+        # Process each function
         for func_name in state.get("vulnerable_functions", []):
             if func_name in state.get("cbmc_results", {}):
                 result = state.get("cbmc_results", {})[func_name]
@@ -1128,57 +1198,56 @@ def output_node(state):
                 else:
                     status_style = "style='color:gray;font-weight:bold'"
                 
-                # Get version count
-                version_count = len(state.get("harness_history", {}).get(func_name, [])) or refinements + 1
-                
-                # Get coverage metrics if available
-                coverage_value = "N/A"
-                coverage_style = ""
-                error_count = "N/A"
-                error_style = ""
-                
-                if not coverage_df.is_empty():
-                    func_data = coverage_df.filter(pl.col("function") == func_name)
-                    if not func_data.is_empty():
-                        max_version = func_data["version"].max()
-                        func_metrics = func_data.filter(pl.col("version") == max_version).row(0, named=True)
-                        
-                        coverage_value = f"{func_metrics['func_coverage_pct']:.2f}%"
-                        error_count = str(func_metrics['reported_errors'])
-                        
-                        # Set color based on coverage
-                        if func_metrics['func_coverage_pct'] >= 80:
-                            coverage_style = "style='color:green;font-weight:bold'"
-                        elif func_metrics['func_coverage_pct'] >= 50:
-                            coverage_style = "style='color:orange;font-weight:bold'"
-                        else:
-                            coverage_style = "style='color:red;font-weight:bold'"
-                        
-                        # Set color based on errors
-                        if func_metrics['reported_errors'] == 0:
-                            error_style = "style='color:green;font-weight:bold'"
-                        else:
-                            error_style = "style='color:red;font-weight:bold'"
-                
+                # Start the row
                 f.write(f"<tr><td>{display_name}</td><td>{file_name}</td><td {status_style}>{result['status']}</td>")
-                f.write(f"<td {coverage_style}>{coverage_value}</td>")
-                f.write(f"<td {error_style}>{error_count}</td>")
                 
-                # Add links to all harness versions
-                f.write("<td>")
-                for i in range(1, version_count + 1):
-                    harness_path = os.path.join(harnesses_dir, func_name, f"v{i}.c")
-                    relative_path = os.path.relpath(harness_path, reports_dir)
-                    f.write(f"<a href='../{relative_path}'>v{i}</a> ")
-                f.write("</td>")
+                # Add coverage metrics for each version
+                if not coverage_df.is_empty():
+                    for version in versions:
+                        # Get data for this function and version
+                        try:
+                            func_data = coverage_df.filter(
+                                (pl.col("function") == func_name) & (pl.col("version") == version)
+                            )
+                            
+                            if not func_data.is_empty():
+                                metrics = func_data.row(0, named=True)
+                                
+                                # Process total coverage
+                                total_cov_val = metrics.get("total_coverage_pct", "N/A")
+                                if isinstance(total_cov_val, (int, float)):
+                                    total_class = "good" if total_cov_val >= 80 else "medium" if total_cov_val >= 50 else "poor"
+                                    f.write(f"<td style='color:{get_color_for_class(total_class)}'>{total_cov_val:.2f}%</td>")
+                                else:
+                                    f.write("<td>N/A</td>")
+                                
+                                # Process func coverage
+                                func_cov_val = metrics.get("func_coverage_pct", "N/A")
+                                if isinstance(func_cov_val, (int, float)):
+                                    func_class = "good" if func_cov_val >= 80 else "medium" if func_cov_val >= 50 else "poor"
+                                    f.write(f"<td style='color:{get_color_for_class(func_class)}'>{func_cov_val:.2f}%</td>")
+                                else:
+                                    f.write("<td>N/A</td>")
+                                
+                                # Process errors/failures
+                                errors_val = metrics.get("reported_errors", "N/A")
+                                if errors_val == "N/A" and "failure_count" in metrics:
+                                    errors_val = metrics.get("failure_count", "N/A")
+                                if errors_val == "N/A" and "error_count" in metrics:
+                                    errors_val = metrics.get("error_count", "N/A")
+                                
+                                if isinstance(errors_val, (int, float)):
+                                    error_class = "good" if errors_val == 0 else "poor"
+                                    f.write(f"<td style='color:{get_color_for_class(error_class)}'>{errors_val}</td>")
+                                else:
+                                    f.write("<td>N/A</td>")
+                            else:
+                                f.write("<td>-</td><td>-</td><td>-</td>")
+                        except Exception as e:
+                            logger.error(f"Error formatting HTML metrics for {func_name}, version {version}: {str(e)}")
+                            f.write("<td>-</td><td>-</td><td>-</td>")
                 
-                # Add links to all version reports
-                f.write("<td>")
-                for i in range(1, refinements + 2):
-                    report_path = os.path.join(verification_dir, func_name, f"v{i}_report.md")
-                    relative_path = os.path.relpath(report_path, reports_dir)
-                    f.write(f"<a href='../{relative_path}'>v{i}</a> ")
-                f.write("</td></tr>")
+                f.write("</tr>")
         
         f.write("</table>")
         
@@ -1197,23 +1266,70 @@ def output_node(state):
                 initial_version = versions[0]
                 final_version = versions[-1]
                 
-                initial_metrics = func_df.filter(pl.col("version") == initial_version).row(0, named=True)
-                final_metrics = func_df.filter(pl.col("version") == final_version).row(0, named=True)
-                
-                # Calculate improvements
-                func_cov_improvement = final_metrics["func_coverage_pct"] - initial_metrics["func_coverage_pct"]
-                error_reduction = initial_metrics["reported_errors"] - final_metrics["reported_errors"]
-                
-                improvement_data.append({
-                    "function": func_name,
-                    "versions": len(versions),
-                    "initial_func_coverage": initial_metrics["func_coverage_pct"],
-                    "final_func_coverage": final_metrics["func_coverage_pct"],
-                    "func_coverage_improvement": func_cov_improvement,
-                    "initial_errors": initial_metrics["reported_errors"],
-                    "final_errors": final_metrics["reported_errors"],
-                    "error_reduction": error_reduction
-                })
+                try:
+                    initial_metrics = func_df.filter(pl.col("version") == initial_version).row(0, named=True)
+                    final_metrics = func_df.filter(pl.col("version") == final_version).row(0, named=True)
+                    
+                    # Safely extract and convert coverage values
+                    init_cov = initial_metrics.get("func_coverage_pct", 0)
+                    final_cov = final_metrics.get("func_coverage_pct", 0)
+                    
+                    # Handle string values
+                    if isinstance(init_cov, str) and init_cov == "NA":
+                        init_cov = 0
+                    elif isinstance(init_cov, str):
+                        try:
+                            init_cov = float(init_cov)
+                        except:
+                            init_cov = 0
+                            
+                    if isinstance(final_cov, str) and final_cov == "NA":
+                        final_cov = 0
+                    elif isinstance(final_cov, str):
+                        try:
+                            final_cov = float(final_cov)
+                        except:
+                            final_cov = 0
+                    
+                    # Calculate improvement
+                    func_cov_improvement = float(final_cov) - float(init_cov)
+                    
+                    # Get error counts safely
+                    init_errors = initial_metrics.get("reported_errors", 0)
+                    final_errors = final_metrics.get("reported_errors", 0)
+                    
+                    # Handle string values for errors
+                    if isinstance(init_errors, str) and init_errors == "NA":
+                        init_errors = 0
+                    elif isinstance(init_errors, str):
+                        try:
+                            init_errors = int(init_errors)
+                        except:
+                            init_errors = 0
+                            
+                    if isinstance(final_errors, str) and final_errors == "NA":
+                        final_errors = 0
+                    elif isinstance(final_errors, str):
+                        try:
+                            final_errors = int(final_errors)
+                        except:
+                            final_errors = 0
+                    
+                    # Calculate error reduction
+                    error_reduction = int(init_errors) - int(final_errors)
+                    
+                    # Only add if there was improvement
+                    if func_cov_improvement > 0:
+                        improvement_data.append({
+                            "function": func_name,
+                            "versions": len(versions),
+                            "initial_func_coverage": float(init_cov),
+                            "final_func_coverage": float(final_cov),
+                            "func_coverage_improvement": func_cov_improvement,
+                            "error_reduction": error_reduction
+                        })
+                except Exception as e:
+                    logger.error(f"Error processing improvement data for {func_name}: {str(e)}")
             
             if improvement_data:
                 f.write("<h2>Coverage Improvement</h2>")
@@ -1226,10 +1342,6 @@ def output_node(state):
                 improvement_data.sort(key=lambda x: x["func_coverage_improvement"], reverse=True)
                 
                 for item in improvement_data:
-                    # Skip functions without improvement
-                    if item["func_coverage_improvement"] <= 0:
-                        continue
-                        
                     # Determine class for coverage improvement
                     improvement_class = "good" if item["func_coverage_improvement"] > 10 else "medium" if item["func_coverage_improvement"] > 0 else "poor"
                     

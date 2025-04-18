@@ -19,6 +19,17 @@ def harness_evaluator_node(state):
     func_name = state.get("current_function", "")
     loop_counter = state.get("loop_counter", 0)
     
+    # Check if we're dealing with a C keyword function and ensure we use the right name
+    c_keywords = ["free", "malloc", "if", "while", "for", "return", "switch", "case", "default", "break"]
+    if func_name in c_keywords:
+        original_func_name = func_name
+        func_name = f"function_{func_name}"
+        logger.warning(f"Function name '{original_func_name}' is a C keyword. Using '{func_name}' internally to avoid conflicts.")
+        # Update state for downstream processes
+        state["current_function"] = func_name
+        # Keep track of the original name
+        state["original_function_name"] = original_func_name
+    
     logger.info(f"Evaluating harness for {func_name}")
     
     harnesses = state.get("harnesses", {})
@@ -41,7 +52,7 @@ def harness_evaluator_node(state):
         state_refinement_attempts[func_name] = 0
     
     current_attempts = state_refinement_attempts.get(func_name, 0)
-    max_refinements = 9  # Maximum number of refinement attempts
+    max_refinements = 10  # Maximum number of refinement attempts
     
     # Processed functions tracking
     state_processed_functions = state.get("processed_functions", []).copy()
@@ -111,12 +122,16 @@ def harness_evaluator_node(state):
         with open(harness_file, "w") as f:
             f.write(harness_code)
             
-    # Save to harness history
+    # Save to harness history - with defensive initialization
     harness_history = state.get("harness_history", {}).copy()
     if func_name not in harness_history:
         harness_history[func_name] = []
+    elif not isinstance(harness_history[func_name], list):
+        # Fix any corrupted state - ensure it's always a list
+        logger.warning(f"Harness history for {func_name} was not a list. Reinitializing.")
+        harness_history[func_name] = []
         
-    if harness_code not in harness_history[func_name]:
+    if harness_code and harness_code not in harness_history[func_name]:
         harness_history[func_name].append(harness_code)
     
     # IMPORTANT: Store previous error categories in current result for tracking progress
@@ -125,6 +140,62 @@ def harness_evaluator_node(state):
     prev_result = cbmc_results.get(func_name, {})
     if prev_result and "error_categories" in prev_result and version_num > 1:
         cbmc_result["previous_error_categories"] = prev_result.get("error_categories", [])
+    
+    # Check for critical STDERR issues that need to be prioritized
+    stderr = cbmc_result.get("stderr", "")
+    if stderr and ("error:" in stderr or "undefined reference" in stderr):
+        logger.warning(f"Critical STDERR errors detected for {func_name}")
+        
+        # Add specialized error categories based on stderr content
+        if "redeclaration" in stderr and "redeclaration" not in curr_error_categories:
+            curr_error_categories.append("redeclaration")
+            cbmc_result["error_categories"] = curr_error_categories
+            logger.warning(f"Added 'redeclaration' to error categories based on STDERR")
+            
+        if "undefined reference" in stderr and "linking_error" not in curr_error_categories:
+            curr_error_categories.append("linking_error")
+            cbmc_result["error_categories"] = curr_error_categories
+            logger.warning(f"Added 'linking_error' to error categories based on STDERR")
+            
+        # Check for common CBMC-specific issues in STDERR
+        if "cannot open file" in stderr:
+            curr_error_categories.append("missing_file")
+            cbmc_result["error_categories"] = curr_error_categories
+            logger.warning(f"Added 'missing_file' to error categories based on STDERR")
+            
+        # Ensure the stderr is properly processed in the evaluation output
+        cbmc_result["has_stderr_errors"] = True
+        
+    # Check for timeout and performance issues
+    is_timeout = cbmc_result.get("status") == "TIMEOUT" or cbmc_result.get("verification_status") == "TIMEOUT"
+    is_slow = cbmc_result.get("is_slow_verification", False)
+    
+    # Add specialized handling for timeouts
+    if is_timeout and "timeout" not in curr_error_categories:
+        curr_error_categories.append("timeout")
+        cbmc_result["error_categories"] = curr_error_categories
+        logger.warning(f"Added 'timeout' to error categories for {func_name}")
+        
+        # Track timeout as a persistent issue
+        state_persistent_errors = state.get("persistent_errors", {})
+        if func_name not in state_persistent_errors:
+            state_persistent_errors[func_name] = {}
+            
+        if "timeout" not in state_persistent_errors[func_name]:
+            state_persistent_errors[func_name]["timeout"] = 1
+        else:
+            state_persistent_errors[func_name]["timeout"] += 1
+            
+        state["persistent_errors"] = state_persistent_errors
+        cbmc_result["persistent_errors"] = state_persistent_errors[func_name]
+        
+    # Add specialized handling for slow verification (may lead to future timeouts)
+    if is_slow and "performance_warning" not in curr_error_categories:
+        curr_error_categories.append("performance_warning")
+        cbmc_result["error_categories"] = curr_error_categories
+        
+        verification_time = cbmc_result.get("slow_verification_time", 0.0)
+        logger.warning(f"Added 'performance_warning' to error categories for {func_name} - verification took {verification_time:.1f}s")
     
     # NEW: Check for repeated errors - if same errors in consecutive versions, consider the solution ineffective
     error_categories = cbmc_result.get("error_categories", [])

@@ -713,10 +713,18 @@ class UnifiedEmbeddingDB:
                 
             # If we have conditions, execute the query
             if query_conditions:
-                existing_solutions = self.solution_collection.get(
-                    where_document={"$or": query_conditions},
-                    include=["metadatas"]
-                )
+                if len(query_conditions) == 1:
+                    # If only one condition, use it directly
+                    existing_solutions = self.solution_collection.get(
+                        where_document=query_conditions[0],
+                        include=["metadatas"]
+                    )
+                else:
+                    # If multiple conditions, use $or operator
+                    existing_solutions = self.solution_collection.get(
+                        where_document={"$or": query_conditions},
+                        include=["metadatas"]
+                    )
             else:
                 # Default empty result if no valid conditions
                 existing_solutions = {"ids": [], "metadatas": []}
@@ -908,14 +916,29 @@ class UnifiedEmbeddingDB:
                 include=["documents", "metadatas"]
             )
         else:
+            # Build query conditions
+            query_conditions = []
+            if error_id and isinstance(error_id, str):
+                query_conditions.append({"$contains": error_id})
+            if func_name and isinstance(func_name, str):
+                query_conditions.append({"$contains": func_name})
+            
             # Try to find solutions for the specific error
-            solutions = self.solution_collection.get(
-                where_document={"$or": [
-                    {"$contains": error_id},
-                    {"$contains": func_name}
-                ]},
-                include=["documents", "metadatas"]
-            )
+            if not query_conditions:
+                # No valid conditions, use empty result
+                solutions = {"ids": [], "metadatas": []}
+            elif len(query_conditions) == 1:
+                # Only one condition, use it directly
+                solutions = self.solution_collection.get(
+                    where_document=query_conditions[0],
+                    include=["documents", "metadatas"]
+                )
+            else:
+                # Multiple conditions, use $or
+                solutions = self.solution_collection.get(
+                    where_document={"$or": query_conditions},
+                    include=["documents", "metadatas"]
+                )
         
         # Process solutions
         solution_list = []
