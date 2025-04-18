@@ -812,6 +812,279 @@ def format_error_for_feedback(result: Dict[str, Any]) -> str:
     
     return "\n".join(feedback)
 
+def parse_line_specific_errors(cbmc_stderr: str, cbmc_stdout: str, harness_code: str) -> Dict[str, Any]:
+    """
+    Parse CBMC error messages to extract line-specific errors and suggest fixes.
+    
+    Args:
+        cbmc_stderr: Standard error output from CBMC
+        cbmc_stdout: Standard output from CBMC
+        harness_code: The harness code being verified
+        
+    Returns:
+        Dictionary with line-specific errors and suggested fixes
+    """
+    result = {
+        "error_lines": {},  # Maps line numbers to error messages
+        "suggested_fixes": {},  # Maps line numbers to suggested fixes
+        "error_types": {},  # Maps line numbers to error types
+        "code_snippets": {}  # Maps line numbers to relevant code snippets
+    }
+    
+    # Initialize sets to track line numbers
+    syntax_error_lines = set()
+    null_pointer_lines = set()
+    memory_leak_lines = set()
+    array_bounds_lines = set()
+    division_by_zero_lines = set()
+    redeclaration_lines = set()
+    
+    # First process stderr for more detailed error messages
+    if cbmc_stderr:
+        for line in cbmc_stderr.split('\n'):
+            # Look for lines with error or critical warnings
+            if 'error:' in line or ('warning:' in line and any(critical in line.lower() 
+                                                         for critical in ['pointer', 'memory', 'null', 'invalid'])):
+                # Extract file and line information using improved regex
+                loc_match = re.search(r'([^:]+):(\d+)(?::\d+)?:', line)
+                if loc_match:
+                    file_name = loc_match.group(1)
+                    line_num = int(loc_match.group(2))
+                    
+                    # Extract the actual error message
+                    error_msg = line.split(':', 3)[-1].strip() if len(line.split(':', 3)) >= 4 else line
+                    
+                    # Skip if not related to harness files
+                    if "harness" not in file_name.lower() and "_harness_" not in file_name.lower():
+                        continue
+                    
+                    # Store the error
+                    if line_num not in result["error_lines"]:
+                        result["error_lines"][line_num] = []
+                    result["error_lines"][line_num].append(error_msg)
+                    
+                    # Categorize the error type
+                    error_type = "syntax"  # Default type
+                    
+                    # Check for specific error types
+                    if "redeclaration" in line.lower() or "redefinition" in line.lower():
+                        error_type = "redeclaration"
+                        redeclaration_lines.add(line_num)
+                    elif "null" in line.lower() or "nullptr" in line.lower():
+                        error_type = "null_pointer"
+                        null_pointer_lines.add(line_num)
+                    elif "memory" in line.lower() and ("leak" in line.lower() or "free" in line.lower()):
+                        error_type = "memory_leak"
+                        memory_leak_lines.add(line_num)
+                    elif "bounds" in line.lower() or "index" in line.lower() or "buffer" in line.lower():
+                        error_type = "array_bounds"
+                        array_bounds_lines.add(line_num)
+                    elif "division" in line.lower() and "zero" in line.lower():
+                        error_type = "division_by_zero"
+                        division_by_zero_lines.add(line_num)
+                    
+                    # Store the error type
+                    result["error_types"][line_num] = error_type
+                    
+                    # Add suggested fix based on error type
+                    fix = ""
+                    if error_type == "redeclaration":
+                        if "struct" in line.lower() or "redefinition of body" in line.lower() or "redefinition of" in line.lower():
+                            fix = "NEVER redefine structs. Remove this struct definition entirely and use the one from the header."
+                        else:
+                            fix = "Remove this declaration or add 'extern' if it's a function declaration."
+                    elif error_type == "null_pointer":
+                        fix = "Add null check before using this pointer: if (ptr != NULL) { ... }"
+                    elif error_type == "memory_leak":
+                        fix = "Ensure all allocated memory is freed: free(ptr);"
+                    elif error_type == "array_bounds":
+                        fix = "Add bounds check: __CPROVER_assume(index < array_size);"
+                    elif error_type == "division_by_zero":
+                        fix = "Add zero check: __CPROVER_assume(divisor != 0);"
+                    
+                    # Store the suggested fix
+                    result["suggested_fixes"][line_num] = fix
+                    
+                    # Get code snippet from the harness code
+                    harness_lines = harness_code.strip().split('\n')
+                    line_index = line_num - 1  # Convert to 0-based index
+                    
+                    if 0 <= line_index < len(harness_lines):
+                        # Get context lines (2 before and 2 after)
+                        start_ctx = max(0, line_index - 2)
+                        end_ctx = min(len(harness_lines), line_index + 3)
+                        
+                        # Extract the context lines
+                        context_lines = []
+                        for ctx_idx in range(start_ctx, end_ctx):
+                            prefix = "→ " if ctx_idx == line_index else "  "
+                            context_lines.append(f"{prefix}Line {ctx_idx+1}: {harness_lines[ctx_idx].strip()}")
+                        
+                        # Store the code snippet
+                        result["code_snippets"][line_num] = "\n".join(context_lines)
+    
+    # Now process stdout for additional errors
+    if cbmc_stdout:
+        for line in cbmc_stdout.split('\n'):
+            if "FAILED" in line or "FAILURE" in line:
+                # Extract file and line information
+                loc_match = re.search(r'file ([^:]+):(\d+)', line)
+                if loc_match:
+                    file_name = loc_match.group(1)
+                    line_num = int(loc_match.group(2))
+                    
+                    # Skip if not related to harness files
+                    if "harness" not in file_name.lower() and "_harness_" not in file_name.lower():
+                        continue
+                    
+                    # Skip if we already have this error from stderr (higher precedence)
+                    if line_num in result["error_lines"]:
+                        continue
+                    
+                    # Store the error
+                    if line_num not in result["error_lines"]:
+                        result["error_lines"][line_num] = []
+                    result["error_lines"][line_num].append(line.strip())
+                    
+                    # Try to categorize the error type
+                    error_type = "general"  # Default type
+                    
+                    # Check for specific error types
+                    if "[memory]" in line or "memory-leak" in line:
+                        error_type = "memory_leak"
+                        memory_leak_lines.add(line_num)
+                    elif "[pointer]" in line or "NULL pointer" in line:
+                        error_type = "null_pointer"
+                        null_pointer_lines.add(line_num)
+                    elif "[array]" in line or "array bounds" in line:
+                        error_type = "array_bounds"
+                        array_bounds_lines.add(line_num)
+                    elif "[arithmetic]" in line or "division by zero" in line:
+                        error_type = "division_by_zero"
+                        division_by_zero_lines.add(line_num)
+                    
+                    # Store the error type
+                    result["error_types"][line_num] = error_type
+                    
+                    # Add suggested fix based on error type
+                    fix = ""
+                    if error_type == "memory_leak":
+                        fix = "Ensure all allocated memory is freed: free(ptr);"
+                    elif error_type == "null_pointer":
+                        fix = "Add null check before using this pointer: if (ptr != NULL) { ... }"
+                    elif error_type == "array_bounds":
+                        fix = "Add bounds check: __CPROVER_assume(index < array_size);"
+                    elif error_type == "division_by_zero":
+                        fix = "Add zero check: __CPROVER_assume(divisor != 0);"
+                    elif error_type == "general":
+                        fix = "Review this line for potential errors."
+                    
+                    # Store the suggested fix
+                    result["suggested_fixes"][line_num] = fix
+                    
+                    # Get code snippet from the harness code
+                    harness_lines = harness_code.strip().split('\n')
+                    line_index = line_num - 1  # Convert to 0-based index
+                    
+                    if 0 <= line_index < len(harness_lines):
+                        # Get context lines (2 before and 2 after)
+                        start_ctx = max(0, line_index - 2)
+                        end_ctx = min(len(harness_lines), line_index + 3)
+                        
+                        # Extract the context lines
+                        context_lines = []
+                        for ctx_idx in range(start_ctx, end_ctx):
+                            prefix = "→ " if ctx_idx == line_index else "  "
+                            context_lines.append(f"{prefix}Line {ctx_idx+1}: {harness_lines[ctx_idx].strip()}")
+                        
+                        # Store the code snippet
+                        result["code_snippets"][line_num] = "\n".join(context_lines)
+    
+    # Add code pattern suggestions for specific error types
+    for line_num, error_type in result["error_types"].items():
+        if error_type == "redeclaration" and ("struct" in result.get("error_lines", {}).get(line_num, [""])[0].lower() 
+                                         or "redefinition of body" in result.get("error_lines", {}).get(line_num, [""])[0].lower()):
+            pattern = """
+// STRUCT REDEFINITION ERROR:
+// NEVER redefine structs that are in headers. Instead:
+
+// 1. Include the header that defines the struct
+#include "your_header.h"
+
+// 2. Use the struct directly WITHOUT redefining it
+struct MyStruct* ptr;  // Just declare a pointer or variable
+
+// WRONG - NEVER DO THIS:
+// struct MyStruct {  // This causes a redefinition error
+//     int field1;    // Even if identical to the header definition
+//     char field2;
+// };
+
+// RIGHT - DO THIS:
+// Simply use the struct that's already defined in the header
+"""
+            if "code_pattern" not in result:
+                result["code_pattern"] = {}
+            result["code_pattern"]["struct_redefinition"] = pattern
+            
+        elif error_type == "null_pointer":
+            pattern = """
+// NULL pointer check pattern:
+if (ptr != NULL) {
+    // Use ptr only inside this block
+    result = ptr->field;  // Safe to dereference
+} else {
+    // Handle NULL case
+    return ERROR_CODE;
+}
+
+// Alternatively, use CBMC assume:
+__CPROVER_assume(ptr != NULL);
+result = ptr->field;  // Now safe because CBMC knows ptr is not NULL
+"""
+            if "code_pattern" not in result:
+                result["code_pattern"] = {}
+            result["code_pattern"][error_type] = pattern
+        
+        elif error_type == "memory_leak":
+            pattern = """
+// Memory management pattern:
+void* buffer = malloc(size);
+__CPROVER_assume(buffer != NULL);
+// ... use buffer ...
+free(buffer);  // Always free allocated memory at the end
+
+// OR use stack allocation instead:
+char static_buffer[SIZE];  // No need for malloc/free
+"""
+            if "code_pattern" not in result:
+                result["code_pattern"] = {}
+            result["code_pattern"][error_type] = pattern
+        
+        elif error_type == "array_bounds":
+            pattern = """
+// Array bounds check pattern:
+size_t index = nondet_size_t();
+__CPROVER_assume(index < array_size);  // Ensure index is within bounds
+array[index] = value;  // Safe array access
+"""
+            if "code_pattern" not in result:
+                result["code_pattern"] = {}
+            result["code_pattern"][error_type] = pattern
+        
+        elif error_type == "division_by_zero":
+            pattern = """
+// Division by zero check pattern:
+int divisor = nondet_int();
+__CPROVER_assume(divisor != 0);  // Ensure divisor is not zero
+result = value / divisor;  // Safe division
+"""
+            if "code_pattern" not in result:
+                result["code_pattern"] = {}
+            result["code_pattern"][error_type] = pattern
+    
+    return result
+
 def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_result: Dict[str, Any]) -> str:
     """
     Generate a targeted improvement recommendation based on CBMC results.
@@ -826,8 +1099,54 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
         A detailed improvement recommendation
     """
     try:
+        # Parse line-specific errors
+        stderr = cbmc_result.get("stderr", "")
+        stdout = cbmc_result.get("stdout", "")
+        line_specific_errors = parse_line_specific_errors(stderr, stdout, harness_code)
+        
         # Start with the error feedback
         recommendation = [format_error_for_feedback(cbmc_result)]
+        
+        # Add line-specific error information if available
+        if line_specific_errors and line_specific_errors["error_lines"]:
+            recommendation.append("\n\n== LINE-SPECIFIC ERROR ANALYSIS ==")
+            recommendation.append("The following line numbers in your harness have specific errors that need to be fixed:")
+            
+            # Sort the errors by line number
+            for line_num in sorted(line_specific_errors["error_lines"].keys()):
+                error_msgs = line_specific_errors["error_lines"][line_num]
+                error_type = line_specific_errors["error_types"].get(line_num, "unknown")
+                fix = line_specific_errors["suggested_fixes"].get(line_num, "Review this line for errors.")
+                code_snippet = line_specific_errors["code_snippets"].get(line_num, "")
+                
+                # Add the error information
+                recommendation.append(f"\n🔴 Line {line_num} - {error_type.upper()} ERROR:")
+                recommendation.append(f"  Error: {'; '.join(error_msgs)}")
+                recommendation.append(f"  Suggested Fix: {fix}")
+                
+                # Add the code snippet
+                if code_snippet:
+                    recommendation.append("\n  Code Context:")
+                    recommendation.append(f"{code_snippet}")
+            
+            # Add code patterns for common error types
+            if "code_pattern" in line_specific_errors:
+                recommendation.append("\n== CODE PATTERNS FOR FIXING ERRORS ==")
+                
+                for error_type, pattern in line_specific_errors["code_pattern"].items():
+                    recommendation.append(f"\nPattern for {error_type.replace('_', ' ')} errors:")
+                    recommendation.append("```c")
+                    recommendation.append(pattern.strip())
+                    recommendation.append("```")
+                    
+            # Add overall guidance
+            recommendation.append("\n== HOW TO FIX THESE ERRORS ==")
+            recommendation.append("1. Start with the highest priority errors (syntax errors, redeclarations)")
+            recommendation.append("2. Fix each error by applying the suggested fix to the specific line")
+            recommendation.append("3. Use the provided code patterns as templates for your fixes")
+            recommendation.append("4. After fixing all line-specific errors, run verification again")
+            recommendation.append("5. If you have memory leaks, make sure EVERY malloc has a corresponding free")
+            recommendation.append("6. If you have null pointer errors, add checks before EVERY pointer dereference")
         
         # Check for persistent errors and add specific guidance when errors repeat
         persistent_errors = cbmc_result.get("persistent_errors", {})

@@ -475,16 +475,25 @@ def generator_node(state):
         2. Always use the EXACT parameter names from the original function
         3. ALWAYS use "extern" keyword for function declarations to avoid redefinition conflicts
         4. NEVER redefine the function being tested
-        5. Create a main() function that calls the target function
-        6. Use __CPROVER_assume() for input constraints
-        7. Use nondet_* functions (like nondet_int(), nondet_char()) for nondeterministic inputs
-        8. You are ENCOURAGED to use both project-specific resources AND standard library headers/functions
-        9. Standard library usage is fully allowed and encouraged where appropriate
-        10. Ensure all declarations are complete and syntactically correct
-        11. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
-        12. DO NOT CREATE STUBS for existing function dependencies
-        13. Properly use project macros that are provided in the PROJECT MACRO LIBRARY section
-        14. Your goal is to achieve coverage of at least {target_coverage}% for the target function
+        5. NEVER redefine any struct, even if you define it exactly the same as the header
+        6. Create a main() function that calls the target function
+        7. Use __CPROVER_assume() for input constraints
+        8. Use nondet_* functions (like nondet_int(), nondet_char()) for nondeterministic inputs
+        9. You are ENCOURAGED to use both project-specific resources AND standard library headers/functions
+        10. Standard library usage is fully allowed and encouraged where appropriate
+        11. Ensure all declarations are complete and syntactically correct
+        12. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
+        13. DO NOT CREATE STUBS for existing function dependencies
+        14. Properly use project macros that are provided in the PROJECT MACRO LIBRARY section
+        15. Your goal is to achieve coverage of at least {target_coverage}% for the target function
+        16. IMPORTANT: If you can't find certain constants (like SHADOW_THINGNAME_MAX_LENGTH), create mock values:
+            /* BEGIN MOCK CONSTANTS */
+            #define MISSING_CONSTANT 128  // Mock value for missing constant
+            /* END MOCK CONSTANTS */
+        17. STRUCT HANDLING - IMPORTANT:
+            - NEVER redefine structs from headers
+            - NEVER declare anonymous structs
+            - Just use the structs directly from their headers
 
         CBMC Verification Flags that will be used:
         {cbmc_flags}
@@ -790,7 +799,7 @@ def generator_node(state):
             // To fix these redeclaration issues:
             // 1. REMOVE ALL DECLARATIONS for these symbols that are already defined in headers
             // 2. If you MUST declare them, use 'extern' keyword and EXACT matching signatures
-            // 3. NEVER redeclare any symbol, type, or enum already defined in a header
+            // 3. NEVER redeclare or redefine any symbol, struct, type, or enum already defined in a header
             // 4. Check for and remove ALL duplicate declarations in your harness
             // 5. For each header you include, DO NOT redeclare ANY symbol from that header
             // 6. If you see "redeclaration with no linkage", use extern or completely remove the declaration
@@ -801,6 +810,29 @@ def generator_node(state):
             // 3. If still failing, ensure your include order is correct
             """
 
+        # Add line-specific error information if available
+        if "line_specific_errors" in cbmc_result and cbmc_result["line_specific_errors"]["error_lines"]:
+            line_specific_errors = cbmc_result["line_specific_errors"]
+            
+            generator_prompt += """
+            // LINE-SPECIFIC ERRORS DETECTED
+            // The following specific line errors were found in the previous harness:
+            """
+            
+            # Sort errors by line number
+            for line_num in sorted(line_specific_errors["error_lines"].keys()):
+                error_msgs = line_specific_errors["error_lines"][line_num]
+                error_type = line_specific_errors["error_types"].get(line_num, "unknown")
+                fix = line_specific_errors["suggested_fixes"].get(line_num, "")
+                
+                generator_prompt += f"// Line {line_num} - {error_type.upper()} ERROR:\n"
+                generator_prompt += f"// - Error: {'; '.join(error_msgs)}\n"
+                generator_prompt += f"// - Fix: {fix}\n"
+            
+            generator_prompt += """
+            // IMPORTANT: Focus first on fixing these specific line errors
+            // Apply the suggested fixes exactly as recommended
+            """
         
         # Add RAG-based recommendations if available
         if rag_recommendations and (rag_recommendations.get("has_similar_errors", False) or 

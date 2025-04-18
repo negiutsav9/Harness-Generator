@@ -50,6 +50,18 @@ notes.txt
 version_*
 Device-Defender-for-AWS-IoT-embedded-sdk
 Device-Defender-for-AWS-IoT-embedded-sdk/*
+coreMQTT
+coreMQTT/*
+coreMQTT-Agent
+coreMQTT-Agent/*
+Device-Shadow-for-AWS-IoT-embedded-sdk
+Device-Shadow-for-AWS-IoT-embedded-sdk/*
+Fleet-Provisioning-for-AWS-IoT-embedded-sdk
+Fleet-Provisioning-for-AWS-IoT-embedded-sdk/*
+Jobs-for-AWS-IoT-embedded-sdk
+Jobs-for-AWS-IoT-embedded-sdk/*
+SigV4-for-AWS-IoT-embedded-sdk
+SigV4-for-AWS-IoT-embedded-sdk/*
 
 # ChromaDB files
 .chroma/

@@ -346,6 +346,16 @@ def harness_evaluator_node(state):
         version_num
     )
     
+    # Parse line-specific errors
+    from utils.cbmc_parser import parse_line_specific_errors
+    
+    stderr = cbmc_result.get("stderr", "")
+    stdout = cbmc_result.get("stdout", "")
+    line_specific_errors = parse_line_specific_errors(stderr, stdout, harness_code)
+    
+    # Add line-specific errors to the CBMC result
+    cbmc_result["line_specific_errors"] = line_specific_errors
+    
     # Generate improvement recommendation
     improvement_recommendation = generate_improvement_recommendation(harness_code, func_code, cbmc_result)
     
