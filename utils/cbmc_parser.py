@@ -406,6 +406,7 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     stderr_error_locations = {}
     stderr_error_messages = []
     stderr_redeclaration_errors = []
+    missing_constants = []  # Track missing constants (uppercase identifiers)
     
     if has_stderr_content:
         # Look for specific error patterns in stderr with line numbers
@@ -427,6 +428,13 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
                     if redecl_symbol not in result["redeclared_symbols"]:
                         result["redeclared_symbols"].append(redecl_symbol)
             
+            # Check specifically for missing constants (all uppercase identifiers)
+            missing_const_match = re.search(r"'([A-Z][A-Z0-9_]*)'.*(undeclared|undefined|not declared)", line)
+            if missing_const_match:
+                missing_constant = missing_const_match.group(1)
+                if missing_constant not in missing_constants:
+                    missing_constants.append(missing_constant)
+                    
             # Look for error message patterns with line numbers
             if 'error:' in line or ('warning:' in line and any(critical in line.lower() 
                                                              for critical in ['pointer', 'memory', 'null', 'invalid'])):
@@ -452,6 +460,11 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
         result["verification_status"] = "FAILED"
         result["has_preprocessing_error"] = True
         result["message"] = "Preprocessing error detected"
+        
+        # Add missing constants to result
+        if missing_constants:
+            result["missing_constants"] = missing_constants
+            result["has_missing_constants"] = True
         
         # Extract specific error messages from stderr
         if stderr_error_messages:  # Use the already extracted error messages
@@ -559,7 +572,7 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
                 if line_num not in failure_locations[file_name]:
                     failure_locations[file_name].append(line_num)
     
-    # Extract missing function bodies
+    # Extract missing function bodies and constants
     missing_functions = set()
     for line in stdout.split('\n'):
         if "no body for callee" in line:
@@ -567,6 +580,13 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
             if match:
                 func_name = match.group(1)
                 missing_functions.add(func_name)
+        
+        # Check for missing constants in stdout too (sometimes they appear here)
+        missing_const_match = re.search(r"'([A-Z][A-Z0-9_]*)'.*(undeclared|undefined|not declared)", line)
+        if missing_const_match:
+            missing_constant = missing_const_match.group(1)
+            if missing_constant not in missing_constants:
+                missing_constants.append(missing_constant)
     
     # Parse coverage information - extract lines for analysis
     # Extract lines of code information from coverage output
@@ -633,13 +653,25 @@ def process_cbmc_output(stdout: str, stderr: str) -> Dict[str, Any]:
     result["failure_count"] = failure_count
     result["error_count"] = error_count
     
+    # Add missing constants to result - do this before setting other categories
+    if missing_constants:
+        result["missing_constants"] = missing_constants
+        result["has_missing_constants"] = True
+        # Add to error categories
+        if "missing_constants" not in failure_categories:
+            failure_categories.add("missing_constants")
+
     # Count errors and set suggestions based on categories
     if failure_categories:
         result["error_categories"] = list(failure_categories)
         result["verification_failures"] = list(failure_categories)
         
         # Set message and suggestions based on primary failure category
-        if "memory_leak" in failure_categories:
+        if "missing_constants" in failure_categories and len(failure_categories) == 1:
+            # If the only issue is missing constants, make that the primary message
+            result["message"] = f"VERIFICATION FAILED: Missing constants detected: {', '.join(missing_constants)}"
+            result["suggestions"] = "Add mock definitions for these constants at the top of your harness"
+        elif "memory_leak" in failure_categories:
             result["message"] = "VERIFICATION FAILED: Memory leak detected"
             result["suggestions"] = "Ensure all allocated memory is freed in all execution paths"
         elif "null_pointer" in failure_categories:
@@ -1104,8 +1136,48 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
         stdout = cbmc_result.get("stdout", "")
         line_specific_errors = parse_line_specific_errors(stderr, stdout, harness_code)
         
+        # Check for missing constants (uppercase identifiers) and add mock suggestions
+        missing_constants = cbmc_result.get("missing_constants", [])
+        has_missing_constants = cbmc_result.get("has_missing_constants", False)
+        
         # Start with the error feedback
         recommendation = [format_error_for_feedback(cbmc_result)]
+        
+        # Add missing constants section if needed
+        if has_missing_constants or missing_constants:
+            recommendation.append(f"\n== MISSING CONSTANTS DETECTED ==")
+            
+            # List all identified missing constants
+            if missing_constants:
+                recommendation.append("The following constants/macros are undefined:")
+                for constant in missing_constants:
+                    recommendation.append(f"- '{constant}'")
+                
+            recommendation.append("\nTo fix these missing constants:")
+            recommendation.append("1. These are likely project-specific constants that need to be defined")
+            recommendation.append("2. You should add mock definitions for these constants in your harness")
+            recommendation.append("3. Place all mock constants in a dedicated section at the top of your harness:")
+            recommendation.append("```c")
+            recommendation.append("/* BEGIN MOCK CONSTANTS */")
+            
+            # Add suggested mocks for common constant types
+            for constant in missing_constants:
+                if "MAX" in constant or "SIZE" in constant or "LENGTH" in constant or "LIMIT" in constant:
+                    recommendation.append(f"#define {constant} 128  // Mock value for size/length constant")
+                elif "MIN" in constant:
+                    recommendation.append(f"#define {constant} 1    // Mock value for minimum constant")
+                elif "TIMEOUT" in constant or "DELAY" in constant:
+                    recommendation.append(f"#define {constant} 60   // Mock value for time constant in seconds")
+                elif "ENABLED" in constant or "DISABLED" in constant:
+                    recommendation.append(f"#define {constant} 1    // Mock value for feature flag (1=enabled, 0=disabled)")
+                elif "FLAG" in constant or "OPTION" in constant:
+                    recommendation.append(f"#define {constant} 1    // Mock value for flag/option")
+                else:
+                    recommendation.append(f"#define {constant} 42   // Mock value for general constant")
+            
+            recommendation.append("/* END MOCK CONSTANTS */")
+            recommendation.append("```")
+            recommendation.append("\nAdjust these values based on how they're used in the function.")
         
         # Add line-specific error information if available
         if line_specific_errors and line_specific_errors["error_lines"]:
@@ -1271,10 +1343,11 @@ def generate_improvement_recommendation(harness_code: str, func_code: str, cbmc_
             recommendation.append("\nTo fix these redeclaration issues:")
             recommendation.append("1. REMOVE all declarations for symbols already defined in included headers")
             recommendation.append("2. Do NOT redeclare any function, type, enum, or struct from an included header")
-            recommendation.append("3. Check each included header to see what symbols it already defines")
-            recommendation.append("4. If you absolutely must declare something, use 'extern' and match signatures exactly")
-            recommendation.append("5. Remove duplicate declarations in your harness code")
-            recommendation.append("6. For 'redeclaration with no linkage' errors, use extern or remove the declaration completely\n")
+            recommendation.append("3. NEVER redefine any macros from included headers")
+            recommendation.append("4. Check each included header to see what symbols it already defines")
+            recommendation.append("5. If you absolutely must declare something, use 'extern' and match signatures exactly")
+            recommendation.append("6. Remove duplicate declarations in your harness code")
+            recommendation.append("7. For 'redeclaration with no linkage' errors, use extern or remove the declaration completely\n")
             
             recommendation.append("RESOLUTION STRATEGY:")
             recommendation.append("1. First try REMOVING the declarations completely (preferred solution)")

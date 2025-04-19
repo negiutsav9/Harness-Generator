@@ -482,6 +482,50 @@ def cbmc_node(state):
         if "stderr" not in cbmc_result:
             cbmc_result["stderr"] = cbmc_stderr
             
+        # Extract specific error signatures from stderr for more precise error handling
+        if cbmc_stderr:
+            # Function to extract error signatures
+            def extract_error_signatures(stderr_text):
+                """Extract unique error signatures from stderr text."""
+                error_sigs = []
+                if not stderr_text:
+                    return error_sigs
+                    
+                for line in stderr_text.splitlines():
+                    # Focus on actual error messages, not just line numbers
+                    if 'error:' in line or 'ERROR:' in line:
+                        # Extract core error message without line numbers and file paths
+                        parts = line.split('error:', 1)
+                        if len(parts) > 1:
+                            error_msg = parts[1].strip()
+                            # Keep only the error message content
+                            error_sigs.append(error_msg)
+                return error_sigs
+                
+            # Get specific error messages and add to result
+            error_signatures = extract_error_signatures(cbmc_stderr)
+            if error_signatures:
+                cbmc_result["error_signatures"] = error_signatures
+                logger.info(f"Extracted error signatures: {error_signatures}")
+                
+                # Add specific error category types based on error signatures
+                for sig in error_signatures:
+                    if "function 'nondet_" in sig.lower() and "not declared" in sig.lower():
+                        if "nondet_function_error" not in cbmc_result["error_categories"]:
+                            cbmc_result["error_categories"].append("nondet_function_error")
+                            
+                    if "member" in sig.lower() and "not found" in sig.lower():
+                        if "struct_member_error" not in cbmc_result["error_categories"]:
+                            cbmc_result["error_categories"].append("struct_member_error")
+                            
+                    if "not declared" in sig.lower() or "undeclared" in sig.lower():
+                        if "declaration_error" not in cbmc_result["error_categories"]:
+                            cbmc_result["error_categories"].append("declaration_error")
+                            
+                    if "struct" in sig.lower() or "has no member" in sig.lower():
+                        if "struct_error" not in cbmc_result["error_categories"]:
+                            cbmc_result["error_categories"].append("struct_error")
+            
         # Make sure we prioritize stderr output when there are critical errors
         # This ensures that downstream components focus on the most important error information
         if cbmc_stderr and ("error:" in cbmc_stderr or "undefined reference" in cbmc_stderr):
