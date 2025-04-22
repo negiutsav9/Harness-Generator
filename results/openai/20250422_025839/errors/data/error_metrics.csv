@@ -1,0 +1,13 @@
+function,version,status,error_count,reported_errors,failure_count,error_categories
+shadow.c:Shadow_AssembleTopicString,1,FAILED,1,1,0,generic_error
+shadow.c:Shadow_AssembleTopicString,2,FAILED,1,1,0,generic_error
+shadow.c:Shadow_AssembleTopicString,3,SUCCESS,0,0,0,
+shadow.c:Shadow_MatchTopic,1,FAILED,1,1,0,generic_error
+shadow.c:Shadow_MatchTopic,2,FAILED,1,1,0,generic_error
+shadow.c:Shadow_MatchTopic,3,SUCCESS,0,0,0,
+shadow.c:Shadow_MatchTopicString,1,FAILED,1,1,0,generic_error
+shadow.c:Shadow_MatchTopicString,2,FAILED,1,1,0,generic_error
+shadow.c:Shadow_MatchTopicString,3,FAILED,1,1,0,generic_error
+shadow.c:Shadow_MatchTopicString,4,SUCCESS,0,0,0,
+shadow.c:Shadow_MatchTopicString,5,SUCCESS,0,0,0,
+shadow.c:Shadow_MatchTopicString,6,SUCCESS,0,0,0,

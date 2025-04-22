@@ -1,0 +1,5 @@
+function,version,status,error_count,reported_errors,failure_count,error_categories
+defender.c:Defender_GetTopic,1,FAILED,1,1,0,generic_error
+defender.c:Defender_GetTopic,2,FAILED,1,1,0,generic_error
+defender.c:Defender_GetTopic,3,FAILED,1,1,0,generic_error
+defender.c:Defender_MatchTopic,1,FAILED,1,1,0,generic_error

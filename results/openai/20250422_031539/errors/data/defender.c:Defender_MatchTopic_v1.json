@@ -1,0 +1,9 @@
+{
+  "function": "defender.c:Defender_MatchTopic",
+  "version": 1,
+  "status": "SUCCESS",
+  "error_count": 0,
+  "reported_errors": 0,
+  "failure_count": 0,
+  "error_categories": ""
+}

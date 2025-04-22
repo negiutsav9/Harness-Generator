@@ -1,0 +1,9 @@
+{
+  "function": "defender.c:Defender_MatchTopic",
+  "version": 4,
+  "status": "FAILED",
+  "error_count": 2,
+  "reported_errors": 2,
+  "failure_count": 0,
+  "error_categories": "generic_error"
+}

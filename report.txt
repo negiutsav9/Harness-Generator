@@ -1,0 +1,779 @@
+CBMC version 6.4.1 (cbmc-6.4.1) 64-bit arm64 macos
+Type-checking Defender_GetTopic_harness_v3
+Type-checking defender
+Generating GOTO Program
+Adding CPROVER library (arm64)
+Removal of function pointers and virtual functions
+Generic Property Instrumentation
+Starting Bounded Model Checking
+Passing problem to propositional reduction
+converting SSA
+Running propositional reduction
+SAT checker: instance is UNSATISFIABLE
+
+** Results:
+function __CPROVER__start
+[__CPROVER__start.memory-leak.1] dynamically allocated memory never freed in __CPROVER_memory_leak == NULL: SUCCESS
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_stdio.h function __sputc
+[__sputc.overflow.1] line 362 arithmetic overflow on signed - in _p->_w - 1: SUCCESS
+[__sputc.pointer_dereference.1] line 362 dereference failure: pointer NULL in _p->_w: SUCCESS
+[__sputc.pointer_dereference.2] line 362 dereference failure: pointer invalid in _p->_w: SUCCESS
+[__sputc.pointer_dereference.3] line 362 dereference failure: deallocated dynamic object in _p->_w: SUCCESS
+[__sputc.pointer_dereference.4] line 362 dereference failure: dead object in _p->_w: SUCCESS
+[__sputc.pointer_dereference.5] line 362 dereference failure: pointer outside object bounds in _p->_w: SUCCESS
+[__sputc.pointer_dereference.6] line 362 dereference failure: invalid integer address in _p->_w: SUCCESS
+[__sputc.pointer_dereference.7] line 362 dereference failure: pointer NULL in _p->_w: SUCCESS
+[__sputc.pointer_dereference.8] line 362 dereference failure: pointer invalid in _p->_w: SUCCESS
+[__sputc.pointer_dereference.9] line 362 dereference failure: deallocated dynamic object in _p->_w: SUCCESS
+[__sputc.pointer_dereference.10] line 362 dereference failure: dead object in _p->_w: SUCCESS
+[__sputc.pointer_dereference.11] line 362 dereference failure: pointer outside object bounds in _p->_w: SUCCESS
+[__sputc.pointer_dereference.12] line 362 dereference failure: invalid integer address in _p->_w: SUCCESS
+[__sputc.pointer_dereference.13] line 362 dereference failure: pointer NULL in _p->_lbfsize: SUCCESS
+[__sputc.pointer_dereference.14] line 362 dereference failure: pointer invalid in _p->_lbfsize: SUCCESS
+[__sputc.pointer_dereference.15] line 362 dereference failure: deallocated dynamic object in _p->_lbfsize: SUCCESS
+[__sputc.pointer_dereference.16] line 362 dereference failure: dead object in _p->_lbfsize: SUCCESS
+[__sputc.pointer_dereference.17] line 362 dereference failure: pointer outside object bounds in _p->_lbfsize: SUCCESS
+[__sputc.pointer_dereference.18] line 362 dereference failure: invalid integer address in _p->_lbfsize: SUCCESS
+[__sputc.pointer_arithmetic.1] line 363 pointer arithmetic: pointer NULL in _p->_p + 1l: SUCCESS
+[__sputc.pointer_arithmetic.2] line 363 pointer arithmetic: pointer invalid in _p->_p + 1l: SUCCESS
+[__sputc.pointer_arithmetic.3] line 363 pointer arithmetic: deallocated dynamic object in _p->_p + 1l: SUCCESS
+[__sputc.pointer_arithmetic.4] line 363 pointer arithmetic: dead object in _p->_p + 1l: SUCCESS
+[__sputc.pointer_arithmetic.5] line 363 pointer arithmetic: pointer outside object bounds in _p->_p + 1l: SUCCESS
+[__sputc.pointer_arithmetic.6] line 363 pointer arithmetic: invalid integer address in _p->_p + 1l: SUCCESS
+[__sputc.pointer_dereference.19] line 363 dereference failure: pointer NULL in _p->_p: SUCCESS
+[__sputc.pointer_dereference.20] line 363 dereference failure: pointer invalid in _p->_p: SUCCESS
+[__sputc.pointer_dereference.21] line 363 dereference failure: deallocated dynamic object in _p->_p: SUCCESS
+[__sputc.pointer_dereference.22] line 363 dereference failure: dead object in _p->_p: SUCCESS
+[__sputc.pointer_dereference.23] line 363 dereference failure: pointer outside object bounds in _p->_p: SUCCESS
+[__sputc.pointer_dereference.24] line 363 dereference failure: invalid integer address in _p->_p: SUCCESS
+[__sputc.pointer_dereference.25] line 363 dereference failure: pointer NULL in *tmp_post: SUCCESS
+[__sputc.pointer_dereference.26] line 363 dereference failure: pointer invalid in *tmp_post: SUCCESS
+[__sputc.pointer_dereference.27] line 363 dereference failure: deallocated dynamic object in *tmp_post: SUCCESS
+[__sputc.pointer_dereference.28] line 363 dereference failure: dead object in *tmp_post: SUCCESS
+[__sputc.pointer_dereference.29] line 363 dereference failure: pointer outside object bounds in *tmp_post: SUCCESS
+[__sputc.pointer_dereference.30] line 363 dereference failure: invalid integer address in *tmp_post: SUCCESS
+
+<builtin-library-__builtin___memcpy_chk> function __builtin___memcpy_chk
+[__builtin___memcpy_chk.pointer.1] line 27 same object violation in (const char *)(const void *)pDefenderApiPrefix >= (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.3] line 27 same object violation in (const char *)(const void *)pThingName >= (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer.5] line 27 same object violation in (const char *)(const void *)pDefenderApiBridge >= (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.7] line 27 same object violation in (const char *)(const void *)pDefenderApiJsonFormat >= (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.9] line 27 same object violation in (const char *)(const void *)pDefenderApiJsonFormat >= (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.11] line 27 same object violation in (const char *)(const void *)pDefenderApiAcceptedSuffix >= (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.13] line 27 same object violation in (const char *)(const void *)pDefenderApiJsonFormat >= (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.15] line 27 same object violation in (const char *)(const void *)pDefenderApiRejectedSuffix >= (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.17] line 27 same object violation in (const char *)(const void *)pDefenderApiCborFormat >= (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.19] line 27 same object violation in (const char *)(const void *)pDefenderApiCborFormat >= (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.21] line 27 same object violation in (const char *)(const void *)pDefenderApiAcceptedSuffix >= (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.23] line 27 same object violation in (const char *)(const void *)pDefenderApiCborFormat >= (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.25] line 27 same object violation in (const char *)(const void *)pDefenderApiRejectedSuffix >= (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.1] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.2] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.3] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.4] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.5] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.6] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.7] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiPrefix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.8] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiPrefix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.9] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiPrefix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.10] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiPrefix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.11] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiPrefix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.12] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiPrefix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.25] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.26] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.27] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.28] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.29] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.30] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.31] line 27 pointer relation: pointer NULL in (const char *)(const void *)pThingName: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.32] line 27 pointer relation: pointer invalid in (const char *)(const void *)pThingName: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.33] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pThingName: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.34] line 27 pointer relation: dead object in (const char *)(const void *)pThingName: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.35] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pThingName: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.36] line 27 pointer relation: invalid integer address in (const char *)(const void *)pThingName: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.49] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.50] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.51] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.52] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.53] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.54] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)offset] + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.55] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiBridge: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.56] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiBridge: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.57] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiBridge: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.58] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiBridge: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.59] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiBridge: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.60] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiBridge: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.73] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.74] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.75] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.76] line 27 pointer arithmetic: dead object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.77] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.78] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.79] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.80] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.81] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.82] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.83] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.84] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.97] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.98] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.99] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.100] line 27 pointer arithmetic: dead object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.101] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.102] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.103] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.104] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.105] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.106] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.107] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.108] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.121] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.122] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.123] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.124] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.125] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.126] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.127] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.128] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.129] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.130] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.131] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.132] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.145] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.146] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.147] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.148] line 27 pointer arithmetic: dead object in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.149] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.150] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.151] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.152] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.153] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.154] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.155] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.156] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiJsonFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.169] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.170] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.171] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.172] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.173] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.174] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.175] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.176] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.177] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.178] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.179] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.180] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.193] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.194] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.195] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.196] line 27 pointer arithmetic: dead object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.197] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.198] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.199] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.200] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.201] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.202] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.203] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.204] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.217] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.218] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.219] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.220] line 27 pointer arithmetic: dead object in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.221] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.222] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)pBuffer + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.223] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.224] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.225] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.226] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.227] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.228] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.241] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.242] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.243] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.244] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.245] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.246] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.247] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.248] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.249] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.250] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.251] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.252] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiAcceptedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.265] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.266] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.267] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.268] line 27 pointer arithmetic: dead object in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.269] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.270] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)pBuffer + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.271] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.272] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.273] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.274] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.275] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.276] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiCborFormat: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.289] line 27 pointer arithmetic: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.290] line 27 pointer arithmetic: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.291] line 27 pointer arithmetic: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.292] line 27 pointer arithmetic: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.293] line 27 pointer arithmetic: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.294] line 27 pointer arithmetic: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.295] line 27 pointer relation: pointer NULL in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.296] line 27 pointer relation: pointer invalid in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.297] line 27 pointer relation: deallocated dynamic object in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.298] line 27 pointer relation: dead object in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.299] line 27 pointer relation: pointer outside object bounds in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.300] line 27 pointer relation: invalid integer address in (const char *)(const void *)pDefenderApiRejectedSuffix: SUCCESS
+[__builtin___memcpy_chk.pointer.2] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)offset] >= (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.4] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)offset] >= (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer.6] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)offset] >= (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.8] line 28 same object violation in (const char *)(void *)pBuffer >= (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.10] line 28 same object violation in (const char *)(void *)pBuffer >= (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.12] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] >= (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.14] line 28 same object violation in (const char *)(void *)pBuffer >= (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.16] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] >= (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.18] line 28 same object violation in (const char *)(void *)pBuffer >= (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.20] line 28 same object violation in (const char *)(void *)pBuffer >= (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.22] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] >= (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.24] line 28 same object violation in (const char *)(void *)pBuffer >= (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer.26] line 28 same object violation in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)] >= (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.13] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.14] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.15] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.16] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.17] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.18] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiPrefix + (signed long int)(size_t)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.19] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.20] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.21] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.22] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.23] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.24] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.37] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.38] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.39] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.40] line 28 pointer arithmetic: dead object in (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.41] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.42] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pThingName + (signed long int)(size_t)thingNameLength: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.43] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.44] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.45] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.46] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.47] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.48] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.61] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.62] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.63] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.64] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.65] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.66] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiBridge + (signed long int)(size_t)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.67] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.68] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.69] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.70] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.71] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.72] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)offset]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.85] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.86] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.87] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.88] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.89] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.90] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.91] line 28 pointer relation: pointer NULL in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.92] line 28 pointer relation: pointer invalid in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.93] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.94] line 28 pointer relation: dead object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.95] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.96] line 28 pointer relation: invalid integer address in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.109] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.110] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.111] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.112] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.113] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.114] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.115] line 28 pointer relation: pointer NULL in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.116] line 28 pointer relation: pointer invalid in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.117] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.118] line 28 pointer relation: dead object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.119] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.120] line 28 pointer relation: invalid integer address in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.133] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.134] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.135] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.136] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.137] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.138] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.139] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.140] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.141] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.142] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.143] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.144] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.157] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.158] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.159] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.160] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.161] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.162] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiJsonFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.163] line 28 pointer relation: pointer NULL in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.164] line 28 pointer relation: pointer invalid in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.165] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.166] line 28 pointer relation: dead object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.167] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.168] line 28 pointer relation: invalid integer address in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.181] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.182] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.183] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.184] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.185] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.186] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.187] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.188] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.189] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.190] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.191] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.192] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.205] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.206] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.207] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.208] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.209] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.210] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.211] line 28 pointer relation: pointer NULL in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.212] line 28 pointer relation: pointer invalid in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.213] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.214] line 28 pointer relation: dead object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.215] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.216] line 28 pointer relation: invalid integer address in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.229] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.230] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.231] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.232] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.233] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.234] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(__CPROVER_size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.235] line 28 pointer relation: pointer NULL in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.236] line 28 pointer relation: pointer invalid in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.237] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.238] line 28 pointer relation: dead object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.239] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.240] line 28 pointer relation: invalid integer address in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.253] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.254] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.255] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.256] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.257] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.258] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiAcceptedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.259] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.260] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.261] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.262] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.263] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.264] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.277] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.278] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.279] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.280] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.281] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.282] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiCborFormat + (signed long int)(size_t)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.283] line 28 pointer relation: pointer NULL in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.284] line 28 pointer relation: pointer invalid in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.285] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.286] line 28 pointer relation: dead object in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.287] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.288] line 28 pointer relation: invalid integer address in (const char *)(void *)pBuffer: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.301] line 28 pointer arithmetic: pointer NULL in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.302] line 28 pointer arithmetic: pointer invalid in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.303] line 28 pointer arithmetic: deallocated dynamic object in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.304] line 28 pointer arithmetic: dead object in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.305] line 28 pointer arithmetic: pointer outside object bounds in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.306] line 28 pointer arithmetic: invalid integer address in (const char *)(const void *)pDefenderApiRejectedSuffix + (signed long int)(size_t)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.307] line 28 pointer relation: pointer NULL in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.308] line 28 pointer relation: pointer invalid in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.309] line 28 pointer relation: deallocated dynamic object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.310] line 28 pointer relation: dead object in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.311] line 28 pointer relation: pointer outside object bounds in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+[__builtin___memcpy_chk.pointer_arithmetic.312] line 28 pointer relation: invalid integer address in (const char *)(void *)&pBuffer[(signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u)]: SUCCESS
+
+<builtin-library-malloc> function malloc
+[malloc.assertion.1] line 31 max allocation size exceeded: SUCCESS
+[malloc.assertion.2] line 36 max allocation may fail: SUCCESS
+
+results/openai/20250422_030948/verification/harness_files/Defender_GetTopic_harness_v3.c function main
+[main.pointer_arithmetic.1] line 55 pointer arithmetic: pointer NULL in pThingName + (signed long int)i: SUCCESS
+[main.pointer_arithmetic.2] line 55 pointer arithmetic: pointer invalid in pThingName + (signed long int)i: SUCCESS
+[main.pointer_arithmetic.3] line 55 pointer arithmetic: deallocated dynamic object in pThingName + (signed long int)i: SUCCESS
+[main.pointer_arithmetic.4] line 55 pointer arithmetic: dead object in pThingName + (signed long int)i: SUCCESS
+[main.pointer_arithmetic.5] line 55 pointer arithmetic: pointer outside object bounds in pThingName + (signed long int)i: SUCCESS
+[main.pointer_arithmetic.6] line 55 pointer arithmetic: invalid integer address in pThingName + (signed long int)i: SUCCESS
+[main.pointer_dereference.1] line 55 dereference failure: pointer NULL in pThingName[(signed long int)i]: SUCCESS
+[main.pointer_dereference.2] line 55 dereference failure: pointer invalid in pThingName[(signed long int)i]: SUCCESS
+[main.pointer_dereference.3] line 55 dereference failure: deallocated dynamic object in pThingName[(signed long int)i]: SUCCESS
+[main.pointer_dereference.4] line 55 dereference failure: dead object in pThingName[(signed long int)i]: SUCCESS
+[main.pointer_dereference.5] line 55 dereference failure: pointer outside object bounds in pThingName[(signed long int)i]: SUCCESS
+[main.pointer_dereference.6] line 55 dereference failure: invalid integer address in pThingName[(signed long int)i]: SUCCESS
+[main.overflow.1] line 76 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[main.overflow.2] line 76 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[main.pointer_dereference.7] line 79 dereference failure: pointer NULL in *pOutLength: SUCCESS
+[main.pointer_dereference.8] line 79 dereference failure: pointer invalid in *pOutLength: SUCCESS
+[main.pointer_dereference.9] line 79 dereference failure: deallocated dynamic object in *pOutLength: SUCCESS
+[main.pointer_dereference.10] line 79 dereference failure: dead object in *pOutLength: SUCCESS
+[main.pointer_dereference.11] line 79 dereference failure: pointer outside object bounds in *pOutLength: SUCCESS
+[main.pointer_dereference.12] line 79 dereference failure: invalid integer address in *pOutLength: SUCCESS
+[main.precondition_instance.1] line 86 free argument must be NULL or valid pointer: SUCCESS
+[main.precondition_instance.2] line 86 free argument must be dynamic object: SUCCESS
+[main.precondition_instance.3] line 86 free argument has offset zero: SUCCESS
+[main.precondition_instance.4] line 86 double free: SUCCESS
+[main.precondition_instance.5] line 86 free called for new[] object: SUCCESS
+[main.precondition_instance.6] line 86 free called for stack-allocated object: SUCCESS
+[main.precondition_instance.7] line 88 free argument must be NULL or valid pointer: SUCCESS
+[main.precondition_instance.8] line 88 free argument must be dynamic object: SUCCESS
+[main.precondition_instance.9] line 88 free argument has offset zero: SUCCESS
+[main.precondition_instance.10] line 88 double free: SUCCESS
+[main.precondition_instance.11] line 88 free called for new[] object: SUCCESS
+[main.precondition_instance.12] line 88 free called for stack-allocated object: SUCCESS
+[main.precondition_instance.13] line 89 free argument must be NULL or valid pointer: SUCCESS
+[main.precondition_instance.14] line 89 free argument must be dynamic object: SUCCESS
+[main.precondition_instance.15] line 89 free argument has offset zero: SUCCESS
+[main.precondition_instance.16] line 89 double free: SUCCESS
+[main.precondition_instance.17] line 89 free called for new[] object: SUCCESS
+[main.precondition_instance.18] line 89 free called for stack-allocated object: SUCCESS
+
+results/openai/20250422_030948/verification/includes/defender.c function Defender_GetTopic
+[Defender_GetTopic.pointer_arithmetic.1] line 438 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.2] line 438 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.3] line 438 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.4] line 438 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.5] line 438 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.6] line 438 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.7] line 438 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.8] line 438 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.9] line 438 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.10] line 438 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.11] line 438 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.12] line 438 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.13] line 438 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.14] line 438 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.15] line 438 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.16] line 438 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.17] line 438 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.18] line 438 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.19] line 438 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.20] line 438 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.21] line 438 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.22] line 438 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.23] line 438 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.24] line 438 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.precondition_instance.1] line 438 memcpy src/dst overlap: SUCCESS
+[Defender_GetTopic.precondition_instance.2] line 438 memcpy source region readable: SUCCESS
+[Defender_GetTopic.precondition_instance.3] line 438 memcpy destination region writeable: SUCCESS
+[Defender_GetTopic.overflow.1] line 441 arithmetic overflow on signed + in (signed int)offset + (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_GetTopic.pointer_arithmetic.25] line 444 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.26] line 444 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.27] line 444 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.28] line 444 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.29] line 444 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.30] line 444 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.31] line 444 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.32] line 444 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.33] line 444 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.34] line 444 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.35] line 444 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.36] line 444 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.37] line 444 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.38] line 444 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.39] line 444 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.40] line 444 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.41] line 444 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.42] line 444 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.43] line 444 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.44] line 444 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.45] line 444 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.46] line 444 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.47] line 444 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.48] line 444 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.precondition_instance.4] line 444 memcpy src/dst overlap: SUCCESS
+[Defender_GetTopic.precondition_instance.5] line 444 memcpy source region readable: SUCCESS
+[Defender_GetTopic.precondition_instance.6] line 444 memcpy destination region writeable: SUCCESS
+[Defender_GetTopic.overflow.2] line 447 arithmetic overflow on signed + in (signed int)offset + (signed int)thingNameLength: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.49] line 450 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.50] line 450 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.51] line 450 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.52] line 450 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.53] line 450 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.54] line 450 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.55] line 450 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.56] line 450 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.57] line 450 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.58] line 450 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.59] line 450 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.60] line 450 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.61] line 450 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.62] line 450 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.63] line 450 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.64] line 450 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.65] line 450 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.66] line 450 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.67] line 450 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.68] line 450 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.69] line 450 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.70] line 450 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.71] line 450 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.72] line 450 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.precondition_instance.7] line 450 memcpy src/dst overlap: SUCCESS
+[Defender_GetTopic.precondition_instance.8] line 450 memcpy source region readable: SUCCESS
+[Defender_GetTopic.precondition_instance.9] line 450 memcpy destination region writeable: SUCCESS
+[Defender_GetTopic.overflow.3] line 453 arithmetic overflow on signed + in (signed int)offset + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_GetTopic.pointer_arithmetic.73] line 456 pointer arithmetic: pointer NULL in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.74] line 456 pointer arithmetic: pointer invalid in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.75] line 456 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.76] line 456 pointer arithmetic: dead object in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.77] line 456 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_arithmetic.78] line 456 pointer arithmetic: invalid integer address in pBuffer + (signed long int)offset: SUCCESS
+[Defender_GetTopic.pointer_dereference.1] line 458 dereference failure: pointer NULL in *pOutLength: SUCCESS
+[Defender_GetTopic.pointer_dereference.2] line 458 dereference failure: pointer invalid in *pOutLength: SUCCESS
+[Defender_GetTopic.pointer_dereference.3] line 458 dereference failure: deallocated dynamic object in *pOutLength: SUCCESS
+[Defender_GetTopic.pointer_dereference.4] line 458 dereference failure: dead object in *pOutLength: SUCCESS
+[Defender_GetTopic.pointer_dereference.5] line 458 dereference failure: pointer outside object bounds in *pOutLength: SUCCESS
+[Defender_GetTopic.pointer_dereference.6] line 458 dereference failure: invalid integer address in *pOutLength: SUCCESS
+
+results/openai/20250422_030948/verification/includes/defender.c function Defender_MatchTopic
+[Defender_MatchTopic.pointer_arithmetic.1] line 488 pointer arithmetic: pointer NULL in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.2] line 488 pointer arithmetic: pointer invalid in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.3] line 488 pointer arithmetic: deallocated dynamic object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.4] line 488 pointer arithmetic: dead object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.5] line 488 pointer arithmetic: pointer outside object bounds in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.6] line 488 pointer arithmetic: invalid integer address in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.overflow.1] line 493 arithmetic overflow on signed - in (signed int)remainingTopicLength - (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.overflow.2] line 494 arithmetic overflow on signed + in (signed int)consumedTopicLength + (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.7] line 504 pointer arithmetic: pointer NULL in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.8] line 504 pointer arithmetic: pointer invalid in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.9] line 504 pointer arithmetic: deallocated dynamic object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.10] line 504 pointer arithmetic: dead object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.11] line 504 pointer arithmetic: pointer outside object bounds in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.12] line 504 pointer arithmetic: invalid integer address in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.overflow.3] line 510 arithmetic overflow on signed - in (signed int)remainingTopicLength - (signed int)thingNameLength: SUCCESS
+[Defender_MatchTopic.overflow.4] line 511 arithmetic overflow on signed + in (signed int)consumedTopicLength + (signed int)thingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.13] line 521 pointer arithmetic: pointer NULL in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.14] line 521 pointer arithmetic: pointer invalid in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.15] line 521 pointer arithmetic: deallocated dynamic object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.16] line 521 pointer arithmetic: dead object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.17] line 521 pointer arithmetic: pointer outside object bounds in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.18] line 521 pointer arithmetic: invalid integer address in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.overflow.5] line 526 arithmetic overflow on signed - in (signed int)remainingTopicLength - (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.overflow.6] line 527 arithmetic overflow on signed + in (signed int)consumedTopicLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.19] line 537 pointer arithmetic: pointer NULL in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.20] line 537 pointer arithmetic: pointer invalid in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.21] line 537 pointer arithmetic: deallocated dynamic object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.22] line 537 pointer arithmetic: dead object in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.23] line 537 pointer arithmetic: pointer outside object bounds in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.24] line 537 pointer arithmetic: invalid integer address in pTopic + (signed long int)consumedTopicLength: SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.25] line 555 pointer arithmetic: pointer NULL in pTopic + (signed long int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.26] line 555 pointer arithmetic: pointer invalid in pTopic + (signed long int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.27] line 555 pointer arithmetic: deallocated dynamic object in pTopic + (signed long int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.28] line 555 pointer arithmetic: dead object in pTopic + (signed long int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.29] line 555 pointer arithmetic: pointer outside object bounds in pTopic + (signed long int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_arithmetic.30] line 555 pointer arithmetic: invalid integer address in pTopic + (signed long int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u): SUCCESS
+[Defender_MatchTopic.pointer_dereference.1] line 555 dereference failure: pointer NULL in *ppOutThingName: SUCCESS
+[Defender_MatchTopic.pointer_dereference.2] line 555 dereference failure: pointer invalid in *ppOutThingName: SUCCESS
+[Defender_MatchTopic.pointer_dereference.3] line 555 dereference failure: deallocated dynamic object in *ppOutThingName: SUCCESS
+[Defender_MatchTopic.pointer_dereference.4] line 555 dereference failure: dead object in *ppOutThingName: SUCCESS
+[Defender_MatchTopic.pointer_dereference.5] line 555 dereference failure: pointer outside object bounds in *ppOutThingName: SUCCESS
+[Defender_MatchTopic.pointer_dereference.6] line 555 dereference failure: invalid integer address in *ppOutThingName: SUCCESS
+[Defender_MatchTopic.pointer_dereference.7] line 560 dereference failure: pointer NULL in *pOutThingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_dereference.8] line 560 dereference failure: pointer invalid in *pOutThingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_dereference.9] line 560 dereference failure: deallocated dynamic object in *pOutThingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_dereference.10] line 560 dereference failure: dead object in *pOutThingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_dereference.11] line 560 dereference failure: pointer outside object bounds in *pOutThingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_dereference.12] line 560 dereference failure: invalid integer address in *pOutThingNameLength: SUCCESS
+[Defender_MatchTopic.pointer_dereference.13] line 568 dereference failure: pointer NULL in *pOutApi: SUCCESS
+[Defender_MatchTopic.pointer_dereference.14] line 568 dereference failure: pointer invalid in *pOutApi: SUCCESS
+[Defender_MatchTopic.pointer_dereference.15] line 568 dereference failure: deallocated dynamic object in *pOutApi: SUCCESS
+[Defender_MatchTopic.pointer_dereference.16] line 568 dereference failure: dead object in *pOutApi: SUCCESS
+[Defender_MatchTopic.pointer_dereference.17] line 568 dereference failure: pointer outside object bounds in *pOutApi: SUCCESS
+[Defender_MatchTopic.pointer_dereference.18] line 568 dereference failure: invalid integer address in *pOutApi: SUCCESS
+
+results/openai/20250422_030948/verification/includes/defender.c function extractThingNameLength
+[extractThingNameLength.pointer_arithmetic.1] line 291 pointer arithmetic: pointer NULL in pRemainingTopic + (signed long int)i: SUCCESS
+[extractThingNameLength.pointer_arithmetic.2] line 291 pointer arithmetic: pointer invalid in pRemainingTopic + (signed long int)i: SUCCESS
+[extractThingNameLength.pointer_arithmetic.3] line 291 pointer arithmetic: deallocated dynamic object in pRemainingTopic + (signed long int)i: SUCCESS
+[extractThingNameLength.pointer_arithmetic.4] line 291 pointer arithmetic: dead object in pRemainingTopic + (signed long int)i: SUCCESS
+[extractThingNameLength.pointer_arithmetic.5] line 291 pointer arithmetic: pointer outside object bounds in pRemainingTopic + (signed long int)i: SUCCESS
+[extractThingNameLength.pointer_arithmetic.6] line 291 pointer arithmetic: invalid integer address in pRemainingTopic + (signed long int)i: SUCCESS
+[extractThingNameLength.pointer_dereference.1] line 291 dereference failure: pointer NULL in pRemainingTopic[(signed long int)i]: SUCCESS
+[extractThingNameLength.pointer_dereference.2] line 291 dereference failure: pointer invalid in pRemainingTopic[(signed long int)i]: SUCCESS
+[extractThingNameLength.pointer_dereference.3] line 291 dereference failure: deallocated dynamic object in pRemainingTopic[(signed long int)i]: SUCCESS
+[extractThingNameLength.pointer_dereference.4] line 291 dereference failure: dead object in pRemainingTopic[(signed long int)i]: SUCCESS
+[extractThingNameLength.pointer_dereference.5] line 291 dereference failure: pointer outside object bounds in pRemainingTopic[(signed long int)i]: SUCCESS
+[extractThingNameLength.pointer_dereference.6] line 291 dereference failure: invalid integer address in pRemainingTopic[(signed long int)i]: SUCCESS
+[extractThingNameLength.pointer_dereference.7] line 300 dereference failure: pointer NULL in *pOutThingNameLength: SUCCESS
+[extractThingNameLength.pointer_dereference.8] line 300 dereference failure: pointer invalid in *pOutThingNameLength: SUCCESS
+[extractThingNameLength.pointer_dereference.9] line 300 dereference failure: deallocated dynamic object in *pOutThingNameLength: SUCCESS
+[extractThingNameLength.pointer_dereference.10] line 300 dereference failure: dead object in *pOutThingNameLength: SUCCESS
+[extractThingNameLength.pointer_dereference.11] line 300 dereference failure: pointer outside object bounds in *pOutThingNameLength: SUCCESS
+[extractThingNameLength.pointer_dereference.12] line 300 dereference failure: invalid integer address in *pOutThingNameLength: SUCCESS
+
+results/openai/20250422_030948/verification/includes/defender.c function getTopicLength
+[getTopicLength.overflow.1] line 153 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[getTopicLength.overflow.2] line 153 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.3] line 153 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.4] line 157 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[getTopicLength.overflow.5] line 157 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.6] line 157 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.7] line 157 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.8] line 161 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[getTopicLength.overflow.9] line 161 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.10] line 161 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.11] line 161 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.12] line 165 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[getTopicLength.overflow.13] line 165 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.14] line 165 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.15] line 169 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[getTopicLength.overflow.16] line 169 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.17] line 169 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.18] line 169 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.19] line 178 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength: SUCCESS
+[getTopicLength.overflow.20] line 178 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.21] line 178 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[getTopicLength.overflow.22] line 178 arithmetic overflow on signed + in (signed int)(uint16_t)(sizeof(char [13l]) /*13ul*/  - (unsigned long int)1u) + (signed int)thingNameLength + (signed int)(uint16_t)(sizeof(char [19l]) /*19ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u) + (signed int)(uint16_t)(sizeof(char [10l]) /*10ul*/  - (unsigned long int)1u): SUCCESS
+
+results/openai/20250422_030948/verification/includes/defender.c function matchApi
+[matchApi.array_bounds.1] line 368 array 'defenderApiTopicLength' upper bound in defenderApiTopicLength[(signed long int)i]: SUCCESS
+[matchApi.array_bounds.2] line 370 array 'defenderApiTopic' upper bound in defenderApiTopic[(signed long int)i]: SUCCESS
+[matchApi.array_bounds.3] line 373 array 'defenderApi' upper bound in defenderApi[(signed long int)i]: SUCCESS
+[matchApi.pointer_dereference.1] line 373 dereference failure: pointer NULL in *pOutApi: SUCCESS
+[matchApi.pointer_dereference.2] line 373 dereference failure: pointer invalid in *pOutApi: SUCCESS
+[matchApi.pointer_dereference.3] line 373 dereference failure: deallocated dynamic object in *pOutApi: SUCCESS
+[matchApi.pointer_dereference.4] line 373 dereference failure: dead object in *pOutApi: SUCCESS
+[matchApi.pointer_dereference.5] line 373 dereference failure: pointer outside object bounds in *pOutApi: SUCCESS
+[matchApi.pointer_dereference.6] line 373 dereference failure: invalid integer address in *pOutApi: SUCCESS
+
+results/openai/20250422_030948/verification/includes/defender.c function writeFormatAndSuffix
+[writeFormatAndSuffix.precondition_instance.1] line 202 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.2] line 202 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.3] line 202 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.4] line 208 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.5] line 208 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.6] line 208 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.1] line 211 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.2] line 211 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.3] line 211 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.4] line 211 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.5] line 211 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.6] line 211 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.7] line 211 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.8] line 211 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.9] line 211 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.10] line 211 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.11] line 211 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.12] line 211 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.13] line 211 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.14] line 211 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.15] line 211 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.16] line 211 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.17] line 211 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.18] line 211 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.19] line 211 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.20] line 211 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.21] line 211 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.22] line 211 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.23] line 211 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.24] line 211 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.precondition_instance.7] line 211 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.8] line 211 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.9] line 211 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.10] line 217 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.11] line 217 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.12] line 217 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.25] line 220 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.26] line 220 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.27] line 220 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.28] line 220 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.29] line 220 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.30] line 220 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.31] line 220 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.32] line 220 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.33] line 220 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.34] line 220 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.35] line 220 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.36] line 220 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.37] line 220 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.38] line 220 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.39] line 220 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.40] line 220 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.41] line 220 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.42] line 220 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.43] line 220 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.44] line 220 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.45] line 220 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.46] line 220 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.47] line 220 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.48] line 220 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.precondition_instance.13] line 220 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.14] line 220 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.15] line 220 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.16] line 226 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.17] line 226 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.18] line 226 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.19] line 232 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.20] line 232 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.21] line 232 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.49] line 235 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.50] line 235 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.51] line 235 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.52] line 235 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.53] line 235 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.54] line 235 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.55] line 235 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.56] line 235 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.57] line 235 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.58] line 235 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.59] line 235 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.60] line 235 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.61] line 235 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.62] line 235 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.63] line 235 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.64] line 235 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.65] line 235 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.66] line 235 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.67] line 235 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.68] line 235 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.69] line 235 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.70] line 235 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.71] line 235 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.72] line 235 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.precondition_instance.22] line 235 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.23] line 235 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.24] line 235 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.25] line 246 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.26] line 246 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.27] line 246 memcpy destination region writeable: SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.73] line 249 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.74] line 249 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.75] line 249 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.76] line 249 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.77] line 249 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.78] line 249 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.79] line 249 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.80] line 249 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.81] line 249 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.82] line 249 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.83] line 249 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.84] line 249 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.85] line 249 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.86] line 249 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.87] line 249 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.88] line 249 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.89] line 249 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.90] line 249 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.91] line 249 pointer arithmetic: pointer NULL in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.92] line 249 pointer arithmetic: pointer invalid in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.93] line 249 pointer arithmetic: deallocated dynamic object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.94] line 249 pointer arithmetic: dead object in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.95] line 249 pointer arithmetic: pointer outside object bounds in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.pointer_arithmetic.96] line 249 pointer arithmetic: invalid integer address in pBuffer + (signed long int)(uint16_t)(sizeof(char [5l]) /*5ul*/  - (unsigned long int)1u): SUCCESS
+[writeFormatAndSuffix.precondition_instance.28] line 249 memcpy src/dst overlap: SUCCESS
+[writeFormatAndSuffix.precondition_instance.29] line 249 memcpy source region readable: SUCCESS
+[writeFormatAndSuffix.precondition_instance.30] line 249 memcpy destination region writeable: SUCCESS
+
+** 0 of 741 failed (1 iterations)
+VERIFICATION SUCCESSFUL

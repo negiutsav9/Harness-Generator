@@ -1,0 +1,9 @@
+{
+  "function": "defender.c:Defender_GetTopic",
+  "version": 5,
+  "status": "FAILED",
+  "error_count": 1,
+  "reported_errors": 1,
+  "failure_count": 0,
+  "error_categories": "generic_error"
+}

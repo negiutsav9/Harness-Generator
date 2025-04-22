@@ -1,0 +1,9 @@
+function,version,status,error_count,reported_errors,failure_count,error_categories
+defender.c:Defender_GetTopic,1,SUCCESS,0,0,0,
+defender.c:Defender_MatchTopic,1,SUCCESS,0,0,0,
+defender.c:extractThingNameLength,1,SUCCESS,0,0,0,
+defender.c:getTopicLength,1,SUCCESS,0,0,0,
+defender.c:matchApi,1,SUCCESS,0,0,0,
+defender.c:matchBridge,1,SUCCESS,0,0,0,
+defender.c:matchPrefix,1,SUCCESS,0,0,0,
+defender.c:writeFormatAndSuffix,1,SUCCESS,0,0,0,

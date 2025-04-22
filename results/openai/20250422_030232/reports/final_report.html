@@ -1,0 +1,454 @@
+<html><head><title>CBMC Verification Report</title><style>body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px}h1{color:#2c3e50}h2{color:#3498db}h3{color:#2980b9}pre{background:#f8f8f8;border:1px solid #ddd;padding:10px;overflow:auto;border-radius:3px}table{border-collapse:collapse;width:100%}table,th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}tr:nth-child(even){background-color:#f9f9f9}</style></head><body><h1>CBMC Harness Generation Complete - Directory Mode - Openai</h1>
+<p>Total processing time: 315.12 seconds
+Processed 3 source files.
+Analyzed 16 functions.
+Identified 13 functions with memory or arithmetic operations.
+Generated 12 verification harnesses.
+Performed 24 harness refinements (average 2.00 per function).</p>
+<h2>File Analysis</h2>
+<h3>shadow.c</h3>
+<p>Functions analyzed: 13
+Functions verified: 12
+Successful verifications: 1
+Failed verifications: 11</p>
+<h2>RAG Knowledge Base Statistics</h2>
+<p>Code functions stored: 106
+Pattern templates: 16
+Error patterns stored: 23
+Successful solutions: 1</p>
+<p>The RAG (Retrieval-Augmented Generation) knowledge base stores code functions, patterns, errors, and solutions to improve harness generation over time. Each run contributes to this knowledge base, helping future runs generate better harnesses with fewer iterations.</p>
+<h2>Unit Proof Metrics Summary</h2>
+<p>Total reachable lines: 0
+Total coverage: 0.00%
+Total reachable lines for harnessed functions only: 0
+Coverage of harnessed functions only: 0.00%
+Number of reported errors: 0
+Functions with full coverage: 2 of 12
+Functions without errors: 12 of 12</p>
+<h3>Note on Error Reporting:</h3>
+<ul>
+<li>Errors are grouped by line number (one error per line)</li>
+<li>Errors about missing function bodies are excluded</li>
+<li>Loop unwinding assertions are excluded from error count</li>
+</ul>
+<h2>Detailed Coverage Matrix by Function and Version</h2>
+<p>The table below shows detailed metrics for each function across different versions of the generated harnesses:</p>
+<p>| Function | Version 1 | Version 2 | Version 3 |
+| --- | Total % | Func % | Errors | Total % | Func % | Errors | Total % | Func % | Errors |
+| shadow.c:Shadow_AssembleTopicString | 100.00% | 100.00% | 1 | 100.00% | 100.00% | 1 | 100.00% | 100.00% | 1 |
+| shadow.c:Shadow_MatchTopic | 100.00% | 100.00% | 1 | 100.00% | 100.00% | 1 | 100.00% | 100.00% | 1 |
+| shadow.c:Shadow_MatchTopicString | 74.67% | 55.81% | 1 | 69.51% | 55.81% | 1 | 74.67% | 55.81% | 1 |
+| shadow.c:containsSubString | 77.42% | 0.00% | 1 | 77.42% | 0.00% | 1 | 76.67% | 0.00% | 1 |
+| shadow.c:createShadowTopicString | 61.11% | 0.00% | 1 | 64.41% | 0.00% | 1 | 60.71% | 0.00% | 1 |
+| shadow.c:extractShadowMessageType | 43.33% | 0.00% | 1 | 43.33% | 0.00% | 1 | 43.33% | 0.00% | 1 |
+| shadow.c:extractShadowRootAndName | 45.83% | 0.00% | 1 | 45.83% | 0.00% | 1 | 40.91% | 0.00% | 1 |
+| shadow.c:extractThingName | 64.29% | 0.00% | 1 | 64.29% | 0.00% | 1 | 65.52% | 0.00% | 1 |
+| shadow.c:getShadowOperationLength | 10.00% | 0.00% | 1 | 10.00% | 0.00% | 0 | - | - | - |
+| shadow.c:getShadowOperationString | 10.00% | 0.00% | 1 | 10.00% | 0.00% | 1 | 12.20% | 0.00% | 1 |
+| shadow.c:validateAssembleTopicParameters | 72.92% | 0.00% | 1 | 72.92% | 0.00% | 1 | 75.00% | 0.00% | 1 |
+| shadow.c:validateMatchTopicParameters | 80.00% | 0.00% | 1 | 80.65% | 0.00% | 1 | 75.00% | 0.00% | 1 |</p>
+<p><strong>Metrics Legend:</strong>
+- <strong>Total %</strong>: Percentage of all reachable lines that were covered during verification.
+- <strong>Func %</strong>: Percentage of target function lines that were covered.
+- <strong>Errors</strong>: Number of verification errors or failures detected.</p>
+<h2>Performance Metrics</h2>
+<p>Average harness generation time: 7.94 seconds
+Average verification time: 0.41 seconds
+Average evaluation time: 0.00 seconds</p>
+<h2>Coverage Analysis</h2>
+<p>Coverage report available at: coverage/coverage_report.html</p>
+<h2>Summary of Results</h2>
+<h3>Function: Shadow_AssembleTopicString (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 100.00%</li>
+<li>Final coverage (v3): 100.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:Shadow_AssembleTopicString/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:Shadow_AssembleTopicString/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:Shadow_AssembleTopicString/v3.c</li>
+<li>Size evolution: Initial 87 lines → Final 81 lines (-6 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_AssembleTopicString/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_AssembleTopicString/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_AssembleTopicString/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_AssembleTopicString/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_AssembleTopicString/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_AssembleTopicString/v3_report.md</li>
+</ul>
+<h3>Function: Shadow_MatchTopic (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 100.00%</li>
+<li>Final coverage (v3): 100.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:Shadow_MatchTopic/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:Shadow_MatchTopic/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:Shadow_MatchTopic/v3.c</li>
+<li>Size evolution: Initial 62 lines → Final 60 lines (-2 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopic/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopic/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopic/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopic/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopic/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopic/v3_report.md</li>
+</ul>
+<h3>Function: Shadow_MatchTopicString (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 55.81%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 55.81%</li>
+<li>Final coverage (v3): 55.81%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:Shadow_MatchTopicString/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:Shadow_MatchTopicString/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:Shadow_MatchTopicString/v3.c</li>
+<li>Size evolution: Initial 83 lines → Final 85 lines (+2 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopicString/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopicString/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopicString/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopicString/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopicString/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:Shadow_MatchTopicString/v3_report.md</li>
+</ul>
+<h3>Function: containsSubString (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:containsSubString/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:containsSubString/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:containsSubString/v3.c</li>
+<li>Size evolution: Initial 77 lines → Final 62 lines (-15 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:containsSubString/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:containsSubString/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:containsSubString/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:containsSubString/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:containsSubString/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:containsSubString/v3_report.md</li>
+</ul>
+<h3>Function: createShadowTopicString (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:createShadowTopicString/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:createShadowTopicString/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:createShadowTopicString/v3.c</li>
+<li>Size evolution: Initial 100 lines → Final 96 lines (-4 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:createShadowTopicString/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:createShadowTopicString/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:createShadowTopicString/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:createShadowTopicString/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:createShadowTopicString/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:createShadowTopicString/v3_report.md</li>
+</ul>
+<h3>Function: extractShadowMessageType (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:extractShadowMessageType/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:extractShadowMessageType/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:extractShadowMessageType/v3.c</li>
+<li>Size evolution: Initial 49 lines → Final 43 lines (-6 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowMessageType/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowMessageType/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowMessageType/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowMessageType/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowMessageType/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowMessageType/v3_report.md</li>
+</ul>
+<h3>Function: extractShadowRootAndName (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:extractShadowRootAndName/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:extractShadowRootAndName/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:extractShadowRootAndName/v3.c</li>
+<li>Size evolution: Initial 65 lines → Final 58 lines (-7 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowRootAndName/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowRootAndName/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowRootAndName/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowRootAndName/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowRootAndName/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractShadowRootAndName/v3_report.md</li>
+</ul>
+<h3>Function: extractThingName (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:extractThingName/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:extractThingName/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:extractThingName/v3.c</li>
+<li>Size evolution: Initial 50 lines → Final 61 lines (+11 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:extractThingName/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractThingName/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractThingName/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractThingName/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractThingName/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:extractThingName/v3_report.md</li>
+</ul>
+<h3>Function: getShadowOperationLength (File: shadow.c)</h3>
+<p>Status: SUCCESS
+Refinements: 2
+Message: Verification successful</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v2): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:getShadowOperationLength/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:getShadowOperationLength/v2.c</li>
+<li>Size evolution: Initial 27 lines → Final 32 lines (+5 lines)</li>
+<li>Refinement result: Successfully addressed all verification issues</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationLength/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationLength/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationLength/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationLength/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationLength/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationLength/v3_report.md</li>
+</ul>
+<h3>Function: getShadowOperationString (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:getShadowOperationString/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:getShadowOperationString/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:getShadowOperationString/v3.c</li>
+<li>Size evolution: Initial 29 lines → Final 28 lines (-1 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationString/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationString/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationString/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationString/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationString/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:getShadowOperationString/v3_report.md</li>
+</ul>
+<h3>Function: validateAssembleTopicParameters (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:validateAssembleTopicParameters/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:validateAssembleTopicParameters/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:validateAssembleTopicParameters/v3.c</li>
+<li>Size evolution: Initial 100 lines → Final 100 lines (0 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:validateAssembleTopicParameters/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateAssembleTopicParameters/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateAssembleTopicParameters/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateAssembleTopicParameters/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateAssembleTopicParameters/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateAssembleTopicParameters/v3_report.md</li>
+</ul>
+<h3>Function: validateMatchTopicParameters (File: shadow.c)</h3>
+<p>Status: FAILED
+Refinements: 2
+Message: PREPROCESSING ERROR: Macro definition error: file results/openai/20250422_030232/verification/includes/shadow_config.h line 51: results/openai/20250422_030232/verification/includes/shadow_config.h:51:13: warning: 'LogError' macro redefined [-Wmacro-redefined]; file results/openai/20250422_030232/verification/includes/shadow_config.h line 53: results/openai/20250422_030232/verification/includes/shadow_config.h:53:13: warning: 'LogWarn' macro redefined [-Wmacro-redefined]
+Suggestions: Fix macro definitions and ensure they are properly defined</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 0.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 0.00%</li>
+<li>Final coverage (v3): 0.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250422_030232/harnesses/shadow.c:validateMatchTopicParameters/v1.c</li>
+<li>Version 2: results/openai/20250422_030232/harnesses/shadow.c:validateMatchTopicParameters/v2.c</li>
+<li>Version 3: results/openai/20250422_030232/harnesses/shadow.c:validateMatchTopicParameters/v3.c</li>
+<li>Size evolution: Initial 61 lines → Final 54 lines (-7 lines)</li>
+<li>Refinement result: Some issues remain after 2 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250422_030232/verification/shadow.c:validateMatchTopicParameters/v1_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateMatchTopicParameters/v1_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateMatchTopicParameters/v2_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateMatchTopicParameters/v2_report.md</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateMatchTopicParameters/v3_results.txt</li>
+<li>results/openai/20250422_030232/verification/shadow.c:validateMatchTopicParameters/v3_report.md</li>
+</ul></body></html>

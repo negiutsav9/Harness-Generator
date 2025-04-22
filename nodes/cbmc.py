@@ -413,9 +413,11 @@ def cbmc_node(state):
                 with open(metrics_file, "w") as f:
                     json.dump(coverage_metrics, f, indent=2)
                     
-                # Create coverage directory structure for centralized collection
+                # Create coverage and errors directory structure for centralized collection
                 coverage_dir = os.path.join(result_base_dir, "coverage", "data")
+                errors_dir = os.path.join(result_base_dir, "errors", "data")
                 os.makedirs(coverage_dir, exist_ok=True)
+                os.makedirs(errors_dir, exist_ok=True)
                 
                 # Create flattened data for CSV storage
                 flat_data = {
@@ -497,6 +499,40 @@ def cbmc_node(state):
                     cbmc_result["error_categories"] = ["generic_error"]
                 
                 logger.warning(f"Updated error count from stderr: {stderr_error_count} errors found")
+            
+        # Save error metrics to CSV similar to coverage metrics
+        errors_dir = os.path.join(result_base_dir, "errors", "data")
+        os.makedirs(errors_dir, exist_ok=True)
+        
+        # Create flattened error data for CSV storage
+        error_data = {
+            "function": func_name,
+            "version": version_num,
+            "status": cbmc_result.get("verification_status", "UNKNOWN"),
+            "error_count": cbmc_result.get("error_count", 0),
+            "reported_errors": cbmc_result.get("reported_errors", 0),
+            "failure_count": cbmc_result.get("failure_count", 0),
+            "error_categories": ";".join(cbmc_result.get("error_categories", []))
+        }
+        
+        # Save as JSON for each function version
+        error_metrics_file = os.path.join(errors_dir, f"{func_name}_v{version_num}.json")
+        with open(error_metrics_file, "w") as f:
+            json.dump(error_data, f, indent=2)
+        
+        # Update the running CSV file
+        error_csv_path = os.path.join(errors_dir, "error_metrics.csv")
+        error_file_exists = os.path.exists(error_csv_path)
+        
+        with open(error_csv_path, "a") as f:
+            # Write headers if file is new
+            if not error_file_exists:
+                headers = ",".join(error_data.keys())
+                f.write(f"{headers}\n")
+            
+            # Write data row
+            values = [str(v).replace(",", ";") for v in error_data.values()]
+            f.write(f"{','.join(values)}\n")
             
         # Extract specific error signatures from stderr for more precise error handling
         if cbmc_stderr:
