@@ -280,15 +280,38 @@ def generator_node(state):
             
             # Compare error categories and failure counts between versions
             if cbmc_result.get("error_categories") and cbmc_result.get("previous_error_categories"):
-                current_errors = set(cbmc_result.get("error_categories", []))
-                previous_errors = set(cbmc_result.get("previous_error_categories", []))
+                # Ensure we're comparing the lists correctly by converting to sorted lists
+                current_errors = sorted(cbmc_result.get("error_categories", []))
+                previous_errors = sorted(cbmc_result.get("previous_error_categories", []))
                 
+                # Safely extract failure counts, defaulting to 0 if not present
                 current_failure_count = cbmc_result.get("failure_count", 0)
+                if isinstance(current_failure_count, str) and current_failure_count.isdigit():
+                    current_failure_count = int(current_failure_count)
+                elif not isinstance(current_failure_count, (int, float)):
+                    current_failure_count = 0
+                    
                 previous_failure_count = cbmc_result.get("previous_failure_count", 0)
+                if isinstance(previous_failure_count, str) and previous_failure_count.isdigit():
+                    previous_failure_count = int(previous_failure_count)
+                elif not isinstance(previous_failure_count, (int, float)):
+                    previous_failure_count = 0
                 
-                # Log the actual failure counts for debugging
+                # Log the actual failure counts for debugging with comprehensive information
                 logger.info(f"Previous failure count for {func_name}: {previous_failure_count}")
                 logger.info(f"Current failure count for {func_name}: {current_failure_count}")
+                logger.info(f"Current error categories: {current_errors}")
+                logger.info(f"Previous error categories: {previous_errors}")
+                
+                # Also log coverage to track correlation between coverage and errors
+                current_coverage = cbmc_result.get("func_coverage_pct", 0.0)
+                if isinstance(current_coverage, str) and current_coverage != "NA":
+                    try:
+                        current_coverage = float(current_coverage)
+                    except (ValueError, TypeError):
+                        current_coverage = 0.0
+                
+                logger.info(f"Current function coverage: {current_coverage:.2f}% with {current_failure_count} errors")
                 
                 # If same errors persist and failure count didn't decrease, remove the previous solution from RAG
                 if current_errors == previous_errors and current_errors and current_failure_count >= previous_failure_count and current_failure_count > 0:
@@ -477,16 +500,17 @@ def generator_node(state):
         4. NEVER redefine the function being tested
         5. NEVER redefine any struct, even if you define it exactly the same as the header
         6. NEVER redefine any macros that may be defined in project headers
-        7. Create a main() function that calls the target function
-        8. Use __CPROVER_assume() for input constraints
-        9. Use nondet_* functions (like nondet_int(), nondet_char()) for nondeterministic inputs
-        10. You are ENCOURAGED to use both project-specific resources AND standard library headers/functions
-        11. Standard library usage is fully allowed and encouraged where appropriate
-        12. Ensure all declarations are complete and syntactically correct
-        13. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
-        14. DO NOT CREATE STUBS for existing function dependencies
-        15. Properly use project macros that are provided in the PROJECT MACRO LIBRARY section
-        16. PRIORITY: Focus on successful verification FIRST, then aim for coverage of at least {target_coverage}% for the target function
+        7. NEVER redefine any functions, macros, or structs that are defined in standard libraries
+        8. Create a main() function that calls the target function
+        9. Use __CPROVER_assume() for input constraints
+        10. Use nondet_* functions (like nondet_int(), nondet_char()) for nondeterministic inputs
+        11. You are ENCOURAGED to use both project-specific resources AND standard library headers/functions
+        12. Standard library usage is fully allowed and encouraged where appropriate
+        13. Ensure all declarations are complete and syntactically correct
+        14. ALWAYS FREE ALL ALLOCATED MEMORY - Any malloc() must have a corresponding free()
+        15. DO NOT CREATE STUBS for existing function dependencies
+        16. Properly use project macros that are provided in the PROJECT MACRO LIBRARY section
+        17. PRIORITY: Focus on successful verification FIRST, then aim for coverage of at least {target_coverage}% for the target function
         17. IMPORTANT: If you can't find certain constants (like SHADOW_THINGNAME_MAX_LENGTH), create mock values:
             /* BEGIN MOCK CONSTANTS */
             #define MISSING_CONSTANT 128  // Mock value for missing constant

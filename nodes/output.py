@@ -35,6 +35,8 @@ def extract_coverage_metrics_from_json(json_data: Dict, func_name: str) -> Dict[
         "func_covered_lines": 0,
         "func_coverage_pct": 0.0,
         "reported_errors": 0,
+        "failure_count": 0,
+        "error_count": 0,
         "error_categories": []
     }
     
@@ -139,7 +141,7 @@ def extract_coverage_metrics_from_json(json_data: Dict, func_name: str) -> Dict[
         
         # Extract error information
         errors = 0
-        error_categories = set()
+        error_categories = []
         
         # Look for errors in messages
         if "messages" in json_data and isinstance(json_data["messages"], list):
@@ -150,18 +152,18 @@ def extract_coverage_metrics_from_json(json_data: Dict, func_name: str) -> Dict[
                         # Try to categorize the error
                         if "messageText" in message:
                             error_text = message["messageText"].lower()
-                            if "memory" in error_text:
-                                error_categories.add("memory_leak")
-                            elif "pointer" in error_text:
-                                error_categories.add("null_pointer")
-                            elif "bounds" in error_text or "array" in error_text:
-                                error_categories.add("array_bounds")
-                            elif "division" in error_text or "zero" in error_text:
-                                error_categories.add("division_by_zero")
-                            elif "overflow" in error_text:
-                                error_categories.add("arithmetic_overflow")
-                            else:
-                                error_categories.add("generic_error")
+                            if "memory" in error_text and "memory_leak" not in error_categories:
+                                error_categories.append("memory_leak")
+                            elif "pointer" in error_text and "null_pointer" not in error_categories:
+                                error_categories.append("null_pointer")
+                            elif ("bounds" in error_text or "array" in error_text) and "array_bounds" not in error_categories:
+                                error_categories.append("array_bounds")
+                            elif ("division" in error_text or "zero" in error_text) and "division_by_zero" not in error_categories:
+                                error_categories.append("division_by_zero")
+                            elif "overflow" in error_text and "arithmetic_overflow" not in error_categories:
+                                error_categories.append("arithmetic_overflow")
+                            elif "generic_error" not in error_categories:
+                                error_categories.append("generic_error")
         
         # Alternative way to find errors - look for failed verification
         if "verification-results" in json_data:
@@ -170,29 +172,50 @@ def extract_coverage_metrics_from_json(json_data: Dict, func_name: str) -> Dict[
                     errors += 1
                     if "property" in result:
                         prop = result["property"].lower()
-                        if "memory" in prop:
-                            error_categories.add("memory_leak")
-                        elif "pointer" in prop:
-                            error_categories.add("null_pointer")
-                        elif "bound" in prop:
-                            error_categories.add("array_bounds")
-                        elif "division" in prop:
-                            error_categories.add("division_by_zero")
-                        elif "overflow" in prop:
-                            error_categories.add("arithmetic_overflow")
-                        else:
-                            error_categories.add("generic_error")
+                        if "memory" in prop and "memory_leak" not in error_categories:
+                            error_categories.append("memory_leak")
+                        elif "pointer" in prop and "null_pointer" not in error_categories:
+                            error_categories.append("null_pointer")
+                        elif "bound" in prop and "array_bounds" not in error_categories:
+                            error_categories.append("array_bounds")
+                        elif "division" in prop and "division_by_zero" not in error_categories:
+                            error_categories.append("division_by_zero")
+                        elif "overflow" in prop and "arithmetic_overflow" not in error_categories:
+                            error_categories.append("arithmetic_overflow")
+                        elif "generic_error" not in error_categories:
+                            error_categories.append("generic_error")
         
-        # If we still have no errors but found failures in the string
-        if errors == 0:
-            json_str = json.dumps(json_data)
-            failure_count = json_str.count('"FAILURE"') + json_str.count('"status":"failed"')
-            if failure_count > 0:
-                errors = failure_count
-                error_categories.add("generic_error")
+        # Check for errors in the raw JSON string regardless of other detection methods
+        json_str = json.dumps(json_data)
+        failure_count = json_str.count('"FAILURE"') + json_str.count('"status":"failed"')
+        error_count = json_str.count('"ERROR"') + json_str.count('"messageType":"ERROR"')
         
+        # Look for stderr-based errors as well
+        stderr_error_count = 0
+        if "stderr" in json_data and isinstance(json_data["stderr"], str):
+            stderr_error_count = json_data["stderr"].lower().count("error:")
+            
+        # If we have any kind of error, make sure it's captured
+        if failure_count > 0 or error_count > 0 or stderr_error_count > 0:
+            # Use the highest count as the reported error value
+            errors = max(failure_count, error_count, stderr_error_count, errors)
+            
+            # Make sure we have at least one error category
+            if not error_categories:
+                error_categories.append("generic_error")
+                
+            logger.info(f"Error detection: failures={failure_count}, errors={error_count}, stderr_errors={stderr_error_count}")
+        
+        # Set all error metrics
         metrics["reported_errors"] = errors
-        metrics["error_categories"] = list(error_categories)
+        metrics["failure_count"] = failure_count
+        metrics["error_count"] = error_count
+        metrics["error_categories"] = error_categories  # Already a list from our previous fix
+        
+        # Add logging for traceability
+        logger.info(f"Coverage metrics extraction - Coverage: {metrics.get('func_coverage_pct', 0.0):.2f}%, "
+                   f"Error counts: reported={errors}, failures={failure_count}, total={error_count}")
+        logger.info(f"Error categories: {error_categories}")
     
     except Exception as e:
         logger.error(f"Error extracting coverage metrics from JSON: {str(e)}")
@@ -436,6 +459,8 @@ def analyze_coverage_by_version(
                     "func_covered_lines": metrics["func_covered_lines"],
                     "func_coverage_pct": metrics["func_coverage_pct"],
                     "reported_errors": metrics["reported_errors"],
+                    "failure_count": metrics["failure_count"],
+                    "error_count": metrics["error_count"],
                     "error_categories": str(metrics["error_categories"])
                 })
     
@@ -465,7 +490,9 @@ def analyze_coverage_by_version(
                 "total_covered_lines": row["total_covered_lines"],
                 "func_reachable_lines": row["func_reachable_lines"],
                 "func_covered_lines": row["func_covered_lines"],
-                "reported_errors": row["reported_errors"]
+                "reported_errors": row["reported_errors"],
+                "failure_count": row["failure_count"],
+                "error_count": row["error_count"]
             }
             
             # Save as JSON
@@ -553,10 +580,28 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                     all_json_functions = sorted(json_coverage_data.keys())
                     all_json_versions = sorted(set(v for func_data in json_coverage_data.values() for v in func_data.keys()))
                     
-                    # Add a summary line for total functions
+                    # Count functions with errors for better tracking
+                    funcs_with_errors = 0
+                    for func_name, versions in json_coverage_data.items():
+                        latest_version = max(versions.keys())
+                        error_val = 0
+                        if "reported_errors" in versions[latest_version]:
+                            try:
+                                if isinstance(versions[latest_version]["reported_errors"], (int, float)):
+                                    error_val = int(versions[latest_version]["reported_errors"])
+                                elif isinstance(versions[latest_version]["reported_errors"], str) and versions[latest_version]["reported_errors"] != "NA":
+                                    error_val = int(float(versions[latest_version]["reported_errors"]))
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        if error_val > 0:
+                            funcs_with_errors += 1
+                    
+                    # Add a summary line for total functions with enhanced error tracking
                     html_report += f"""
                         <p>Total Functions Analyzed: {len(all_json_functions)}</p>
                         <p>Total Versions: {len(all_json_versions)}</p>
+                        <p>Functions with Errors: {funcs_with_errors} ({(funcs_with_errors/len(all_json_functions)*100 if all_json_functions else 0):.1f}%)</p>
                     """
                     
                     html_report += """
@@ -569,13 +614,14 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                     
                     # Add version column headers
                     for version in all_json_versions:
-                        html_report += f'<th colspan="2" class="version-header">Version {version}</th>'
+                        html_report += f'<th colspan="3" class="version-header">Version {version}</th>'
                     
                     # Add sub-headers for total and func coverage
                     html_report += "</tr><tr>"
                     for _ in all_json_versions:
                         html_report += '<th class="subheader">Total %</th>'
                         html_report += '<th class="subheader">Func %</th>'
+                        html_report += '<th class="subheader">Errors</th>'
                     html_report += "</tr>"
                     
                     # Add data rows
@@ -590,6 +636,33 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                                 try:
                                     total_cov_val = data.get("total_coverage_pct", 0)
                                     func_cov_val = data.get("func_coverage_pct", 0)
+                                    
+                                    # Get error counts from different possible fields
+                                    reported_errors = data.get("reported_errors", 0)
+                                    failure_count = data.get("failure_count", 0)
+                                    error_count = data.get("error_count", 0)
+                                    
+                                    # Handle string values for all error counts
+                                    if isinstance(reported_errors, str) and reported_errors != "NA":
+                                        try:
+                                            reported_errors = int(float(reported_errors))
+                                        except (ValueError, TypeError):
+                                            reported_errors = 0
+                                            
+                                    if isinstance(failure_count, str) and failure_count != "NA":
+                                        try:
+                                            failure_count = int(float(failure_count))
+                                        except (ValueError, TypeError):
+                                            failure_count = 0
+                                            
+                                    if isinstance(error_count, str) and error_count != "NA":
+                                        try:
+                                            error_count = int(float(error_count))
+                                        except (ValueError, TypeError):
+                                            error_count = 0
+                                    
+                                    # Use the highest non-zero value for display
+                                    error_value = max(reported_errors, failure_count, error_count)
                                     
                                     # Check if values are "NA" or strings
                                     if total_cov_val == "NA" or not isinstance(total_cov_val, (int, float)):
@@ -609,11 +682,37 @@ def generate_coverage_report(coverage_df: pl.DataFrame, coverage_dir: str):
                                         # Determine color class
                                         func_class = "good" if func_cov >= 80 else "medium" if func_cov >= 50 else "poor"
                                         html_report += f'<td class="{func_class}">{func_cov:.2f}%</td>'
+                                    
+                                    # Check if there are any error categories to display alongside the count
+                                    error_cats = []
+                                    if "error_categories" in data and data["error_categories"]:
+                                        try:
+                                            # Handle both string and list representations
+                                            if isinstance(data["error_categories"], str):
+                                                if data["error_categories"].startswith("[") and data["error_categories"].endswith("]"):
+                                                    # Try to parse as list-like string
+                                                    error_cats = data["error_categories"].strip("[]").replace("'", "").split(", ")
+                                                else:
+                                                    error_cats = [data["error_categories"]]
+                                            elif isinstance(data["error_categories"], list):
+                                                error_cats = data["error_categories"]
+                                        except Exception:
+                                            pass
+                                    
+                                    # Force error value to at least 1 if we have error categories
+                                    if error_cats and error_value == 0:
+                                        error_value = 1
+                                        logger.info(f"Force-updated error count for {func_name} v{version} - has error categories but zero count")
+                                    
+                                    # Display error count with color coding and tooltip showing error types
+                                    error_class = "good" if error_value == 0 else "poor"
+                                    error_tooltip = ' title="Errors: ' + ', '.join(error_cats) + '"' if error_cats else ''
+                                    html_report += f'<td class="{error_class}"{error_tooltip}>{error_value}</td>'
                                 except (ValueError, TypeError):
                                     # Handle non-numeric values
-                                    html_report += f'<td>N/A</td><td>N/A</td>'
+                                    html_report += f'<td>N/A</td><td>N/A</td><td>N/A</td>'
                             else:
-                                html_report += '<td>-</td><td>-</td>'
+                                html_report += '<td>-</td><td>-</td><td>-</td>'
                         
                         html_report += '</tr>'
                     
@@ -720,11 +819,48 @@ def output_node(state):
                         if isinstance(metric_val, (int, float)) and metric_val != "NA":
                             aggregate_metrics[metric_key] += int(metric_val)
                 
-                # Count reported errors (if available)
+                # Get all error metrics and add the highest one to the total
+                reported_error_val = 0
+                failure_count_val = 0
+                error_count_val = 0
+                
+                # Process reported_errors
                 if "reported_errors" in metrics:
                     error_val = metrics["reported_errors"]
-                    if isinstance(error_val, (int, float)) and error_val != "NA":
-                        aggregate_metrics["total_reported_errors"] += int(error_val)
+                    # Try to convert string to int if needed
+                    if isinstance(error_val, str) and error_val != "NA":
+                        try:
+                            reported_error_val = int(float(error_val))
+                        except (ValueError, TypeError):
+                            pass
+                    elif isinstance(error_val, (int, float)) and error_val != "NA":
+                        reported_error_val = int(error_val)
+                
+                # Process failure_count
+                if "failure_count" in metrics:
+                    failure_val = metrics["failure_count"]
+                    if isinstance(failure_val, str) and failure_val != "NA":
+                        try:
+                            failure_count_val = int(float(failure_val))
+                        except (ValueError, TypeError):
+                            pass
+                    elif isinstance(failure_val, (int, float)) and failure_val != "NA":
+                        failure_count_val = int(failure_val)
+                
+                # Process error_count
+                if "error_count" in metrics:
+                    error_count = metrics["error_count"]
+                    if isinstance(error_count, str) and error_count != "NA":
+                        try:
+                            error_count_val = int(float(error_count))
+                        except (ValueError, TypeError):
+                            pass
+                    elif isinstance(error_count, (int, float)) and error_count != "NA":
+                        error_count_val = int(error_count)
+                
+                # Add the highest non-zero error value to the total
+                max_error_value = max(reported_error_val, failure_count_val, error_count_val)
+                aggregate_metrics["total_reported_errors"] += max_error_value
                 
                 # Count functions with full coverage
                 if "func_coverage_pct" in metrics:
@@ -732,11 +868,11 @@ def output_node(state):
                     if isinstance(coverage_val, (int, float)) and coverage_val != "NA" and float(coverage_val) >= 95.0:
                         aggregate_metrics["functions_with_full_coverage"] += 1
                 
-                # Count functions without errors
-                if "reported_errors" in metrics:
-                    error_val = metrics["reported_errors"]
-                    if isinstance(error_val, (int, float)) and error_val != "NA" and int(error_val) == 0:
-                        aggregate_metrics["functions_without_errors"] += 1
+                # Count functions without errors by checking all error metrics
+                # Convert the values we already calculated above for reported_error_val, failure_count_val, and error_count_val
+                # If all error values are 0, increment functions without errors
+                if max(reported_error_val, failure_count_val, error_count_val) == 0:
+                    aggregate_metrics["functions_without_errors"] += 1
         except Exception as e:
             logger.error(f"Error processing coverage data: {str(e)}")
     
@@ -879,17 +1015,20 @@ def output_node(state):
         # For each version, we have three sub-columns: Total Coverage, Functional Coverage, and Errors
         
         # Table header row with version columns
+        # Table header row with version columns
         header_row = "| Function "
         for version in versions:
-            header_row += f"| Version {version} |||"
+            header_row += f"| Version {version} "
+        header_row += "|"
         header.append(header_row)
-        
+
         # Sub-header row with Total, Func, and Errors columns for each version
         subheader_row = "| --- "
         for _ in versions:
-            subheader_row += "| Total % | Func % | Errors |"
+            subheader_row += "| Total % | Func % | Errors "
+        subheader_row += "|"
         header.append(subheader_row)
-        
+
         # Data rows
         for function in functions:
             func_row = f"| {function} "
@@ -915,6 +1054,13 @@ def output_node(state):
                         if errors_val == "N/A" and "error_count" in record:
                             errors_val = record.get("error_count", "N/A")
                         
+                        # Ensure errors_val is properly converted to integer if it's a string
+                        if isinstance(errors_val, str) and errors_val != "N/A":
+                            try:
+                                errors_val = int(float(errors_val))
+                            except (ValueError, TypeError):
+                                errors_val = 0
+                        
                         # Format values properly
                         if isinstance(total_cov_val, (int, float)):
                             total_cov = f"{total_cov_val:.2f}%"
@@ -929,15 +1075,16 @@ def output_node(state):
                         if isinstance(errors_val, (int, float)):
                             errors = str(errors_val)
                         else:
-                            errors = "N/A"
+                            errors = "0"  # Default to 0 instead of N/A for errors
                             
-                        func_row += f"| {total_cov} | {func_cov} | {errors} |"
+                        func_row += f"| {total_cov} | {func_cov} | {errors} "
                     else:
-                        func_row += "| - | - | - |"
+                        func_row += "| - | - | - "
                 except Exception as e:
                     logger.error(f"Error formatting coverage data: {str(e)}")
-                    func_row += "| - | - | - |"
+                    func_row += "| - | - | - "
             
+            func_row += "|"
             header.append(func_row)
         
         # Add a note about the metrics
@@ -1005,6 +1152,21 @@ def output_node(state):
                         if metric_name in func_metrics:
                             metric_value = func_metrics[metric_name]
                             
+                            # For reported_errors, also try alternative fields if this is zero or N/A
+                            if metric_name == "reported_errors" and (metric_value == 0 or metric_value == "N/A"):
+                                # Try failure_count
+                                if "failure_count" in func_metrics:
+                                    failure_val = func_metrics["failure_count"]
+                                    if failure_val != 0 and failure_val != "N/A":
+                                        metric_value = failure_val
+                                
+                                # Try error_count
+                                if metric_value == 0 or metric_value == "N/A":
+                                    if "error_count" in func_metrics:
+                                        error_val = func_metrics["error_count"]
+                                        if error_val != 0 and error_val != "N/A":
+                                            metric_value = error_val
+                            
                             # Format percentage values appropriately
                             if metric_name.endswith("_pct") and isinstance(metric_value, (int, float)):
                                 header.append(f"- {display_name}: {metric_value:.2f}%")
@@ -1023,8 +1185,33 @@ def output_node(state):
                             final_cov = float(func_metrics.get('func_coverage_pct', 0))
                             cov_improvement = final_cov - initial_cov
                             
-                            initial_errors = int(first_metrics.get('reported_errors', 0))
-                            final_errors = int(func_metrics.get('reported_errors', 0))
+                            # Get error values with fallbacks to alternative fields
+                            initial_errors = 0
+                            for field in ['reported_errors', 'failure_count', 'error_count']:
+                                if field in first_metrics and first_metrics[field] != "N/A":
+                                    try:
+                                        if isinstance(first_metrics[field], str):
+                                            initial_errors = int(float(first_metrics[field]))
+                                        else:
+                                            initial_errors = int(first_metrics[field])
+                                        if initial_errors > 0:
+                                            break
+                                    except (ValueError, TypeError):
+                                        pass
+                            
+                            final_errors = 0
+                            for field in ['reported_errors', 'failure_count', 'error_count']:
+                                if field in func_metrics and func_metrics[field] != "N/A":
+                                    try:
+                                        if isinstance(func_metrics[field], str):
+                                            final_errors = int(float(func_metrics[field]))
+                                        else:
+                                            final_errors = int(func_metrics[field])
+                                        if final_errors > 0:
+                                            break
+                                    except (ValueError, TypeError):
+                                        pass
+                            
                             error_reduction = initial_errors - final_errors
                             
                             header.append(f"\n#### Coverage Evolution")
@@ -1099,51 +1286,12 @@ def output_node(state):
             f.write("</body></html>")
     
     # Generate index.html that links to all reports
-    index_path = os.path.join(reports_dir, "index.html")
+    index_path = os.path.join(reports_dir, "coverage_report.html")
     with open(index_path, "w") as f:
-        f.write("<html><head><title>CBMC Verification Index</title>")
+        f.write("<html><head><title>CBMC Coverage Table </title>")
         f.write("<style>body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px}h1{color:#2c3e50}h2{color:#3498db}h3{color:#2980b9}table{border-collapse:collapse;width:100%}table,th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}tr:nth-child(even){background-color:#f9f9f9}a{color:#3498db;text-decoration:none}a:hover{text-decoration:underline}</style>")
         f.write("</head><body>")
-        f.write("<h1>CBMC Verification Reports</h1>")
-        f.write("<p>This index provides links to all verification reports generated.</p>")
-        f.write(f"<p><strong>LLM Model Used:</strong> {llm_used.capitalize()}</p>")
         
-        # Add section for RAG database statistics
-        f.write("<h2>RAG Knowledge Base</h2>")
-        f.write("<table>")
-        f.write("<tr><th>Collection</th><th>Count</th></tr>")
-        f.write(f"<tr><td>Code Functions</td><td>{rag_stats['code_functions']}</td></tr>")
-        f.write(f"<tr><td>Pattern Templates</td><td>{rag_stats['patterns']}</td></tr>")
-        f.write(f"<tr><td>Error Patterns</td><td>{rag_stats['errors']}</td></tr>")
-        f.write(f"<tr><td>Successful Solutions</td><td>{rag_stats['solutions']}</td></tr>")
-        f.write("</table>")
-        f.write("<p>The RAG knowledge base grows with each run, improving harness generation by leveraging past experience.</p>")
-        
-        # Link to final report
-        f.write("<h2>Final Summary Report</h2>")
-        f.write(f"<p><a href='final_report.html'>View Complete Summary Report</a></p>")
-        
-        # Add coverage report link
-        f.write("<h2>Coverage Reports</h2>")
-        coverage_report_path = os.path.join(result_base_dir, "coverage", "coverage_report.html")
-        if os.path.exists(coverage_report_path):
-            rel_path = os.path.relpath(coverage_report_path, reports_dir)
-            f.write(f"<p><a href='{rel_path}'>View Detailed Coverage Report</a></p>")
-        else:
-            f.write("<p>Coverage report not found.</p>")
-        
-        # Add unit proof metrics summary table
-        f.write("<h2>Unit Proof Metrics Summary</h2>")
-        f.write("<table>")
-        f.write("<tr><th>Metric</th><th>Value</th></tr>")
-        f.write(f"<tr><td>Total reachable lines</td><td>{aggregate_metrics['total_reachable_lines']}</td></tr>")
-        f.write(f"<tr><td>Total coverage</td><td>{overall_total_coverage:.2f}%</td></tr>")
-        f.write(f"<tr><td>Harnessed functions reachable lines</td><td>{aggregate_metrics['func_reachable_lines']}</td></tr>")
-        f.write(f"<tr><td>Harnessed functions coverage</td><td>{overall_func_coverage:.2f}%</td></tr>")
-        f.write(f"<tr><td>Total reported errors</td><td>{aggregate_metrics['total_reported_errors']}</td></tr>")
-        f.write(f"<tr><td>Functions with full coverage</td><td>{aggregate_metrics['functions_with_full_coverage']} of {len(state.get('cbmc_results', {}))}</td></tr>")
-        f.write(f"<tr><td>Functions without errors</td><td>{aggregate_metrics['functions_without_errors']} of {len(state.get('cbmc_results', {}))}</td></tr>")
-        f.write("</table>")
         
         # Table of function reports with enhanced metrics
         f.write("<h2>Function Reports</h2>")
@@ -1229,18 +1377,47 @@ def output_node(state):
                                 else:
                                     f.write("<td>N/A</td>")
                                 
-                                # Process errors/failures
-                                errors_val = metrics.get("reported_errors", "N/A")
-                                if errors_val == "N/A" and "failure_count" in metrics:
-                                    errors_val = metrics.get("failure_count", "N/A")
-                                if errors_val == "N/A" and "error_count" in metrics:
-                                    errors_val = metrics.get("error_count", "N/A")
+                                # Process errors/failures - Get all error metrics
+                                reported_errors = 0
+                                failure_count = 0
+                                error_count = 0
                                 
-                                if isinstance(errors_val, (int, float)):
-                                    error_class = "good" if errors_val == 0 else "poor"
-                                    f.write(f"<td style='color:{get_color_for_class(error_class)}'>{errors_val}</td>")
-                                else:
-                                    f.write("<td>N/A</td>")
+                                # Get the reported errors value
+                                if "reported_errors" in metrics and metrics["reported_errors"] != "N/A":
+                                    try:
+                                        if isinstance(metrics["reported_errors"], str):
+                                            reported_errors = int(float(metrics["reported_errors"]))
+                                        else:
+                                            reported_errors = int(metrics["reported_errors"])
+                                    except (ValueError, TypeError):
+                                        pass
+                                
+                                # Get the failure count value
+                                if "failure_count" in metrics and metrics["failure_count"] != "N/A":
+                                    try:
+                                        if isinstance(metrics["failure_count"], str):
+                                            failure_count = int(float(metrics["failure_count"]))
+                                        else:
+                                            failure_count = int(metrics["failure_count"])
+                                    except (ValueError, TypeError):
+                                        pass
+                                
+                                # Get the error count value
+                                if "error_count" in metrics and metrics["error_count"] != "N/A":
+                                    try:
+                                        if isinstance(metrics["error_count"], str):
+                                            error_count = int(float(metrics["error_count"]))
+                                        else:
+                                            error_count = int(metrics["error_count"])
+                                    except (ValueError, TypeError):
+                                        pass
+                                
+                                # Use the highest non-zero value for display
+                                error_val = max(reported_errors, failure_count, error_count)
+                                
+                                # Color code the errors - green for 0, red for any errors
+                                error_class = "good" if error_val == 0 else "poor"
+                                f.write(f"<td style='color:{get_color_for_class(error_class)}'>{error_val}</td>")
                             else:
                                 f.write("<td>-</td><td>-</td><td>-</td>")
                         except Exception as e:
@@ -1250,117 +1427,6 @@ def output_node(state):
                 f.write("</tr>")
         
         f.write("</table>")
-        
-        # Add coverage improvement section with all functions that have multiple versions
-        if not coverage_df.is_empty():
-            improvement_data = []
-            
-            for func_name in coverage_df["function"].unique():
-                func_df = coverage_df.filter(pl.col("function") == func_name)
-                
-                if len(func_df) < 2:
-                    continue
-                
-                # Get initial and final versions
-                versions = sorted(func_df["version"].unique())
-                initial_version = versions[0]
-                final_version = versions[-1]
-                
-                try:
-                    initial_metrics = func_df.filter(pl.col("version") == initial_version).row(0, named=True)
-                    final_metrics = func_df.filter(pl.col("version") == final_version).row(0, named=True)
-                    
-                    # Safely extract and convert coverage values
-                    init_cov = initial_metrics.get("func_coverage_pct", 0)
-                    final_cov = final_metrics.get("func_coverage_pct", 0)
-                    
-                    # Handle string values
-                    if isinstance(init_cov, str) and init_cov == "NA":
-                        init_cov = 0
-                    elif isinstance(init_cov, str):
-                        try:
-                            init_cov = float(init_cov)
-                        except:
-                            init_cov = 0
-                            
-                    if isinstance(final_cov, str) and final_cov == "NA":
-                        final_cov = 0
-                    elif isinstance(final_cov, str):
-                        try:
-                            final_cov = float(final_cov)
-                        except:
-                            final_cov = 0
-                    
-                    # Calculate improvement
-                    func_cov_improvement = float(final_cov) - float(init_cov)
-                    
-                    # Get error counts safely
-                    init_errors = initial_metrics.get("reported_errors", 0)
-                    final_errors = final_metrics.get("reported_errors", 0)
-                    
-                    # Handle string values for errors
-                    if isinstance(init_errors, str) and init_errors == "NA":
-                        init_errors = 0
-                    elif isinstance(init_errors, str):
-                        try:
-                            init_errors = int(init_errors)
-                        except:
-                            init_errors = 0
-                            
-                    if isinstance(final_errors, str) and final_errors == "NA":
-                        final_errors = 0
-                    elif isinstance(final_errors, str):
-                        try:
-                            final_errors = int(final_errors)
-                        except:
-                            final_errors = 0
-                    
-                    # Calculate error reduction
-                    error_reduction = int(init_errors) - int(final_errors)
-                    
-                    # Only add if there was improvement
-                    if func_cov_improvement > 0:
-                        improvement_data.append({
-                            "function": func_name,
-                            "versions": len(versions),
-                            "initial_func_coverage": float(init_cov),
-                            "final_func_coverage": float(final_cov),
-                            "func_coverage_improvement": func_cov_improvement,
-                            "error_reduction": error_reduction
-                        })
-                except Exception as e:
-                    logger.error(f"Error processing improvement data for {func_name}: {str(e)}")
-            
-            if improvement_data:
-                f.write("<h2>Coverage Improvement</h2>")
-                f.write("<p>The following functions showed coverage improvement across iterations:</p>")
-                
-                f.write("<table>")
-                f.write("<tr><th>Function</th><th>Versions</th><th>Initial Coverage</th><th>Final Coverage</th><th>Improvement</th><th>Error Reduction</th></tr>")
-                
-                # Sort by improvement
-                improvement_data.sort(key=lambda x: x["func_coverage_improvement"], reverse=True)
-                
-                for item in improvement_data:
-                    # Determine class for coverage improvement
-                    improvement_class = "good" if item["func_coverage_improvement"] > 10 else "medium" if item["func_coverage_improvement"] > 0 else "poor"
-                    
-                    # Extract original function name
-                    display_name = item["function"]
-                    if ":" in display_name:
-                        _, display_name = display_name.split(":", 1)
-                    
-                    f.write(f"<tr>")
-                    f.write(f"<td>{display_name}</td>")
-                    f.write(f"<td>{item['versions']}</td>")
-                    f.write(f"<td>{item['initial_func_coverage']:.2f}%</td>")
-                    f.write(f"<td>{item['final_func_coverage']:.2f}%</td>")
-                    f.write(f"<td class='{improvement_class}'>{item['func_coverage_improvement']:.2f}%</td>")
-                    f.write(f"<td>{item['error_reduction']}</td>")
-                    f.write(f"</tr>")
-                
-                f.write("</table>")
-        
         f.write("</body></html>")
     
     # Calculate relative path for displaying in message

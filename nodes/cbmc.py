@@ -482,6 +482,22 @@ def cbmc_node(state):
         if "stderr" not in cbmc_result:
             cbmc_result["stderr"] = cbmc_stderr
             
+        # Make sure we have at least a basic error count if stderr contains errors
+        if cbmc_stderr and "error:" in cbmc_stderr.lower():
+            # Count error lines in stderr
+            stderr_error_count = cbmc_stderr.lower().count("error:")
+            
+            # Force update the error count to reflect actual errors
+            if stderr_error_count > 0:
+                cbmc_result["error_count"] = max(stderr_error_count, cbmc_result.get("error_count", 0))
+                cbmc_result["reported_errors"] = max(stderr_error_count, cbmc_result.get("reported_errors", 0))
+                
+                # Ensure we have at least one error category
+                if not cbmc_result.get("error_categories"):
+                    cbmc_result["error_categories"] = ["generic_error"]
+                
+                logger.warning(f"Updated error count from stderr: {stderr_error_count} errors found")
+            
         # Extract specific error signatures from stderr for more precise error handling
         if cbmc_stderr:
             # Function to extract error signatures

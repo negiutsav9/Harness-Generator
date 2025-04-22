@@ -252,9 +252,53 @@ def harness_evaluator_node(state):
         # Store the specific error signatures in the result for the generator
         cbmc_result["error_signatures"] = current_error_sigs
         
-    # Log the actual counts for debugging
-    logger.info(f"Previous failure count for {func_name}: {cbmc_result.get('previous_failure_count', 0)}")
+    # Get previous failure count safely (accessing it correctly before we use it)
+    previous_failure_count = cbmc_result.get("previous_failure_count", 0)
+    if isinstance(previous_failure_count, str) and previous_failure_count.isdigit():
+        previous_failure_count = int(previous_failure_count)
+    elif not isinstance(previous_failure_count, (int, float)):
+        previous_failure_count = 0
+    
+    # Sort error categories for consistent comparison and logging
+    sorted_error_categories = sorted(error_categories) if error_categories else []
+    sorted_previous_error_categories = sorted(previous_error_categories) if previous_error_categories else []
+    
+    # Log the actual counts for debugging with additional error information
+    logger.info(f"Previous failure count for {func_name}: {previous_failure_count}")
     logger.info(f"Current failure count for {func_name}: {current_failure_count}")
+    logger.info(f"Current error categories: {sorted_error_categories}")
+    logger.info(f"Previous error categories: {sorted_previous_error_categories}")
+    
+    # Log coverage information alongside error data for better tracking
+    coverage_percentage = cbmc_result.get("func_coverage_pct", 0.0)
+    if isinstance(coverage_percentage, str) and coverage_percentage != "NA":
+        try:
+            coverage_percentage = float(coverage_percentage)
+        except (ValueError, TypeError):
+            coverage_percentage = 0.0
+    
+    # Get all error metrics to ensure we have a complete picture
+    reported_errors = cbmc_result.get("reported_errors", 0)
+    failure_count = cbmc_result.get("failure_count", 0)
+    error_count = cbmc_result.get("error_count", 0)
+    
+    # Check stderr for errors as an additional verification
+    stderr = cbmc_result.get("stderr", "")
+    stderr_error_count = stderr.lower().count("error:") if stderr else 0
+    
+    # Make sure current_failure_count reflects the actual errors
+    max_errors = max(reported_errors, failure_count, error_count, stderr_error_count, current_failure_count)
+    
+    # If we have errors in stderr but zero counts elsewhere, fix the error counts
+    if stderr_error_count > 0 and max_errors == stderr_error_count and current_failure_count == 0:
+        current_failure_count = stderr_error_count
+        cbmc_result["failure_count"] = stderr_error_count
+        cbmc_result["reported_errors"] = stderr_error_count
+        cbmc_result["error_count"] = stderr_error_count
+        logger.warning(f"Fixed zero error count using stderr errors: {stderr_error_count} errors found")
+    
+    logger.info(f"Function coverage: {coverage_percentage:.2f}% with {current_failure_count} errors")
+    logger.info(f"All error counts: reported={reported_errors}, failures={failure_count}, errors={error_count}, stderr={stderr_error_count}")
     
     # First, retrieve any existing persistent_errors from the state
     state_persistent_errors = state.get("persistent_errors", {})
@@ -269,11 +313,23 @@ def harness_evaluator_node(state):
     # 2. Check if specific error signatures are the same
     # 3. Ensure we're not making progress on failures
     
-    if ((set(error_categories) == set(previous_error_categories) and error_categories) or 
+    # We already defined sorted_error_categories and sorted_previous_error_categories above
+    # No need to redefine them here
+    
+    # Convert any string failure counts to integers for proper comparison
+    if isinstance(current_failure_count, str) and current_failure_count.isdigit():
+        current_failure_count = int(current_failure_count)
+    elif not isinstance(current_failure_count, (int, float)):
+        current_failure_count = 0
+        
+    # We already have previous_failure_count from earlier, so we don't need to redefine it here
+    # The value was properly initialized and converted above
+    
+    if ((sorted_error_categories == sorted_previous_error_categories and sorted_error_categories) or 
         (same_specific_errors and current_error_sigs)) and current_failure_count > 0:
         
         # Check if we've made NO progress at all
-        previous_failure_count = cbmc_result.get("previous_failure_count", 0)
+        # We already converted previous_failure_count above, so use that value directly
         if current_failure_count >= previous_failure_count:
             persistent_error_detected = True
             logger.warning(f"Same errors persist between versions for {func_name} with no improvement in failures. This solution is ineffective.")
