@@ -25,6 +25,12 @@ The system excels at identifying complex issues in C code:
 - Type conversion issues
 - Pointer arithmetic problems
 
+### Performance Optimization
+- Multiple SAT solver options (minisat, kissat, cadical) to balance performance and accuracy
+- Intelligent test case minimization for faster verification
+- Enhanced coverage metrics for better evaluation of verification quality
+- Metrics export to Excel for external analysis
+
 ## Architecture
 
 The system employs a sophisticated multi-node workflow with advanced knowledge tracking:
@@ -161,6 +167,16 @@ python main.py -f file.c --timeout 7200
 
 # Enable verbose logging
 python main.py -f file.c -v
+
+# Export metrics to Excel file
+python main.py -f file.c --export results.xlsx
+
+# Choose specific SAT solver for CBMC (default is minisat)
+python main.py -f file.c --sat_solver kissat
+python main.py -f file.c --sat_solver cadical
+
+# Disable RAG system
+python main.py -f file.c --no-rag
 ```
 
 ## Output
@@ -176,6 +192,8 @@ python main.py -f file.c -v
 - Solution effectiveness tracking
 - Vulnerability insights
 - Knowledge base learnings
+- Coverage metrics and visualizations
+- Detailed tables showing metrics evolution across harness versions
 
 ## Environment Configuration
 
@@ -186,6 +204,12 @@ python main.py -f file.c -v
 
 ### Optional Configuration
 - `TOKENIZERS_PARALLELISM`: Set to "false" to avoid warnings
+
+## Performance Optimization
+
+- Multiple SAT solver options (minisat, kissat, cadical)
+- Intelligent test case minimization
+- Enhanced coverage metrics
 
 ## Known Limitations
 - Requires active internet connection for LLM APIs
