@@ -46,6 +46,7 @@ coreJSON
 coreJSON/*
 demo
 coverage
+errors
 notes.txt
 version_*
 Device-Defender-for-AWS-IoT-embedded-sdk
