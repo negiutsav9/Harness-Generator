@@ -1,0 +1,180 @@
+<html><head><title>CBMC Verification Report</title><style>body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px}h1{color:#2c3e50}h2{color:#3498db}h3{color:#2980b9}pre{background:#f8f8f8;border:1px solid #ddd;padding:10px;overflow:auto;border-radius:3px}table{border-collapse:collapse;width:100%}table,th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}tr:nth-child(even){background-color:#f9f9f9}</style></head><body><h1>CBMC Harness Generation Complete - Openai</h1>
+<p>Total processing time: 67.73 seconds
+Analyzed 6 functions.
+Identified 6 functions with memory or arithmetic operations.
+Generated 5 verification harnesses.
+Performed 8 harness refinements (average 1.60 per function).</p>
+<h2>RAG Knowledge Base Statistics</h2>
+<p>Code functions stored: 9
+Pattern templates: 16
+Error patterns stored: 4
+Successful solutions: 4</p>
+<p>The RAG (Retrieval-Augmented Generation) knowledge base stores code functions, patterns, errors, and solutions to improve harness generation over time. Each run contributes to this knowledge base, helping future runs generate better harnesses with fewer iterations.</p>
+<h2>Unit Proof Metrics Summary</h2>
+<p>Total reachable lines: 0
+Total coverage: 0.00%
+Total reachable lines for harnessed functions only: 0
+Coverage of harnessed functions only: 0.00%
+Number of reported errors: 0
+Functions with full coverage: 5 of 5
+Functions without errors: 5 of 5</p>
+<h3>Note on Error Reporting:</h3>
+<ul>
+<li>Errors are grouped by line number (one error per line)</li>
+<li>Errors about missing function bodies are excluded</li>
+<li>Loop unwinding assertions are excluded from error count</li>
+</ul>
+<h2>Detailed Coverage Matrix by Function and Version</h2>
+<p>The table below shows detailed metrics for each function across different versions of the generated harnesses:</p>
+<p>| Function | Version 1 | Version 2 | Version 3 | Version 4 |
+| --- | Total % | Func % | Errors | Total % | Func % | Errors | Total % | Func % | Errors | Total % | Func % | Errors |
+| bubble_sort | 100.00% | 100.00% | 0 | - | - | - | - | - | - | - | - | - |
+| create_array | 100.00% | 100.00% | 0 | - | - | - | - | - | - | - | - | - |
+| filter_array | 100.00% | 100.00% | 0 | 100.00% | 100.00% | 0 | - | - | - | - | - | - |
+| find_median | 100.00% | 100.00% | 0 | 100.00% | 100.00% | 0 | 100.00% | 100.00% | 0 | 100.00% | 100.00% | 0 |
+| merge_sorted_arrays | 100.00% | 100.00% | 0 | - | - | - | - | - | - | - | - | - |</p>
+<p><strong>Metrics Legend:</strong>
+- <strong>Total %</strong>: Percentage of all reachable lines that were covered during verification.
+- <strong>Func %</strong>: Percentage of target function lines that were covered.
+- <strong>Errors</strong>: Number of verification errors or failures detected.</p>
+<h2>Performance Metrics</h2>
+<p>Total execution time: 67.73 seconds
+Average harness generation time: 4.34 seconds
+Average verification time: 0.33 seconds
+Average evaluation time: 0.01 seconds</p>
+<h3>Function Timing Breakdown</h3>
+<p>| Function | Total Time (s) | Generation (s) | Verification (s) | Evaluation (s) | Refinements |
+| -------- | -------------- | -------------- | ---------------- | -------------- | ----------- |
+| bubble_sort | 6.59 | 6.22 | 0.36 | 0.01 | 1 |
+| merge_sorted_arrays | 6.41 | 6.01 | 0.40 | 0.01 | 1 |
+| create_array | 5.99 | 5.57 | 0.42 | 0.01 | 1 |
+| filter_array | 4.88 | 4.49 | 0.38 | 0.01 | 2 |
+| find_median | 4.22 | 3.77 | 0.45 | 0.00 | 3 |
+|  | 0.03 | 0.00 | 0.00 | 0.03 | 0 |</p>
+<h2>Coverage Analysis</h2>
+<p>Coverage report available at: coverage/coverage_report.html</p>
+<h2>Summary of Results</h2>
+<h3>Function: bubble_sort</h3>
+<p>Status: SUCCESS
+Refinements: 1
+Message: Verification successful</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250502_120546/harnesses/bubble_sort/v1.c</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250502_120546/verification/bubble_sort/v1_results.txt</li>
+<li>results/openai/20250502_120546/verification/bubble_sort/v1_report.md</li>
+<li>results/openai/20250502_120546/verification/bubble_sort/v2_results.txt</li>
+<li>results/openai/20250502_120546/verification/bubble_sort/v2_report.md</li>
+</ul>
+<h3>Function: create_array</h3>
+<p>Status: SUCCESS
+Refinements: 1
+Message: Verification successful</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250502_120546/harnesses/create_array/v1.c</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250502_120546/verification/create_array/v1_results.txt</li>
+<li>results/openai/20250502_120546/verification/create_array/v1_report.md</li>
+<li>results/openai/20250502_120546/verification/create_array/v2_results.txt</li>
+<li>results/openai/20250502_120546/verification/create_array/v2_report.md</li>
+</ul>
+<h3>Function: merge_sorted_arrays</h3>
+<p>Status: SUCCESS
+Refinements: 1
+Message: Verification successful</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250502_120546/harnesses/merge_sorted_arrays/v1.c</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250502_120546/verification/merge_sorted_arrays/v1_results.txt</li>
+<li>results/openai/20250502_120546/verification/merge_sorted_arrays/v1_report.md</li>
+<li>results/openai/20250502_120546/verification/merge_sorted_arrays/v2_results.txt</li>
+<li>results/openai/20250502_120546/verification/merge_sorted_arrays/v2_report.md</li>
+</ul>
+<h3>Function: filter_array</h3>
+<p>Status: SUCCESS
+Refinements: 2
+Message: Verification successful</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 100.00%</li>
+<li>Final coverage (v2): 100.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250502_120546/harnesses/filter_array/v1.c</li>
+<li>Version 2: results/openai/20250502_120546/harnesses/filter_array/v2.c</li>
+<li>Size evolution: Initial 44 lines → Final 52 lines (+8 lines)</li>
+<li>Refinement result: Successfully addressed all verification issues</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250502_120546/verification/filter_array/v1_results.txt</li>
+<li>results/openai/20250502_120546/verification/filter_array/v1_report.md</li>
+<li>results/openai/20250502_120546/verification/filter_array/v2_results.txt</li>
+<li>results/openai/20250502_120546/verification/filter_array/v2_report.md</li>
+<li>results/openai/20250502_120546/verification/filter_array/v3_results.txt</li>
+<li>results/openai/20250502_120546/verification/filter_array/v3_report.md</li>
+</ul>
+<h3>Function: find_median</h3>
+<p>Status: FAILED
+Refinements: 3
+Message: VERIFICATION FAILED: Arithmetic overflow detected
+Suggestions: Add checks to prevent integer overflow</p>
+<h4>Coverage Metrics</h4>
+<ul>
+<li>Function coverage: 100.00%</li>
+</ul>
+<h4>Coverage Evolution</h4>
+<ul>
+<li>Initial coverage (v1): 100.00%</li>
+<li>Final coverage (v4): 100.00%</li>
+<li>Coverage improvement: 0.00%</li>
+<li>Error reduction: 0</li>
+</ul>
+<h4>Harness Evolution:</h4>
+<ul>
+<li>Version 1: results/openai/20250502_120546/harnesses/find_median/v1.c</li>
+<li>Version 2: results/openai/20250502_120546/harnesses/find_median/v2.c</li>
+<li>Version 3: results/openai/20250502_120546/harnesses/find_median/v3.c</li>
+<li>Version 4: results/openai/20250502_120546/harnesses/find_median/v4.c</li>
+<li>Size evolution: Initial 26 lines → Final 28 lines (+2 lines)</li>
+<li>Refinement result: Some issues remain after 3 refinements</li>
+</ul>
+<h4>Verification Reports:</h4>
+<ul>
+<li>results/openai/20250502_120546/verification/find_median/v1_results.txt</li>
+<li>results/openai/20250502_120546/verification/find_median/v1_report.md</li>
+<li>results/openai/20250502_120546/verification/find_median/v2_results.txt</li>
+<li>results/openai/20250502_120546/verification/find_median/v2_report.md</li>
+<li>results/openai/20250502_120546/verification/find_median/v3_results.txt</li>
+<li>results/openai/20250502_120546/verification/find_median/v3_report.md</li>
+<li>results/openai/20250502_120546/verification/find_median/v4_results.txt</li>
+<li>results/openai/20250502_120546/verification/find_median/v4_report.md</li>
+</ul></body></html>

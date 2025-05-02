@@ -1131,12 +1131,28 @@ def cbmc_node(state):
     else:
         status_indicator = "❌ FAILED"
         
+    # Update function timings tracking for detailed function breakdown
+    function_timings = state.get("function_timings", {}).copy()
+    if func_name not in function_timings:
+        function_timings[func_name] = {}
+    function_timings[func_name]["verification"] = verification_time
+    
+    # Update module timings
+    module_timings = state.get("module_timings", {})
+    if "cbmc" not in module_timings:
+        module_timings["cbmc"] = 0
+    module_timings["cbmc"] += verification_time  # Accumulate time across all functions
+    
+    logger.info(f"CBMC verification for {func_name} completed in {verification_time:.2f}s with status {status}")
+        
     result_message = f"CBMC verification for {func_name} v{version_num} complete in {verification_time:.2f}s. Status: {status_indicator}"
     
     return {
         "messages": [AIMessage(content=result_message)],
         "cbmc_results": cbmc_results,
         "function_times": function_times,
+        "function_timings": function_timings,
+        "module_timings": module_timings,
         "next": "evaluator"  # Always proceed to evaluator
     }
 

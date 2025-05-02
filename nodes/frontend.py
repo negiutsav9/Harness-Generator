@@ -13,8 +13,12 @@ logger = logging.getLogger("frontend")
 
 def frontend_node(state):
     """Extracts source code from user messages and initializes timing."""
-    # Start timing the overall process
-    start_time = time.time()
+    # Start timing for this module
+    module_start_time = time.time()
+    
+    # Start timing the overall process if not already present
+    if "main_start_time" not in state:
+        state["main_start_time"] = time.time()
 
     logger.info("Processing incoming source code request")
     
@@ -89,7 +93,7 @@ def frontend_node(state):
                         if directory_path in file_path:
                             rel_path = file_path[len(directory_path)+1:]
                         
-                        # Create error message
+                        # Create error message focusing on the line number
                         error_message = f"⚠️ SYNTAX ERROR DETECTED in {rel_path}:\n\n{error_details}"
                         ai_message = AIMessage(content=f"⚠️ ERROR: Processing halted. Please fix the syntax error before proceeding.\n\n{error_message}")
                         
@@ -110,7 +114,7 @@ def frontend_node(state):
                         "messages": [AIMessage(content=f"Processing directory: {directory_path}. Found {len(multiple_files)} C source files in source code directory. No syntax errors detected.")],
                         "source_files": multiple_files,
                         "source_code": combined_source,  # For backward compatibility
-                        "start_time": start_time,
+                        "start_time": module_start_time,
                         "is_directory_mode": True,
                         "source_directory": source_subdir,
                         "file_functions": file_functions  # Initialize tracking of functions per file
@@ -121,7 +125,7 @@ def frontend_node(state):
                         "messages": [AIMessage(content=f"No C source files found in source directory of: {directory_path}")],
                         "source_code": "",
                         "source_files": {},
-                        "start_time": start_time,
+                        "start_time": module_start_time,
                         "is_directory_mode": False,
                         "file_functions": {}
                     }
@@ -137,10 +141,13 @@ def frontend_node(state):
             # Get the file name (should be just one file)
             file_name = list(source_files.keys())[0] if source_files else "command_line_file"
             
-            # Check for syntax errors
-            print(f"Performing syntax error detection on file {file_name} using LLM...")
-            llm_choice = state.get("llm_choice", "claude")
-            syntax_errors = detect_syntax_errors(source_files, llm_choice)
+            # Log that we're using pre-checked source code
+            logger.info(f"Using pre-checked source code from command line file: {file_name}")
+            print(f"Using pre-checked source code from file: {file_name}")
+            
+            # Note: Syntax error checking for single file from command line is now done in main.py
+            # This avoids double-checking and ensures a consistent approach
+            syntax_errors = {}
             
             # If syntax errors are found, exit early with error message
             if syntax_errors:
@@ -166,7 +173,7 @@ def frontend_node(state):
                 "messages": [AIMessage(content=f"Processing file: {file_name} ({len(source_code)} characters). No syntax errors detected. Proceeding with code embedding.")],
                 "source_code": source_code,
                 "source_files": source_files,
-                "start_time": start_time,
+                "start_time": module_start_time,
                 "is_directory_mode": False,
                 "file_functions": {file_name: []}  # Initialize tracking for single file
             }
@@ -180,12 +187,13 @@ def frontend_node(state):
                     
                     # Check for syntax errors in the inline code
                     print("Performing syntax error detection on inline code using LLM...")
-                    llm_choice = state.get("llm_choice", "claude")
+                    llm_choice = state.get("llm_used", state.get("llm_choice", "claude"))
                     syntax_errors = detect_syntax_errors({"inline_code": source_code}, llm_choice)
                     
                     # If syntax errors are found, exit early with error message
                     if syntax_errors:
-                        error_details = list(syntax_errors.values())[0]
+                        error_file = list(syntax_errors.keys())[0]
+                        error_details = syntax_errors[error_file]
                         error_message = f"⚠️ SYNTAX ERROR DETECTED in inline code:\n\n{error_details}"
                         ai_message = AIMessage(content=f"⚠️ ERROR: Processing halted. Please fix the syntax error before proceeding.\n\n{error_message}")
                         
@@ -206,17 +214,27 @@ def frontend_node(state):
                         "messages": [AIMessage(content=f"Received source code ({len(source_code)} characters). No syntax errors detected. Proceeding with code embedding.")],
                         "source_code": source_code,
                         "source_files": {"inline_code": source_code},  # Add to source_files for consistency
-                        "start_time": start_time,
+                        "start_time": module_start_time,
                         "is_directory_mode": False,
                         "file_functions": {"inline_code": []}  # Initialize tracking for single file
                     }
     
     # If no source code found or already exists
+    # Calculate module execution time
+    module_time = time.time() - module_start_time
+    
+    # Update module timings
+    module_timings = state.get("module_timings", {})
+    module_timings["frontend"] = module_time
+    
+    logger.info(f"Frontend node completed in {module_time:.2f}s")
+    
     return {
         "messages": [AIMessage(content=f"Proceeding with code embedding.")],
         "source_code": state.get("source_code", ""),
         "source_files": state.get("source_files", {}),
-        "start_time": start_time,
+        "start_time": state.get("main_start_time", time.time()),
         "is_directory_mode": state.get("is_directory_mode", False),
-        "file_functions": state.get("file_functions", {})
+        "file_functions": state.get("file_functions", {}),
+        "module_timings": module_timings
     }

@@ -7,6 +7,7 @@ import glob
 import argparse
 import logging
 import sys
+import time
 from langchain_core.messages import HumanMessage
 import polars as pl
 
@@ -25,13 +26,32 @@ from utils.file_utils import process_directory, calculate_recursion_limit, setup
 from utils.llm_utils import setup_llm
 from utils.solver_utils import setup_sat_solver
 
-def initialize_rag_system(result_base_dir):
+def initialize_rag_system(result_base_dir, embedding_model=None, is_disabled=False):
     """
     Initialize the RAG system after all modules are loaded.
     This avoids circular imports by initializing the RAG system
     only after all core modules are already loaded.
+    
+    Args:
+        result_base_dir: Directory where results are stored
+        embedding_model: The embedding model to use (default: all-MiniLM-L6-v2)
+        is_disabled: If True, completely disable the RAG system
     """
-    logger.info("Initializing unified RAG system")
+    # If RAG is disabled, configure embedding_db to not store anything
+    if is_disabled:
+        logger.info("RAG system is disabled - no data will be stored or retrieved")
+        import core.embedding_db as embedding_db
+        
+        # Set global flag to disable embedding storage
+        embedding_db.rag_enabled = False
+        
+        # Return empty result with None for db
+        return {
+            "db": None,
+            "global_error_patterns": None
+        }
+    
+    logger.info(f"Initializing unified RAG system with model: {embedding_model}")
     
     # Create the directory for RAG storage
     rag_dir = os.path.join(result_base_dir, "rag_data")
@@ -42,13 +62,17 @@ def initialize_rag_system(result_base_dir):
         from utils.rag import get_unified_db
         import core.embedding_db as embedding_db
         
-        # Initialize the unified database
-        db = get_unified_db(rag_dir)
-        logger.info(f"Initialized RAG database at {rag_dir}")
+        # Initialize the unified database with the specified embedding model
+        db = get_unified_db(rag_dir, embedding_model)
+        logger.info(f"Initialized RAG database at {rag_dir} with model {embedding_model}")
+        
+        # Set global flag to enable embedding storage
+        embedding_db.rag_enabled = True
         
         # Update embedding_db to use the unified database
         embedding_db.code_collection = db.code_collection
         embedding_db.pattern_collection = db.pattern_collection
+        embedding_db.embedding_model = embedding_model
         
         # Update the query function to use the unified database
         def updated_query_pattern_db(query: str):
@@ -92,6 +116,9 @@ def main():
     Main function for the CBMC harness generator.
     Parses command line arguments and runs the workflow.
     """
+    # Start the overall execution timer
+    main_start_time = time.time()
+    
     # Set the TOKENIZERS_PARALLELISM environment variable
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     
@@ -108,9 +135,11 @@ def main():
     parser.add_argument('-e', '--export', type=str, default='metrics.xlsx',
                         help='Export metrics to specified Excel file (default: metrics.xlsx)')
     parser.add_argument('--no-rag', action='store_true',
-                        help='Disable the RAG system and use standard embedding database')
-    parser.add_argument('-s', '--sat_solver', type=str, choices=['minisat', 'kissat', 'cadical'], default = 'minisat',
-                        help='SAT solver used by CBMC' )
+                        help='Disable the RAG system completely (no storage or retrieval)')
+    parser.add_argument('-s', '--sat_solver', type=str, choices=['minisat', 'kissat', 'cadical'], default='minisat',
+                        help='SAT solver used by CBMC')
+    parser.add_argument('--embedding-model', type=str, default='all-MiniLM-L6-v2',
+                        help='Embedding model to use for RAG (default: all-MiniLM-L6-v2, alternative: text-embedding-ada-002 for OpenAI)')
     args = parser.parse_args()
     
     # Set logging level based on verbose flag
@@ -128,10 +157,12 @@ def main():
         # Set up verification directories with LLM model name
         directories = setup_verification_directories(llm_used=args.llm)
         
-        # Initialize the RAG system if not disabled
-        rag_result = {"db": None, "global_error_patterns": None}
-        if not args.no_rag:
-            rag_result = initialize_rag_system(directories["result_base"])
+        # Initialize the RAG system with specified embedding model or disable it
+        rag_result = initialize_rag_system(
+            result_base_dir=directories["result_base"],
+            embedding_model=args.embedding_model,
+            is_disabled=args.no_rag
+        )
         
         # Add directories to state for access by nodes
         result_directories = {
@@ -182,7 +213,10 @@ def main():
                 "result_directories": result_directories,
                 "llm_used": args.llm,
                 "rag_enabled": bool(rag_result["db"]),
-                "global_error_patterns": rag_result.get("global_error_patterns", [])
+                "global_error_patterns": rag_result.get("global_error_patterns", []),
+                "main_start_time": main_start_time,
+                "module_timings": {},  # Track time for each workflow module
+                "function_timings": {}  # Track detailed timings for each function
             }
             
             # Run workflow with calculated limit and timeout
@@ -237,6 +271,26 @@ def main():
                 logger.error(f"Error reading file '{args.file}': {str(e)}")
                 print(f"Error reading file '{args.file}': {str(e)}")
                 return 1
+            
+            # Check for syntax errors before proceeding (only for C files, not headers)
+            logger.info(f"Checking for syntax errors in {args.file}...")
+            print(f"Checking for syntax errors in {args.file}...")
+            from utils.syntax_checker import detect_syntax_errors
+            syntax_errors = detect_syntax_errors({os.path.basename(args.file): source_code}, args.llm)
+            
+            if syntax_errors:
+                error_file = list(syntax_errors.keys())[0]
+                error_details = syntax_errors[error_file]
+                error_message = f"⚠️ SYNTAX ERROR DETECTED in {os.path.basename(error_file)}:\n\n{error_details}"
+                
+                logger.error(f"Syntax error found in {error_file}. Halting workflow.")
+                print("\n⚠️  SYNTAX ERROR DETECTED - WORKFLOW TERMINATED")
+                print("Fix the syntax errors in your code before proceeding.")
+                print(error_message)
+                return 1
+                
+            logger.info(f"No syntax errors detected in {args.file}. Proceeding with analysis.")
+            print(f"No syntax errors detected in {args.file}. Proceeding with analysis.")
                 
             initial_message = HumanMessage(content=f"""
             I need to analyze the C source file: {args.file}
@@ -258,7 +312,10 @@ def main():
                 "is_directory_mode": False,
                 "rag_enabled": bool(rag_result["db"]),
                 "global_error_patterns": rag_result.get("global_error_patterns", []),
-                "file_functions": {os.path.basename(args.file): []}
+                "file_functions": {os.path.basename(args.file): []},
+                "main_start_time": main_start_time,
+                "module_timings": {},  # Track time for each workflow module
+                "function_timings": {}  # Track detailed timings for each function
             }
             
             # Run workflow

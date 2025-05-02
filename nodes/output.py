@@ -3,6 +3,7 @@ Output node for CBMC harness generator workflow with unified RAG database integr
 """
 import os
 import time
+import sys
 from langchain_core.messages import AIMessage
 import logging
 import polars as pl
@@ -28,9 +29,11 @@ def output_node(state):
         }
     
     # Normal flow - continue with report generation
-    total_time = time.time() - state.get("start_time", time.time())
+    # Calculate total execution time from main_start_time (more accurate than start_time)
+    main_start_time = state.get("main_start_time", state.get("start_time", time.time()))
+    total_time = time.time() - main_start_time
 
-    logger.info("Generating final report and output summaries")
+    logger.info(f"Generating final report and output summaries (Total execution time: {total_time:.2f}s)")
     
     # Get result directories from state
     result_directories = state.get("result_directories", {})
@@ -193,14 +196,25 @@ def output_node(state):
     if aggregate_metrics["func_reachable_lines"] > 0 and aggregate_metrics["func_covered_lines"] > 0:
         overall_func_coverage = (aggregate_metrics["func_covered_lines"] / aggregate_metrics["func_reachable_lines"]) * 100
     
+    # Get function-specific timing information
+    function_timings = state.get("function_timings", {})
+    module_timings = state.get("module_timings", {})
+    
     # Create performance metrics
     if function_times:
         avg_generation_time = sum(times.get("generation", 0) for times in function_times.values()) / len(function_times)
         avg_verification_time = sum(times.get("verification", 0) for times in function_times.values()) / len(function_times)
         avg_evaluation_time = sum(times.get("evaluation", 0) for times in function_times.values()) / len(function_times)
         avg_refinements = total_refinements / len(state.get("refinement_attempts", {})) if state.get("refinement_attempts", {}) else 0
+        
+        # Calculate total time per function
+        function_total_times = {}
+        for func_name, times in function_times.items():
+            total_func_time = sum(times.values())
+            function_total_times[func_name] = total_func_time
     else:
         avg_generation_time = avg_verification_time = avg_evaluation_time = avg_refinements = 0
+        function_total_times = {}
     
     # Get RAG database statistics
     try:
@@ -421,9 +435,50 @@ def output_node(state):
     header.extend([
         "",
         "## Performance Metrics",
+        f"Total execution time: {total_time:.2f} seconds",
         f"Average harness generation time: {avg_generation_time:.2f} seconds",
         f"Average verification time: {avg_verification_time:.2f} seconds",
         f"Average evaluation time: {avg_evaluation_time:.2f} seconds",
+        ""
+    ])
+    
+    # Add module timing table if available
+    if module_timings:
+        header.extend([
+            "### Module Timing Breakdown",
+            "",
+            "| Module | Time (seconds) | Percentage of Total |",
+            "| ------ | -------------- | ------------------- |"
+        ])
+        
+        # Sort modules by time (descending)
+        sorted_modules = sorted(module_timings.items(), key=lambda x: x[1], reverse=True)
+        for module, time_taken in sorted_modules:
+            percentage = (time_taken / total_time) * 100 if total_time > 0 else 0
+            header.append(f"| {module} | {time_taken:.2f} | {percentage:.2f}% |")
+    
+    # Add function timing breakdown if available
+    if function_total_times:
+        header.extend([
+            "",
+            "### Function Timing Breakdown",
+            "",
+            "| Function | Total Time (s) | Generation (s) | Verification (s) | Evaluation (s) | Refinements |",
+            "| -------- | -------------- | -------------- | ---------------- | -------------- | ----------- |"
+        ])
+        
+        # Sort functions by total time (descending)
+        sorted_functions = sorted(function_total_times.items(), key=lambda x: x[1], reverse=True)
+        for func_name, total_time_func in sorted_functions:
+            times = function_times.get(func_name, {})
+            generation = times.get("generation", 0)
+            verification = times.get("verification", 0)
+            evaluation = times.get("evaluation", 0)
+            refinements = state.get("refinement_attempts", {}).get(func_name, 0)
+            
+            header.append(f"| {func_name} | {total_time_func:.2f} | {generation:.2f} | {verification:.2f} | {evaluation:.2f} | {refinements} |")
+    
+    header.extend([
         "",
         "## Coverage Analysis",
         f"Coverage report available at: {os.path.join('coverage', 'coverage_report.html')}",

@@ -1463,6 +1463,18 @@ Problems with struct definitions. Check:
             function_times[func_name] = {}
         function_times[func_name]["generation"] = generation_time
         
+        # Update function timings tracking for detailed function breakdown
+        function_timings = state.get("function_timings", {}).copy()
+        if func_name not in function_timings:
+            function_timings[func_name] = {}
+        function_timings[func_name]["generation"] = generation_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "generator" not in module_timings:
+            module_timings["generator"] = 0
+        module_timings["generator"] += generation_time  # Accumulate time across all functions
+        
         # Count macro usage in the harness
         macro_usage = 0
         for header_name, data in project_data.items():
@@ -1497,6 +1509,8 @@ Problems with struct definitions. Check:
             "harness_history": harness_history,
             "improvement_recommendation": "",
             "function_times": function_times,
+            "function_timings": function_timings,
+            "module_timings": module_timings,
             "next": "cbmc"  # Proceed to CBMC verification
         }
         

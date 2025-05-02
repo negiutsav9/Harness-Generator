@@ -45,8 +45,20 @@ def harness_evaluator_node(state):
 
     # Track function times
     function_times = state.get("function_times", {}).copy()
+    # Fix for empty string func_name key error
+    if not func_name:
+        logger.warning("Empty function name detected, using 'unknown_function' as key")
+        func_name = "unknown_function"
+        # Update state for downstream processes
+        state["current_function"] = func_name
+        
     if func_name not in function_times:
         function_times[func_name] = {}
+        
+    # Initialize function-specific timings tracking
+    function_timings = state.get("function_timings", {}).copy()
+    if func_name not in function_timings:
+        function_timings[func_name] = {}
     
     # Track refinement attempts
     state_refinement_attempts = state.get("refinement_attempts", {}).copy()
@@ -56,7 +68,7 @@ def harness_evaluator_node(state):
     current_attempts = state_refinement_attempts.get(func_name, 0)
     # Determine max refinements based on mode
     if state.get("is_directory_mode", False):
-        max_refinements = 10  # More refinements for directory mode
+        max_refinements = 5  # More refinements for directory mode
     else:
         max_refinements = 3   # Fewer refinements for single file mode to avoid recursion issues
     
@@ -69,11 +81,35 @@ def harness_evaluator_node(state):
             state_processed_functions.append(func_name)
             logger.info(f"Max refinements reached for {func_name}, proceeding to next function")
         
+        # Calculate evaluation time
+        evaluation_time = time.time() - evaluation_start
+        
+        # Update function times - ensure nested structure exists
+        if func_name not in function_times:
+            function_times[func_name] = {}
+        function_times[func_name]["evaluation"] = evaluation_time
+        
+        # Update function timings tracking - ensure nested structure exists
+        if func_name not in function_timings:
+            function_timings[func_name] = {}
+        function_timings[func_name]["evaluation"] = evaluation_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "evaluator" not in module_timings:
+            module_timings["evaluator"] = 0
+        module_timings["evaluator"] += evaluation_time
+        
+        logger.info(f"Evaluation for {func_name} completed in {evaluation_time:.2f}s - Max attempts reached")
+        
         return {
             "messages": [AIMessage(content=f"Maximum refinement attempts ({max_refinements}) reached for {func_name}. Moving to next function.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
             "loop_counter": loop_counter,
+            "function_times": function_times,
+            "function_timings": function_timings,
+            "module_timings": module_timings,
             "next": "junction"
         }
     
@@ -86,10 +122,24 @@ def harness_evaluator_node(state):
             state_processed_functions.append(func_name)
             logger.info(f"Missing data for {func_name}, proceeding to next function")
         
+        # Calculate evaluation time
+        evaluation_time = time.time() - evaluation_start
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "evaluator" not in module_timings:
+            module_timings["evaluator"] = 0
+        module_timings["evaluator"] += evaluation_time
+        
+        logger.info(f"Evaluation for {func_name} completed in {evaluation_time:.2f}s - Missing data")
+        
         return {
             "messages": [AIMessage(content=f"Error: Missing harness or CBMC result for function {func_name}. Marking as processed.")],
             "processed_functions": state_processed_functions,
             "loop_counter": loop_counter,
+            "function_times": function_times,
+            "function_timings": function_timings,
+            "module_timings": module_timings,
             "next": "junction"
         }
     
@@ -488,11 +538,34 @@ def harness_evaluator_node(state):
             if func_name not in state_processed_functions:
                 state_processed_functions.append(func_name)
             
+            # Calculate evaluation time 
+            evaluation_time = time.time() - evaluation_start
+            
+            # Ensure nested structure exists
+            if func_name not in function_times:
+                function_times[func_name] = {}
+            function_times[func_name]["evaluation"] = evaluation_time
+            
+            # Update function timings tracking
+            if func_name not in function_timings:
+                function_timings[func_name] = {}
+            function_timings[func_name]["evaluation"] = evaluation_time
+            
+            # Update module timings
+            module_timings = state.get("module_timings", {})
+            if "evaluator" not in module_timings:
+                module_timings["evaluator"] = 0
+            module_timings["evaluator"] += evaluation_time
+            
+            logger.info(f"Evaluation for {func_name} completed in {evaluation_time:.2f}s - Success with good coverage")
+            
             return {
                 "messages": [AIMessage(content=f"CBMC verification successful for {func_name} with {coverage_percentage:.2f}% coverage. Solution stored in knowledge base. Moving to next function.")],
                 "refinement_attempts": state_refinement_attempts,
                 "processed_functions": state_processed_functions,
                 "function_times": function_times,
+                "function_timings": function_timings,
+                "module_timings": module_timings,
                 "loop_counter": loop_counter,
                 "harness_history": harness_history,  # Make sure to return updated harness history
                 "next": "junction"
@@ -1074,12 +1147,35 @@ void* void_ptr = (void*)&buffer[0];  // Explicit cast with address
     # Determine whether to proceed with refinement or move to next function
     if current_attempts < max_refinements - 1:
         # Create update_state with all the necessary information
+        # Calculate evaluation time 
+        evaluation_time = time.time() - evaluation_start
+        
+        # Ensure dictionaries have necessary nested structure
+        if func_name not in function_times:
+            function_times[func_name] = {}
+        function_times[func_name]["evaluation"] = evaluation_time
+        
+        # Update function timings tracking
+        if func_name not in function_timings:
+            function_timings[func_name] = {}
+        function_timings[func_name]["evaluation"] = evaluation_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "evaluator" not in module_timings:
+            module_timings["evaluator"] = 0
+        module_timings["evaluator"] += evaluation_time
+        
+        logger.info(f"Evaluation for {func_name} completed in {evaluation_time:.2f}s - Going for refinement")
+        
         update_state = {
             "messages": [AIMessage(content=f"Evaluated harness for {func_name}. Needs improvement (attempt {version_num} of {max_refinements}). Using insights from unified knowledge base.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
             "improvement_recommendation": improvement_recommendation,
             "function_times": function_times,
+            "function_timings": function_timings,
+            "module_timings": module_timings,
             "loop_counter": loop_counter,
             "harness_history": harness_history,  # Make sure to return updated harness history
             "next": "generator"
@@ -1099,12 +1195,36 @@ void* void_ptr = (void*)&buffer[0];  // Explicit cast with address
         if func_name not in state_processed_functions:
             state_processed_functions.append(func_name)
         
+        # Calculate evaluation time
+        evaluation_time = time.time() - evaluation_start
+        
+        # Update function times - ensure nested structure exists
+        if func_name not in function_times:
+            function_times[func_name] = {}
+        function_times[func_name]["evaluation"] = evaluation_time
+        
+        # Update function timings tracking - ensure nested structure exists
+        if func_name not in function_timings:
+            function_timings[func_name] = {}
+        function_timings[func_name]["evaluation"] = evaluation_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "evaluator" not in module_timings:
+            module_timings["evaluator"] = 0
+        module_timings["evaluator"] += evaluation_time
+        
+        logger.info(f"Evaluation for {func_name} completed in {evaluation_time:.2f}s - Final attempt")
+        
         return {
-            "messages": [AIMessage(content=f"Final refinement attempt for {func_name} completed. Moving to next function.")],
+            "messages": [AIMessage(content=f"Final refinement attempt for {func_name} completed in {evaluation_time:.2f}s. Moving to next function.")],
             "refinement_attempts": state_refinement_attempts,
             "processed_functions": state_processed_functions,
             "loop_counter": loop_counter,
             "harness_history": harness_history,  # Make sure to return updated harness history
+            "function_times": function_times,
+            "function_timings": function_timings,
+            "module_timings": module_timings,
             "next": "junction"
         }
 

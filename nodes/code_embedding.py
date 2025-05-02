@@ -2,6 +2,7 @@
 Code embedding node for CBMC harness generator workflow.
 """
 import os
+import time
 from langchain_core.messages import AIMessage
 from utils.code_parser import embed_code
 import logging
@@ -10,6 +11,8 @@ logger = logging.getLogger("code_embedding")
 
 def code_embedding_node(state):
     """Embeds and stores code in the database."""
+    # Start timing for this module
+    module_start_time = time.time()
 
     logger.info("Starting code embedding process")
     
@@ -74,15 +77,35 @@ def code_embedding_node(state):
         file_summary = "\n".join([f"- {path}: {count} functions" for path, count in file_counts.items() if count > 0])
         header_summary = "\n".join([f"- {h}" for h in all_embeddings["available_headers"]])
         
+        # Calculate module execution time
+        module_time = time.time() - module_start_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        module_timings["code_embedding"] = module_time
+        
+        logger.info(f"Code embedding completed in {module_time:.2f}s for multiple files")
+        
         return {
             "messages": [AIMessage(content=f"Source code embedded successfully across multiple files.\n\nSummary:\n{file_summary}\n\nAvailable Headers:\n{header_summary}\n\nTotal functions found: {len(all_embeddings['functions'])}")],
-            "embeddings": all_embeddings
+            "embeddings": all_embeddings,
+            "module_timings": module_timings
         }
     else:
         # Original single file processing
         result = embed_code(state.get("source_code", ""))
         
+        # Calculate module execution time
+        module_time = time.time() - module_start_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        module_timings["code_embedding"] = module_time
+        
+        logger.info(f"Code embedding completed in {module_time:.2f}s for single file")
+        
         return {
             "messages": [AIMessage(content=f"Source code embedded successfully. Found {len(result['functions'])} functions.")],
-            "embeddings": result
+            "embeddings": result,
+            "module_timings": module_timings
         }

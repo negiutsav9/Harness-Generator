@@ -8,6 +8,13 @@ from chromadb.utils import embedding_functions
 from typing import Dict, List, Any
 import logging
 
+# Global flag to determine whether RAG is enabled
+# This will be set by main.py based on command line arguments
+rag_enabled = True
+
+# Global variable to store the selected embedding model name
+embedding_model = "all-MiniLM-L6-v2"
+
 def _initialize_pattern_collection():
     """Initialize pattern collection with common memory and arithmetic patterns."""
     pattern_collection.add(
@@ -73,37 +80,93 @@ logger = logging.getLogger("embedding_db")
 # Set up ChromaDB - Initialize directly first
 # Later this can be updated to use unified RAG database
 chroma_client = chromadb.Client()
-sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
-# Initialize collections
+# Use the global embedding model
 try:
-    code_collection = chroma_client.get_collection(
-        name="code_embeddings",
-        embedding_function=sentence_transformer_ef
+    # Configure embedding function based on model selection
+    if embedding_model.startswith("text-embedding"):
+        # OpenAI embedding models
+        try:
+            # Import OpenAI embedding function
+            from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+            import os
+            
+            # Use API key from environment
+            openai_api_key = os.environ.get("OPENAI_API_KEY")
+            if not openai_api_key:
+                logger.warning("OPENAI_API_KEY not found in environment, using SentenceTransformer instead")
+                sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                    model_name="all-MiniLM-L6-v2"
+                )
+            else:
+                sentence_transformer_ef = OpenAIEmbeddingFunction(
+                    api_key=openai_api_key,
+                    model_name=embedding_model
+                )
+                logger.info(f"Using OpenAI embedding model: {embedding_model}")
+        except ImportError:
+            logger.warning("OpenAI embeddings not available, falling back to SentenceTransformer")
+            sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name="all-MiniLM-L6-v2"
+            )
+    else:
+        # Default to SentenceTransformer
+        sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name=embedding_model
+        )
+        logger.info(f"Using SentenceTransformer embedding model: {embedding_model}")
+except Exception as e:
+    # Fall back to default model if there's an error
+    logger.warning(f"Error configuring embedding model: {str(e)}")
+    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="all-MiniLM-L6-v2"
     )
-    logger.info("Retrieved existing code collection")
-except:
-    code_collection = chroma_client.create_collection(
-        name="code_embeddings",
-        embedding_function=sentence_transformer_ef,
-        metadata={"hnsw:space": "cosine"}
-    )
-    logger.info("Created new code collection")
 
-try:
-    pattern_collection = chroma_client.get_collection(
-        name="pattern_embeddings",
-        embedding_function=sentence_transformer_ef
-    )
-    logger.info("Retrieved existing pattern collection")
-except:
-    pattern_collection = chroma_client.create_collection(
-        name="pattern_embeddings",
-        embedding_function=sentence_transformer_ef,
-        metadata={"hnsw:space": "cosine"}
-    )
-    _initialize_pattern_collection()
-    logger.info("Created new pattern collection with initial patterns")
+# Initialize collections if RAG is enabled
+if rag_enabled:
+    logger.info("RAG is enabled - initializing collections")
+    try:
+        code_collection = chroma_client.get_collection(
+            name="code_embeddings",
+            embedding_function=sentence_transformer_ef
+        )
+        logger.info("Retrieved existing code collection")
+    except:
+        code_collection = chroma_client.create_collection(
+            name="code_embeddings",
+            embedding_function=sentence_transformer_ef,
+            metadata={"hnsw:space": "cosine"}
+        )
+        logger.info("Created new code collection")
+
+    try:
+        pattern_collection = chroma_client.get_collection(
+            name="pattern_embeddings",
+            embedding_function=sentence_transformer_ef
+        )
+        logger.info("Retrieved existing pattern collection")
+    except:
+        pattern_collection = chroma_client.create_collection(
+            name="pattern_embeddings",
+            embedding_function=sentence_transformer_ef,
+            metadata={"hnsw:space": "cosine"}
+        )
+        _initialize_pattern_collection()
+        logger.info("Created new pattern collection with initial patterns")
+else:
+    # Create dummy collections when RAG is disabled
+    logger.info("RAG is disabled - creating dummy in-memory collections (no storage)")
+    from unittest.mock import MagicMock
+    
+    # Create mock collections that don't actually store anything
+    code_collection = MagicMock()
+    code_collection.add = lambda **kwargs: None
+    code_collection.query = lambda **kwargs: {"ids": [[]], "metadatas": [[]], "distances": [[]], "documents": [[]]}
+    
+    pattern_collection = MagicMock()
+    pattern_collection.add = lambda **kwargs: None
+    pattern_collection.query = lambda **kwargs: {"ids": [[]], "metadatas": [[]], "distances": [[]], "documents": [[]]}
+    pattern_collection.get = lambda **kwargs: {"ids": [], "metadatas": [], "distances": [], "documents": []}
 
 
 
@@ -129,6 +192,14 @@ def query_pattern_db(query: str) -> Dict[str, Any]:
     Returns:
         A dictionary with matching patterns
     """
+    # If RAG is disabled, return empty result
+    if not rag_enabled:
+        logger.debug("RAG is disabled - returning empty pattern results")
+        return {
+            "matching_patterns": {},
+            "message": "Pattern matching disabled (--no-rag flag was used)"
+        }
+    
     # Query the pattern collection to find relevant patterns
     results = pattern_collection.query(
         query_texts=[query],
@@ -152,7 +223,7 @@ def query_pattern_db(query: str) -> Dict[str, Any]:
     matching_patterns = {}
     
     # Add patterns from semantic search
-    if len(results['ids']) > 0:
+    if len(results['ids']) > 0 and len(results['ids'][0]) > 0:
         for i, (pattern_id, metadata, distance) in enumerate(zip(
             results['ids'][0],
             results['metadatas'][0],
@@ -173,9 +244,9 @@ def query_pattern_db(query: str) -> Dict[str, Any]:
         pattern_match_idx = ['malloc_without_free', 'nested_malloc', 'conditional_free'].index(direct_match) + 1
         pattern_id = f"pattern{pattern_match_idx}"
         metadata_results = pattern_collection.get(ids=[pattern_id])
-        if metadata_results['ids']:
-            for metadata in metadata_results['metadatas']:
-                if metadata['name'] == direct_match:
+        if metadata_results.get('ids'):
+            for metadata in metadata_results.get('metadatas', []):
+                if metadata.get('name') == direct_match:
                     matching_patterns[direct_match] = {
                         "description": metadata["description"],
                         "severity": metadata["severity"],
@@ -186,7 +257,7 @@ def query_pattern_db(query: str) -> Dict[str, Any]:
     
     return {
         "matching_patterns": matching_patterns,
-        "message": f"Found {len(matching_patterns)} potential matching patterns via ChromaDB"
+        "message": f"Found {len(matching_patterns)} potential matching patterns via embedding search"
     }
 
 # This function will be replaced by main.py when the RAG system is initialized

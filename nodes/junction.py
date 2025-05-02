@@ -2,6 +2,7 @@
 Junction node for CBMC harness generator workflow.
 """
 import logging
+import time
 from langchain_core.messages import AIMessage
 
 # Set up logging
@@ -9,6 +10,9 @@ logger = logging.getLogger("junction")
 
 def junction_node(state):
     """Processes vulnerable functions one at a time in sequential order."""
+    # Start timing for this module
+    module_start_time = time.time()
+    
     # Get lists of functions
     vulnerable_functions = state.get("vulnerable_functions", [])
     processed_functions = state.get("processed_functions", [])
@@ -28,18 +32,42 @@ def junction_node(state):
     # Force termination if loop counter gets too high
     if loop_counter > 120:
         logger.warning(f"Loop counter exceeded maximum value. Forcing termination.")
+        # Calculate module execution time
+        module_time = time.time() - module_start_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "junction" not in module_timings:
+            module_timings["junction"] = 0
+        module_timings["junction"] += module_time
+        
+        logger.info(f"Junction node completed in {module_time:.2f}s - Loop limit exceeded")
+        
         return {
             "messages": [AIMessage(content=f"WARNING: Loop counter exceeded maximum value. Forcing termination to avoid recursion error.")],
             "loop_counter": 0,
+            "module_timings": module_timings,
             "next": "output"
         }
     
     # Check if all functions processed
     if completed_functions >= total_functions:
         logger.info(f"All {total_functions} functions processed. Moving to output.")
+        # Calculate module execution time
+        module_time = time.time() - module_start_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "junction" not in module_timings:
+            module_timings["junction"] = 0
+        module_timings["junction"] += module_time
+        
+        logger.info(f"Junction node completed in {module_time:.2f}s - All functions processed")
+        
         return {
             "messages": [AIMessage(content=f"All {total_functions} functions have been processed. Moving to final output.")],
             "loop_counter": 0,
+            "module_timings": module_timings,
             "next": "output"
         }
     
@@ -53,10 +81,22 @@ def junction_node(state):
     # If valid current function, continue with it
     if current_function and current_function in vulnerable_functions and current_function not in processed_functions and current_function not in failed_functions:
         logger.info(f"Continuing with function: {current_function}")
+        # Calculate module execution time
+        module_time = time.time() - module_start_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "junction" not in module_timings:
+            module_timings["junction"] = 0
+        module_timings["junction"] += module_time
+        
+        logger.info(f"Junction node completed in {module_time:.2f}s - Continuing with existing function")
+        
         return {
             "messages": [AIMessage(content=f"Continuing processing of function: {current_function}")],
             "current_function": current_function,
             "loop_counter": loop_counter,
+            "module_timings": module_timings,
             "next": "generator"
         }
     
@@ -72,27 +112,63 @@ def junction_node(state):
             
         if func not in processed_functions and func not in failed_functions:
             logger.info(f"Selected next function: {func} ({completed_functions + 1}/{total_functions})")
+            # Calculate module execution time
+            module_time = time.time() - module_start_time
+            
+            # Update module timings
+            module_timings = state.get("module_timings", {})
+            if "junction" not in module_timings:
+                module_timings["junction"] = 0
+            module_timings["junction"] += module_time
+            
+            logger.info(f"Junction node completed in {module_time:.2f}s - Selected new function")
+            
             return {
                 "messages": [AIMessage(content=f"Processing function {completed_functions + 1} of {total_functions}: {func}")],
                 "current_function": func,
                 "loop_counter": loop_counter,
+                "module_timings": module_timings,
                 "next": "generator"
             }
     
     # If we get here, all remaining functions have failed
     if failed_functions:
         logger.warning(f"Skipping {len(failed_functions)} failed functions. Moving to output.")
+        # Calculate module execution time
+        module_time = time.time() - module_start_time
+        
+        # Update module timings
+        module_timings = state.get("module_timings", {})
+        if "junction" not in module_timings:
+            module_timings["junction"] = 0
+        module_timings["junction"] += module_time
+        
+        logger.info(f"Junction node completed in {module_time:.2f}s - Skipping failed functions")
+        
         return {
             "messages": [AIMessage(content=f"Skipped {len(failed_functions)} functions due to errors. Moving to final output.")],
             "loop_counter": 0,
+            "module_timings": module_timings,
             "next": "output"
         }
     
     # Fallback - should not reach here
     logger.warning("Junction fallback - all functions appear processed")
+    # Calculate module execution time
+    module_time = time.time() - module_start_time
+    
+    # Update module timings
+    module_timings = state.get("module_timings", {})
+    if "junction" not in module_timings:
+        module_timings["junction"] = 0
+    module_timings["junction"] += module_time
+    
+    logger.info(f"Junction node completed in {module_time:.2f}s - Fallback case")
+    
     return {
         "messages": [AIMessage(content="All functions appear to be processed. Moving to output.")],
         "loop_counter": 0,
+        "module_timings": module_timings,
         "next": "output"
     }
 

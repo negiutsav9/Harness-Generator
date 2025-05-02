@@ -236,6 +236,12 @@ def analyzer_node(state):
     # Calculate time taken for analysis
     analysis_time = time.time() - analysis_start
     
+    # Update module timings
+    module_timings = state.get("module_timings", {})
+    if "analyzer" not in module_timings:
+        module_timings["analyzer"] = 0
+    module_timings["analyzer"] += analysis_time
+    
     print(f"DEBUG: Will process {len(target_functions)} functions")
     for i, func_id in enumerate(target_functions[:10]):  # Print first 10 for debugging
         print(f"DEBUG: Target function {i}: {func_id}")
@@ -245,6 +251,7 @@ def analyzer_node(state):
         "vulnerable_functions": target_functions,
         "total_functions": len(target_functions),
         "current_function_index": 0,  # Initialize the index counter
+        "module_timings": module_timings,  # Add module timings
         "cbmc_framework": {
             "has_framework": len(cbmc_utility_functions) > 0,
             "utility_functions": cbmc_utility_functions,

@@ -45,26 +45,63 @@ class UnifiedEmbeddingDB:
     Unified database for storing and retrieving embeddings for code, patterns, errors, and solutions.
     """
     
-    def __init__(self, persistence_dir: str = "rag_data"):
+    def __init__(self, persistence_dir: str = "rag_data", embedding_model: str = None):
         """
         Initialize the unified embedding database.
         
         Args:
             persistence_dir: Directory to store the persistent database
+            embedding_model: The embedding model to use (default: all-MiniLM-L6-v2)
         """
+        # Import os at the beginning of the method to ensure it's available
+        import os
+        
         self.persistence_dir = persistence_dir
         os.makedirs(persistence_dir, exist_ok=True)
         
+        # Set the embedding model, defaulting to all-MiniLM-L6-v2 if none provided
+        self.embedding_model = embedding_model or "all-MiniLM-L6-v2"
+        
         # Set up ChromaDB with persistence
         self.chroma_client = chromadb.PersistentClient(path=persistence_dir)
-        self.sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        
+        # Configure embedding function based on model selection
+        if self.embedding_model.startswith("text-embedding"):
+            # OpenAI embedding models
+            try:
+                # Import OpenAI embedding function
+                from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+                import os
+                
+                # Use API key from environment
+                openai_api_key = os.environ.get("OPENAI_API_KEY")
+                if not openai_api_key:
+                    logger.warning("OPENAI_API_KEY not found in environment, using SentenceTransformer instead")
+                    self.sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name="all-MiniLM-L6-v2"
+                    )
+                else:
+                    self.sentence_transformer_ef = OpenAIEmbeddingFunction(
+                        api_key=openai_api_key,
+                        model_name=self.embedding_model
+                    )
+                    logger.info(f"Using OpenAI embedding model: {self.embedding_model}")
+            except ImportError:
+                logger.warning("OpenAI embeddings not available, falling back to SentenceTransformer")
+                self.sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                    model_name="all-MiniLM-L6-v2"
+                )
+        else:
+            # Default to SentenceTransformer
+            self.sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=self.embedding_model
+            )
+            logger.info(f"Using SentenceTransformer embedding model: {self.embedding_model}")
         
         # Initialize all collections
         self._initialize_collections()
         
-        logger.info(f"Initialized UnifiedEmbeddingDB with persistence at {persistence_dir}")
+        logger.info(f"Initialized UnifiedEmbeddingDB with persistence at {persistence_dir} using model {self.embedding_model}")
 
     def mark_ineffective_solution(self, func_name: str, version: int) -> bool:
         """
@@ -1262,17 +1299,21 @@ class UnifiedEmbeddingDB:
 # Global instance for convenience
 _db_instance = None
 
-def get_unified_db(persistence_dir: str = "rag_db") -> UnifiedEmbeddingDB:
+def get_unified_db(persistence_dir: str = "rag_db", embedding_model: str = None) -> UnifiedEmbeddingDB:
     """
     Get the global unified database instance.
     
     Args:
         persistence_dir: Directory for persistence
+        embedding_model: The embedding model to use (default: all-MiniLM-L6-v2)
         
     Returns:
         The global UnifiedEmbeddingDB instance
     """
     global _db_instance
+    # Import os here to ensure it's available in this scope
+    import os
+    
     if _db_instance is None:
-        _db_instance = UnifiedEmbeddingDB(persistence_dir)
+        _db_instance = UnifiedEmbeddingDB(persistence_dir, embedding_model)
     return _db_instance
