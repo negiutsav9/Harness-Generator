@@ -32,7 +32,17 @@ def create_workflow():
 
     # Connect the nodes with the main flow
     workflow.add_edge(START, "frontend")
-    workflow.add_edge("frontend", "code_embedding")
+    
+    # Add conditional routing to allow frontend to route directly to output or continue normal flow
+    workflow.add_conditional_edges(
+        "frontend",
+        lambda state: "output" if state.get("syntax_error", False) else "code_embedding",
+        {
+            "output": "output",  # Direct path to output for syntax errors
+            "code_embedding": "code_embedding"  # Normal path
+        }
+    )
+    
     workflow.add_edge("code_embedding", "analyzer") 
     workflow.add_edge("analyzer", "junction")
 

@@ -11,6 +11,7 @@ import json
 from langchain_core.messages import AIMessage
 import logging
 from utils.cbmc_parser import extract_coverage_metrics_from_json, process_cbmc_output
+from utils.rag import get_unified_db
 
 logger = logging.getLogger("cbmc")
 
@@ -203,6 +204,13 @@ def cbmc_node(state):
             os.path.join(directory_path, "test", "cbmc", "sources"),
             os.path.join(directory_path, "test", "cbmc", "stubs")
         ]
+    else:
+        # For single file mode, we don't need to copy project files
+        # But we need to ensure all required variables are set
+        directory_path = ""
+        original_source_dir = ""
+        # Empty paths since it's a single file
+        test_cbmc_paths = []
         
         # Find the specific source file for this function from embeddings
         embeddings = state.get("embeddings", {})
@@ -215,41 +223,42 @@ def cbmc_node(state):
                 dest_file = os.path.join(verification_project_src_dir, os.path.basename(file_path))
                 shutil.copy2(file_path, dest_file)
                 print(f"Copied main source file: {file_path} → {dest_file}")
-        
-        # Copy necessary headers to include directory, prioritizing source and CBMC directories
-        header_paths = []
-        if original_source_dir and os.path.exists(original_source_dir):
-            header_paths.append(original_source_dir)
-        
-        # Add all CBMC test include paths that exist
+    
+    # Common header and utility file processing for both modes
+    # Copy necessary headers to include directory, prioritizing source and CBMC directories
+    header_paths = []
+    if original_source_dir and os.path.exists(original_source_dir):
+        header_paths.append(original_source_dir)
+    
+    # Add all CBMC test include paths that exist
+    for path in test_cbmc_paths:
+        if os.path.exists(path):
+            header_paths.append(path)
+            print(f"Found CBMC test directory: {path}")
+    
+    # Copy headers from all found paths
+    for src_dir in header_paths:
+        for root, dirs, files in os.walk(src_dir):
+            for file in files:
+                # Copy headers and important source files to include directory
+                if file.endswith(('.h', '.hpp', '.c', '.cbmc')):
+                    src_file = os.path.join(root, file)
+                    dest_file = os.path.join(verification_include_dir, file)
+                    
+                    # Avoid overwriting
+                    if not os.path.exists(dest_file):
+                        shutil.copy2(src_file, dest_file)
+                        print(f"Copied test/verification file: {file}")
+    
+    # Additional CBMC-specific copies for known utility files
+    cbmc_utility_files = ['assert.h', 'nondet.h', 'proof_api.h']
+    for util_file in cbmc_utility_files:
         for path in test_cbmc_paths:
-            if os.path.exists(path):
-                header_paths.append(path)
-                print(f"Found CBMC test directory: {path}")
-        
-        # Copy headers from all found paths
-        for src_dir in header_paths:
-            for root, dirs, files in os.walk(src_dir):
-                for file in files:
-                    # Copy headers and important source files to include directory
-                    if file.endswith(('.h', '.hpp', '.c', '.cbmc')):
-                        src_file = os.path.join(root, file)
-                        dest_file = os.path.join(verification_include_dir, file)
-                        
-                        # Avoid overwriting
-                        if not os.path.exists(dest_file):
-                            shutil.copy2(src_file, dest_file)
-                            print(f"Copied test/verification file: {file}")
-        
-        # Additional CBMC-specific copies for known utility files
-        cbmc_utility_files = ['assert.h', 'nondet.h', 'proof_api.h']
-        for util_file in cbmc_utility_files:
-            for path in test_cbmc_paths:
-                potential_file = os.path.join(path, util_file)
-                if os.path.exists(potential_file):
-                    dest_file = os.path.join(verification_include_dir, util_file)
-                    shutil.copy2(potential_file, dest_file)
-                    print(f"Copied CBMC utility file: {util_file}")
+            potential_file = os.path.join(path, util_file)
+            if os.path.exists(potential_file):
+                dest_file = os.path.join(verification_include_dir, util_file)
+                shutil.copy2(potential_file, dest_file)
+                print(f"Copied CBMC utility file: {util_file}")
     
     # Write harness to file with versioned filename
     harness_filename = original_func_name if ":" not in func_name else original_func_name
@@ -281,7 +290,6 @@ def cbmc_node(state):
     cbmc_cmd.extend(c_files_in_includes)
 
     # Get the unified RAG database
-    from utils.rag import get_unified_db
     rag_db = get_unified_db(os.path.join(result_directories.get("result_base_dir", "results"), "rag_data"))
 
     # OPTIMIZATION: Add any targeted dependency files based on function dependencies
@@ -295,6 +303,37 @@ def cbmc_node(state):
     for file in verification_files:
         if file not in c_files_in_includes:
             cbmc_cmd.append(file)
+            
+    # For single file mode, we need to explicitly add the source file to be analyzed
+    if not state.get("is_directory_mode", False):
+        # Get the source file from the state
+        source_files = state.get("source_files", {})
+        if source_files:
+            # For single file mode, there should be only one file
+            file_name = list(source_files.keys())[0]
+            file_content = source_files[file_name]
+            
+            # Modify the source code to rename the main function to avoid conflicts with harness main function
+            modified_content = file_content
+            
+            # Check if there's a main function in the source file and rename it
+            if "int main(" in file_content or "void main(" in file_content:
+                logger.info("Detected main function in source file. Renaming to avoid conflict with harness.")
+                # Replace the main function with a renamed version
+                modified_content = re.sub(
+                    r'(int|void)\s+main\s*\(([^)]*)\)', 
+                    r'\1 original_main(\2)', 
+                    file_content
+                )
+            
+            # Write the modified source file to a temporary location for CBMC to analyze
+            temp_source_file = os.path.join(verification_project_src_dir, file_name)
+            with open(temp_source_file, "w") as f:
+                f.write(modified_content)
+                
+            # Add the source file to the CBMC command
+            cbmc_cmd.append(temp_source_file)
+            logger.info(f"Added source file for single file mode: {temp_source_file}")
 
     # Add verification flags
     cbmc_cmd.extend([
@@ -346,6 +385,8 @@ def cbmc_node(state):
     
     # Create a separate command for coverage with compatible flags
     coverage_cmd = cbmc_cmd.copy()
+    
+    # Add specific coverage flags - ensure we get detailed location coverage
     coverage_cmd.extend([
         "--cover", "location",
         "--json-ui"  # Using JSON format for consistent parsing

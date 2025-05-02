@@ -1067,6 +1067,16 @@ Problems with struct definitions. Check:
         - DO NOT CREATE STUBS for existing function dependencies - only add stubs for truly missing functions
         """
     
+    # Add note about the main function being renamed in single file mode
+    if not state.get("is_directory_mode", False) and "int main(" in func_code:
+        # Add a note to the prompt about the renamed main function
+        special_note = """
+        IMPORTANT NOTE: The system has automatically renamed the main() function in the original source file 
+        to original_main() to avoid conflicts. Your harness should use main() as the entry point, 
+        and you can call original_main() from your harness if needed.
+        """
+        generator_prompt += "\n\n" + special_note
+    
     # Generate the harness
     try:
         logger.info(f"Sending API request to generate harness for {func_name}")

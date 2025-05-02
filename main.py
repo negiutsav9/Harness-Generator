@@ -192,6 +192,23 @@ def main():
                     initial_state,
                     {"recursion_limit": recursion_limit, "timeout": args.timeout}
                 )
+                
+                # Check if the workflow was terminated due to syntax errors
+                if result.get("syntax_error", False):
+                    exit_message = result.get("exit_message", "Unknown syntax error")
+                    logger.error(f"Workflow terminated due to syntax errors: {exit_message}")
+                    
+                    # Print error message to console
+                    print("\n⚠️  SYNTAX ERROR DETECTED - WORKFLOW TERMINATED")
+                    print("Fix the syntax errors in your code before proceeding.")
+                    
+                    # Pass along the message from the frontend node
+                    for message in result.get("messages", []):
+                        print(message.content)
+                    
+                    # Exit with error code
+                    return 1
+                
                 logger.info("Workflow completed successfully")
             except TimeoutError:
                 logger.error(f"Workflow timed out after {args.timeout} seconds")
@@ -202,8 +219,88 @@ def main():
                 print(f"ERROR: Workflow failed: {str(e)}")
                 return 1
         
-        # [Rest of the main() function remains the same as in the original implementation]
-        # ... (including the file mode processing, metrics export, etc.)
+        elif args.file:
+            # Single file mode
+            logger.info(f"Processing single file: {args.file}")
+            
+            # Verify the file exists
+            if not os.path.isfile(args.file):
+                logger.error(f"Error: The specified file '{args.file}' does not exist.")
+                print(f"Error: The specified file '{args.file}' does not exist.")
+                return 1
+                
+            # Read the file content
+            try:
+                with open(args.file, 'r') as f:
+                    source_code = f.read()
+            except Exception as e:
+                logger.error(f"Error reading file '{args.file}': {str(e)}")
+                print(f"Error reading file '{args.file}': {str(e)}")
+                return 1
+                
+            initial_message = HumanMessage(content=f"""
+            I need to analyze the C source file: {args.file}
+            Please identify any potential memory leaks and generate CBMC harnesses for verification.
+            """)
+            
+            # Prepare initial state for single file mode
+            initial_state = {
+                "messages": [initial_message],
+                "source_code": source_code,
+                "source_files": {os.path.basename(args.file): source_code},
+                "embeddings": {},
+                "vulnerable_functions": [],
+                "harnesses": {},
+                "cbmc_results": {},
+                "processed_functions": [],
+                "result_directories": result_directories,
+                "llm_used": args.llm,
+                "is_directory_mode": False,
+                "rag_enabled": bool(rag_result["db"]),
+                "global_error_patterns": rag_result.get("global_error_patterns", []),
+                "file_functions": {os.path.basename(args.file): []}
+            }
+            
+            # Run workflow
+            try:
+                # Use higher recursion limit for single file mode
+                logger.info(f"Starting workflow with timeout {args.timeout}s and recursion limit 50")
+                result = app.invoke(
+                    initial_state,
+                    {"timeout": args.timeout, "recursion_limit": 50}
+                )
+                
+                # Check if the workflow was terminated due to syntax errors
+                if result.get("syntax_error", False):
+                    exit_message = result.get("exit_message", "Unknown syntax error")
+                    logger.error(f"Workflow terminated due to syntax errors: {exit_message}")
+                    
+                    # Print error message to console
+                    print("\n⚠️  SYNTAX ERROR DETECTED - WORKFLOW TERMINATED")
+                    print("Fix the syntax errors in your code before proceeding.")
+                    
+                    # Pass along the message from the frontend node
+                    for message in result.get("messages", []):
+                        print(message.content)
+                    
+                    # Exit with error code
+                    return 1
+                
+                logger.info("Workflow completed successfully")
+            except TimeoutError:
+                logger.error(f"Workflow timed out after {args.timeout} seconds")
+                print(f"ERROR: Workflow timed out after {args.timeout} seconds. Try increasing the timeout with --timeout option.")
+                return 1
+            except Exception as e:
+                logger.error(f"Error during workflow execution: {str(e)}", exc_info=True)
+                print(f"ERROR: Workflow failed: {str(e)}")
+                return 1
+        else:
+            # No source specified
+            logger.error("Error: No source directory or file specified. Use -d/--directory or -f/--file.")
+            print("Error: No source directory or file specified. Use -d/--directory or -f/--file.")
+            print("Run with --help for more information.")
+            return 1
         
     except Exception as e:
         logger.critical(f"Critical error: {str(e)}", exc_info=True)

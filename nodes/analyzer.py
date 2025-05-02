@@ -164,7 +164,11 @@ def analyzer_node(state):
     
     # If we still have no functions, we might need a fallback
     if not target_functions:
-        print("WARNING: No functions match source directory criteria. Trying to find any .c files...")
+        print("WARNING: No functions match source directory criteria. Trying to find any functions...")
+        
+        # Check if this is single file mode
+        is_single_file = not state.get("is_directory_mode", False)
+        
         for i, func_id in enumerate(all_functions["ids"]):
             # Skip problematic patterns
             if (func_id.startswith("header:") or 
@@ -180,15 +184,42 @@ def analyzer_node(state):
             metadata = all_functions["metadatas"][i]
             if metadata.get("type") == "pattern" or metadata.get("is_keyword", False):
                 continue
-                
-            file_path = metadata.get("file_path", "")
             
-            # Check if this is a .c or .cpp file
-            if file_path and (file_path.endswith(".c") or file_path.endswith(".cpp")):
-                # Extract filename for debugging
-                filename = os.path.basename(file_path)
-                print(f"DEBUG: Adding fallback function: {func_id} (from {filename})")
-                target_functions.append(func_id)
+            # For single file mode, add all valid functions
+            if is_single_file:
+                func_code = all_functions["documents"][i]
+                
+                # Check for memory operations
+                has_memory_ops = any(op in func_code for op in [
+                    "malloc(", "calloc(", "realloc(", "free(", "alloca(", 
+                    "new ", "delete ", "memcpy(", "memmove(", "memset(",
+                    "&", "*", "->", "[]"  # Memory-related operators
+                ])
+                
+                # Check for arithmetic operations
+                has_arithmetic = any(op in func_code for op in [
+                    "+", "-", "*", "/", "%",  # Basic arithmetic
+                    "+=", "-=", "*=", "/=", "%=",  # Compound assignment
+                    "++", "--",  # Increment/decrement
+                    "==", "!=", "<", ">", "<=", ">=",  # Comparison operators
+                    "<<", ">>", "&", "|", "^", "~",  # Bitwise operations
+                    "fabs(", "sqrt(", "pow(", "sin(", "cos(",  # Math functions
+                ])
+                
+                # Add this function if it deals with memory or arithmetic
+                if has_memory_ops or has_arithmetic:
+                    print(f"DEBUG: Adding target function from single file: {func_id}")
+                    target_functions.append(func_id)
+            else:
+                # Directory mode fallback - look for .c or .cpp files
+                file_path = metadata.get("file_path", "")
+                
+                # Check if this is a .c or .cpp file
+                if file_path and (file_path.endswith(".c") or file_path.endswith(".cpp")):
+                    # Extract filename for debugging
+                    filename = os.path.basename(file_path)
+                    print(f"DEBUG: Adding fallback function: {func_id} (from {filename})")
+                    target_functions.append(func_id)
     
     # Count functions by category
     category_count = {

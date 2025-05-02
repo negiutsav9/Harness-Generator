@@ -13,6 +13,21 @@ logger = logging.getLogger("output")
 
 def output_node(state):
     """Provides final summary and generates reports with unified RAG database integration."""
+    
+    # Check if workflow was terminated early due to syntax errors
+    if state.get("syntax_error", False):
+        # Log the error and return the error message without generating reports
+        logger.error(f"Workflow stopped due to syntax errors: {state.get('exit_reason', 'unknown')}")
+        
+        # Return the state with syntax error flag for main.py to handle
+        return {
+            "messages": state.get("messages", []),
+            "syntax_error": True,
+            "exit_reason": state.get("exit_reason", "syntax_error"),
+            "exit_message": state.get("exit_message", "Unknown syntax error")
+        }
+    
+    # Normal flow - continue with report generation
     total_time = time.time() - state.get("start_time", time.time())
 
     logger.info("Generating final report and output summaries")

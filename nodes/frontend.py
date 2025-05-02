@@ -6,6 +6,7 @@ import re
 import time
 from langchain_core.messages import AIMessage, HumanMessage
 from utils.file_utils import process_directory
+from utils.syntax_checker import detect_syntax_errors
 import logging
 
 logger = logging.getLogger("frontend")
@@ -71,8 +72,42 @@ def frontend_node(state):
                     logger.info(f"Found {len(multiple_files)} C source files in {directory_path}")
                     print(f"Combined source code length: {len(combined_source)} bytes")
                     
+                    # Check for syntax errors in all source files
+                    print("Performing syntax error detection using LLM...")
+                    # Get LLM choice from state or use default
+                    llm_choice = state.get("llm_choice", "claude")
+                    syntax_errors = detect_syntax_errors(multiple_files, llm_choice)
+                    
+                    # If syntax errors are found, exit early with error message
+                    if syntax_errors:
+                        # Get file path and error details
+                        file_path = list(syntax_errors.keys())[0]
+                        error_details = syntax_errors[file_path]
+                        
+                        # Format the file path for better readability
+                        rel_path = file_path
+                        if directory_path in file_path:
+                            rel_path = file_path[len(directory_path)+1:]
+                        
+                        # Create error message
+                        error_message = f"⚠️ SYNTAX ERROR DETECTED in {rel_path}:\n\n{error_details}"
+                        ai_message = AIMessage(content=f"⚠️ ERROR: Processing halted. Please fix the syntax error before proceeding.\n\n{error_message}")
+                        
+                        logger.error(f"Syntax error found in {rel_path}. Exiting.")
+                        print(f"SYNTAX ERROR: Found error in {rel_path}. Halting workflow.")
+                        
+                        # Return with syntax error flag for immediate exit
+                        return {
+                            "messages": [ai_message],
+                            "syntax_error": True,
+                            "exit_reason": "syntax_error",
+                            "exit_message": error_message,
+                            "next": "output"  # Force jump to output node
+                        }
+                    
+                    # Continue normal flow if no errors found
                     return {
-                        "messages": [AIMessage(content=f"Processing directory: {directory_path}. Found {len(multiple_files)} C source files in source code directory.")],
+                        "messages": [AIMessage(content=f"Processing directory: {directory_path}. Found {len(multiple_files)} C source files in source code directory. No syntax errors detected.")],
                         "source_files": multiple_files,
                         "source_code": combined_source,  # For backward compatibility
                         "start_time": start_time,
@@ -91,15 +126,84 @@ def frontend_node(state):
                         "file_functions": {}
                     }
     
-    # Fall back to the original single file processing if no directory is specified
-    if not state.get("source_code"):
+    # Handle source code already provided from command-line file argument or fall back to inline code
+    if not state.get("source_code") or not state.get("source_files"):
+        # Check if source files are already populated from main.py's file argument
+        if state.get("source_code") and state.get("source_files"):
+            # Source code already exists from command-line argument
+            source_code = state.get("source_code")
+            source_files = state.get("source_files")
+            
+            # Get the file name (should be just one file)
+            file_name = list(source_files.keys())[0] if source_files else "command_line_file"
+            
+            # Check for syntax errors
+            print(f"Performing syntax error detection on file {file_name} using LLM...")
+            llm_choice = state.get("llm_choice", "claude")
+            syntax_errors = detect_syntax_errors(source_files, llm_choice)
+            
+            # If syntax errors are found, exit early with error message
+            if syntax_errors:
+                error_file = list(syntax_errors.keys())[0]
+                error_details = syntax_errors[error_file]
+                error_message = f"⚠️ SYNTAX ERROR DETECTED in {error_file}:\n\n{error_details}"
+                ai_message = AIMessage(content=f"⚠️ ERROR: Processing halted. Please fix the syntax error before proceeding.\n\n{error_message}")
+                
+                logger.error(f"Syntax error found in {error_file}. Exiting.")
+                print(f"SYNTAX ERROR: Found error in {error_file}. Halting workflow.")
+                
+                # Return with syntax error flag for immediate exit
+                return {
+                    "messages": [ai_message],
+                    "syntax_error": True,
+                    "exit_reason": "syntax_error",
+                    "exit_message": error_message,
+                    "next": "output"  # Force jump to output node
+                }
+                
+            # Continue normal flow if no errors found
+            return {
+                "messages": [AIMessage(content=f"Processing file: {file_name} ({len(source_code)} characters). No syntax errors detected. Proceeding with code embedding.")],
+                "source_code": source_code,
+                "source_files": source_files,
+                "start_time": start_time,
+                "is_directory_mode": False,
+                "file_functions": {file_name: []}  # Initialize tracking for single file
+            }
+        
+        # Fall back to extracting code from message content if no file provided
         for message in reversed(state["messages"]):
             if isinstance(message, HumanMessage) and "```" in message.content:
                 match = re.search(r'```(?:\w+)?\n(.+?)\n```', message.content, re.DOTALL)
                 if match:
                     source_code = match.group(1)
+                    
+                    # Check for syntax errors in the inline code
+                    print("Performing syntax error detection on inline code using LLM...")
+                    llm_choice = state.get("llm_choice", "claude")
+                    syntax_errors = detect_syntax_errors({"inline_code": source_code}, llm_choice)
+                    
+                    # If syntax errors are found, exit early with error message
+                    if syntax_errors:
+                        error_details = list(syntax_errors.values())[0]
+                        error_message = f"⚠️ SYNTAX ERROR DETECTED in inline code:\n\n{error_details}"
+                        ai_message = AIMessage(content=f"⚠️ ERROR: Processing halted. Please fix the syntax error before proceeding.\n\n{error_message}")
+                        
+                        logger.error("Syntax error found in inline code. Exiting.")
+                        print("SYNTAX ERROR: Found error in inline code. Halting workflow.")
+                        
+                        # Return with syntax error flag for immediate exit
+                        return {
+                            "messages": [ai_message],
+                            "syntax_error": True,
+                            "exit_reason": "syntax_error",
+                            "exit_message": error_message,
+                            "next": "output"  # Force jump to output node
+                        }
+                        
+                    # Continue normal flow if no errors found
                     return {
-                        "messages": [AIMessage(content=f"Received source code ({len(source_code)} characters). Proceeding with code embedding.")],
+                        "messages": [AIMessage(content=f"Received source code ({len(source_code)} characters). No syntax errors detected. Proceeding with code embedding.")],
                         "source_code": source_code,
                         "source_files": {"inline_code": source_code},  # Add to source_files for consistency
                         "start_time": start_time,

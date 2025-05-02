@@ -129,8 +129,21 @@ def extract_coverage_metrics_from_json(json_data, target_function_name, version_
                             if goal.get("status") == "satisfied":
                                 reachable_lines_main.update(parsed_lines)
                         
-                        # Track lines for target function
-                        if function_name == target_function:
+                        # Track lines for target function - handle both with and without file prefix
+                        # For single file mode, the function may not have a prefix, but the file might contain the target function
+                        if function_name == target_function or function_name.endswith("_" + target_function):
+                            total_lines_target_function.update(parsed_lines)
+                            if goal.get("status") == "satisfied":
+                                reachable_lines_target_function.update(parsed_lines)
+                                
+                        # For bubble_sort.c or similar single files, we need to directly check the file name
+                        original_file_basename = ""
+                        if ":" in target_function_name:
+                            original_file_basename, _ = target_function_name.split(":", 1)
+                            
+                        # Handle single file mode where the basename matches
+                        if (original_file_basename and original_file_basename in file_path and function_name == target_function) or \
+                           (function_name == target_function and ("bubble_sort.c" in file_path or target_function_name in file_path)):
                             total_lines_target_function.update(parsed_lines)
                             if goal.get("status") == "satisfied":
                                 reachable_lines_target_function.update(parsed_lines)

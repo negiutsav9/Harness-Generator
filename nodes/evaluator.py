@@ -54,7 +54,11 @@ def harness_evaluator_node(state):
         state_refinement_attempts[func_name] = 0
     
     current_attempts = state_refinement_attempts.get(func_name, 0)
-    max_refinements = 10  # Maximum number of refinement attempts
+    # Determine max refinements based on mode
+    if state.get("is_directory_mode", False):
+        max_refinements = 10  # More refinements for directory mode
+    else:
+        max_refinements = 3   # Fewer refinements for single file mode to avoid recursion issues
     
     # Processed functions tracking
     state_processed_functions = state.get("processed_functions", []).copy()
@@ -1188,4 +1192,23 @@ def generate_coverage_improvement_recommendation(harness_code, func_code, cbmc_r
 
 def route_from_evaluator(state):
     """Routes from evaluator to either generator (for refinement) or junction (for next function)."""
-    return state.get("next", "junction")
+    improvement_needed = state.get("improvement_needed", False)
+    next_state = state.get("next", "junction")
+    
+    # If already explicit routing is set, respect it
+    if next_state in ["generator", "junction"]:
+        return next_state
+        
+    # Determine if we should stop refinement based on attempt count
+    max_attempts = 5  # Maximum number of refinement attempts per function
+    refinement_attempts = state.get("refinement_attempts", {}).get(state.get("current_function", ""), 0)
+    
+    # For single file mode, we need to be even more careful about recursion
+    if not state.get("is_directory_mode", False):
+        max_attempts = 2  # Even fewer attempts for single file mode
+    
+    if improvement_needed and refinement_attempts < max_attempts:
+        return "generator"
+    else:
+        # Clear improvement data before returning to junction
+        return "junction"
