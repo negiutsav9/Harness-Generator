@@ -1,6 +1,6 @@
 # CBMC Harness Generation System
 
-An AI-powered tool for generating CBMC verification harnesses to detect memory and arithmetic issues in C code using advanced Language Model and Retrieval-Augmented Generation (RAG) techniques.
+An AI-powered tool for generating CBMC verification harnesses to detect memory and arithmetic issues in C code using advanced Language Models (LLMs) and Retrieval-Augmented Generation (RAG) techniques. The system leverages the power of LLMs to analyze C code, identify vulnerabilities, and generate effective verification harnesses.
 
 ## Overview
 
@@ -30,6 +30,8 @@ The system excels at identifying complex issues in C code:
 - Intelligent test case minimization for faster verification
 - Enhanced coverage metrics for better evaluation of verification quality
 - Metrics export to Excel for external analysis
+- Support for syntax error detection and correction
+- Parallel processing capabilities for multi-function projects
 
 ## Architecture
 
@@ -69,10 +71,12 @@ The system maintains a dynamic knowledge base that:
 8. Iterative refinement using RAG insights
 9. Generate comprehensive reports with knowledge base learnings
 
+![System Architecture Diagram](system_architecture_simplified.mmd)
+
 ## Project Structure
 
 ```
-cbmc-harness-generator/
+llm-harness-generator/
 ├── main.py                      # Primary entry point
 ├── requirements.txt             # Python dependencies
 ├── setup.sh                     # Project setup script
@@ -96,14 +100,21 @@ cbmc-harness-generator/
 │   ├── code_parser.py           # Advanced code parsing
 │   ├── file_utils.py            # File handling utilities
 │   ├── llm_utils.py             # LLM configuration
+│   ├── cbmc_parser.py           # CBMC output parsing
+│   ├── syntax_checker.py        # C syntax error detection
+│   ├── solver_utils.py          # SAT solver utilities
 │   └── rag/                     # Retrieval-Augmented Generation
 │       ├── db.py                # RAG knowledge base
 │       └── patterns.py          # Vulnerability pattern recognition
 │
+├── solvers/                     # SAT solver binaries
+│   └── cadical/                 # CaDiCaL SAT solver
+│
 ├── results/                     # Runtime output directories
 │   ├── harnesses/               # Generated verification harnesses
 │   ├── verification/            # Detailed verification results
-│   └── reports/                 # Summary and analysis reports
+│   ├── reports/                 # Summary and analysis reports
+│   └── rag_data/                # RAG system data storage
 ```
 
 ## Requirements
@@ -125,8 +136,8 @@ cbmc-harness-generator/
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/cbmc-harness-generator.git
-cd cbmc-harness-generator
+git clone https://github.com/utsavnegi/llm-harness-generator.git
+cd llm-harness-generator
 ```
 
 2. Run the setup script
@@ -162,7 +173,7 @@ python main.py -d path/to/your/project
 
 ### Advanced Options
 ```bash
-# Set custom timeout
+# Set custom timeout (in seconds)
 python main.py -f file.c --timeout 7200
 
 # Enable verbose logging
@@ -177,6 +188,15 @@ python main.py -f file.c --sat_solver cadical
 
 # Disable RAG system
 python main.py -f file.c --no-rag
+
+# Process single file with syntax error detection
+python main.py -f file.c --check-syntax
+
+# Process files with specific function focus
+python main.py -f file.c --function my_target_function
+
+# Show all available options
+python main.py --help
 ```
 
 ## Output
@@ -204,6 +224,7 @@ python main.py -f file.c --no-rag
 
 ### Optional Configuration
 - `TOKENIZERS_PARALLELISM`: Set to "false" to avoid warnings
+- `LOG_LEVEL`: Set to "DEBUG", "INFO", "WARNING", "ERROR" to control logging verbosity
 
 ## Performance Optimization
 
@@ -215,6 +236,11 @@ python main.py -f file.c --no-rag
 - Requires active internet connection for LLM APIs
 - Performance depends on LLM response quality
 - Some complex codebases might require manual intervention
+- Large projects with many dependencies may need custom configuration
+- External library dependencies may not be properly accounted for without manual input
+- Memory-intensive operations for large codebases
+- LLM token costs may be significant for extensive code analysis
+- Performance can vary based on the chosen LLM provider
 
 ## License
 
@@ -231,4 +257,4 @@ Contributions are welcome! Please submit pull requests or open issues to help im
 
 ## Support
 
-For issues, please [open a GitHub issue](https://github.com/yourusername/cbmc-harness-generator/issues).
+For issues, please [open a GitHub issue](https://github.com/utsavnegi/llm-harness-generator/issues).

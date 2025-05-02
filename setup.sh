@@ -1,11 +1,11 @@
 #!/bin/bash
-# Setup script for CBMC Harness Generator
+# Setup script for LLM-powered CBMC Harness Generator
 # Cross-platform compatible for Linux, macOS, and Windows (Git Bash/WSL)
 
 # Exit on any error
 set -e
 
-echo "Setting up CBMC Harness Generator..."
+echo "Setting up LLM-powered CBMC Harness Generator..."
 
 # Detect operating system
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -237,7 +237,7 @@ python main.py \"\$@\"" > run.sh
 fi
 
 echo
-echo "Setup complete! You can now run the CBMC Harness Generator using these options:"
+echo "Setup complete! You can now run the LLM-powered CBMC Harness Generator using these options:"
 echo
 
 if [[ "$OS_TYPE" == "Windows" && ! "$OSTYPE" == "cygwin" && ! -n "$WSL_DISTRO_NAME" ]]; then
@@ -269,4 +269,7 @@ fi
 
 echo
 echo "Ensure the appropriate API key is set for the LLM you want to use."
-echo "Check the documentation at https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview"
+echo "For more information on API configuration, see the README.md file."
+echo "For best results with Claude models, check the documentation at https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview"
+echo "For OpenAI models, check https://platform.openai.com/docs"
+echo "For Google Gemini models, check https://ai.google.dev/docs"
